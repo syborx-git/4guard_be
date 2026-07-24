@@ -106,4 +106,18 @@ public class BranchController {
         deleteBranchUseCase.deleteBranch(id);
         return ResponseEntity.ok(ApiResponse.ok("Sucursal eliminada con éxito"));
     }
+
+    @GetMapping("/{id}/audit")
+    @PreAuthorize("hasAuthority('BRANCHES_READ') or hasRole('OPERATIONS_MANAGER')")
+    @Operation(summary = "Obtener historial de auditoría de sucursal", description = "Recupera la bitácora de cambios para una sucursal específica por su UUID.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Historial de auditoría recuperado con éxito"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "No autorizado"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Permisos insuficientes"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Sucursal no encontrada")
+    })
+    public ResponseEntity<ApiResponse<List<com.fourguard.wms.application.dto.response.audit.BranchAuditResponse>>> getBranchAuditLogs(@PathVariable UUID id) {
+        List<com.fourguard.wms.application.dto.response.audit.BranchAuditResponse> response = getBranchUseCase.getBranchAuditLogs(id);
+        return ResponseEntity.ok(ApiResponse.ok("Historial de auditoría recuperado con éxito", response));
+    }
 }
