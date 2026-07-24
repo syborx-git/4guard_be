@@ -6,7 +6,6 @@ import com.fourguard.wms.application.dto.response.BranchResponse;
 import com.fourguard.wms.application.dto.response.audit.BranchAuditResponse;
 import com.fourguard.wms.application.mapper.BranchMapper;
 import com.fourguard.wms.domain.enums.BranchStatus;
-import com.fourguard.wms.domain.exception.EntityNotFoundException;
 import com.fourguard.wms.domain.exception.ValidationException;
 import com.fourguard.wms.domain.ports.out.AuditLogRepositoryPort;
 import com.fourguard.wms.domain.ports.out.BranchRepositoryPort;
