@@ -13,6 +13,7 @@ import com.fourguard.wms.infrastructure.security.jwt.JwtService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
@@ -27,6 +28,7 @@ public class RefreshTokenUseCaseImpl implements RefreshTokenUseCase {
     private final UserMapper userMapper;
 
     @Override
+    @Transactional(readOnly = true)
     public AuthResponse refresh(RefreshTokenRequest request) {
         String refreshToken = request.getRefreshToken();
         
