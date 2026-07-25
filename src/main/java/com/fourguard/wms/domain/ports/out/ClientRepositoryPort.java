@@ -13,4 +13,6 @@ public interface ClientRepositoryPort {
     ClientEntity           save(ClientEntity client);
     void                   deleteById(UUID id);
     List<ClientEntity>     findAll();
+    boolean                existsByOrganizationIdAndTaxId(UUID organizationId, String taxId);
+    boolean                existsByOrganizationIdAndTaxIdAndIdNot(UUID organizationId, String taxId, UUID id);
 }

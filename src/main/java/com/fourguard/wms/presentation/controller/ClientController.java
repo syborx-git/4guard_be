@@ -100,4 +100,18 @@ public class ClientController {
         clientUseCase.deleteClient(id);
         return ResponseEntity.ok(ApiResponse.ok("Cliente eliminado con éxito"));
     }
+
+    @GetMapping("/{id}/audit")
+    @PreAuthorize("hasAuthority('CLIENTS_READ') or hasRole('OPERATIONS_MANAGER')")
+    @Operation(summary = "Obtener historial de auditoría de cliente", description = "Recupera la bitácora de cambios para un cliente específico por su UUID.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Historial de auditoría recuperado con éxito"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "No autorizado"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Permisos insuficientes"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Cliente no encontrado")
+    })
+    public ResponseEntity<ApiResponse<List<com.fourguard.wms.application.dto.response.audit.ClientAuditResponse>>> getClientAuditLogs(@PathVariable UUID id) {
+        List<com.fourguard.wms.application.dto.response.audit.ClientAuditResponse> response = clientUseCase.getClientAuditLogs(id);
+        return ResponseEntity.ok(ApiResponse.ok("Historial de auditoría recuperado con éxito", response));
+    }
 }

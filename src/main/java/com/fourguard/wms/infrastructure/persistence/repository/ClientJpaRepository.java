@@ -13,4 +13,6 @@ public interface ClientJpaRepository extends JpaRepository<ClientEntity, UUID> {
     List<ClientEntity> findByOrganizationId(UUID organizationId);
     Optional<ClientEntity> findByOrganizationIdAndExternalId(UUID organizationId, String externalId);
     boolean existsByOrganizationIdAndName(UUID organizationId, String name);
+    boolean existsByOrganizationIdAndTaxIdIgnoreCase(UUID organizationId, String taxId);
+    boolean existsByOrganizationIdAndTaxIdIgnoreCaseAndIdNot(UUID organizationId, String taxId, UUID id);
 }
