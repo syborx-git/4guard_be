@@ -15,6 +15,7 @@ public class Client {
     private Organization organization;
     private String name;
     private String externalId;
+    private String taxId;
     private String status;
     private Long version;
     private OffsetDateTime createdAt;

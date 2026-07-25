@@ -15,6 +15,7 @@ public class ClientResponse {
     private final String organizationName;
     private final String name;
     private final String externalId;
+    private final String taxId;
     private final String status;
     private final Long version;
     private final OffsetDateTime createdAt;
