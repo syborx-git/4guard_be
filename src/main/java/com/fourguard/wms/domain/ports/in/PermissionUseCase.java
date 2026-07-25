@@ -2,6 +2,7 @@ package com.fourguard.wms.domain.ports.in;
 
 import com.fourguard.wms.application.dto.request.CreatePermissionRequest;
 import com.fourguard.wms.application.dto.response.PermissionResponse;
+import com.fourguard.wms.application.dto.response.audit.PermissionAuditResponse;
 
 import java.util.List;
 import java.util.UUID;
@@ -23,6 +24,9 @@ public interface PermissionUseCase {
 
     /** Lista todos los permisos disponibles en el sistema. */
     List<PermissionResponse> getAllPermissions();
+
+    /** Obtiene el historial de auditoría de un permiso por su UUID. */
+    List<PermissionAuditResponse> getPermissionAuditLogs(UUID id);
 
     /**
      * Elimina un permiso del catálogo.

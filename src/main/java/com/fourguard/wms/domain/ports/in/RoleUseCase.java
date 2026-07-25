@@ -3,6 +3,7 @@ package com.fourguard.wms.domain.ports.in;
 import com.fourguard.wms.application.dto.request.CreateRoleRequest;
 import com.fourguard.wms.application.dto.request.UpdateRoleRequest;
 import com.fourguard.wms.application.dto.response.RoleResponse;
+import com.fourguard.wms.application.dto.response.audit.RoleAuditResponse;
 
 import java.util.List;
 import java.util.Set;
@@ -27,6 +28,9 @@ public interface RoleUseCase {
 
     /** Lista todos los roles del sistema. */
     List<RoleResponse> getAllRoles();
+
+    /** Obtiene el historial de auditoría de un rol por su UUID. */
+    List<RoleAuditResponse> getRoleAuditLogs(UUID id);
 
     /**
      * Elimina un rol. Lanza {@code ValidationException} si el rol
