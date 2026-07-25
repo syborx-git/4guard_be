@@ -20,4 +20,14 @@ public class ClientPersistenceAdapter implements ClientRepositoryPort {
     @Override public ClientEntity           save(ClientEntity c)             { return repository.save(c); }
     @Override public void                   deleteById(UUID id)              { repository.deleteById(id); }
     @Override public List<ClientEntity>     findAll()                        { return repository.findAll(); }
+
+    @Override
+    public boolean existsByOrganizationIdAndTaxId(UUID organizationId, String taxId) {
+        return repository.existsByOrganizationIdAndTaxIdIgnoreCase(organizationId, taxId);
+    }
+
+    @Override
+    public boolean existsByOrganizationIdAndTaxIdAndIdNot(UUID organizationId, String taxId, UUID id) {
+        return repository.existsByOrganizationIdAndTaxIdIgnoreCaseAndIdNot(organizationId, taxId, id);
+    }
 }

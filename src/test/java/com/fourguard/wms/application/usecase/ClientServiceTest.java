@@ -5,7 +5,7 @@ import com.fourguard.wms.application.dto.request.UpdateClientRequest;
 import com.fourguard.wms.application.dto.response.ClientResponse;
 import com.fourguard.wms.application.dto.response.audit.ClientAuditResponse;
 import com.fourguard.wms.application.mapper.ClientMapper;
-import com.fourguard.wms.domain.exception.EntityNotFoundException;
+import com.fourguard.wms.domain.exception.ValidationException;
 import com.fourguard.wms.domain.ports.out.AuditLogRepositoryPort;
 import com.fourguard.wms.domain.ports.out.ClientRepositoryPort;
 import com.fourguard.wms.domain.ports.out.OrganizationRepositoryPort;
@@ -75,6 +75,7 @@ class ClientServiceTest {
                 .organization(orgEntity)
                 .name("Cliente Logística SA")
                 .externalId("CLI-001")
+                .taxId("NES800101XYZ")
                 .status("ACTIVE")
                 .build();
 
@@ -82,6 +83,7 @@ class ClientServiceTest {
                 .id(clientId)
                 .name("Cliente Logística SA")
                 .externalId("CLI-001")
+                .taxId("NES800101XYZ")
                 .status("ACTIVE")
                 .build();
 
@@ -89,6 +91,7 @@ class ClientServiceTest {
                 .organizationId(orgId)
                 .name("Cliente Logística SA")
                 .externalId("CLI-001")
+                .taxId("NES800101XYZ")
                 .build();
 
         updateRequest = UpdateClientRequest.builder()
@@ -96,6 +99,7 @@ class ClientServiceTest {
                 .organizationId(orgId)
                 .name("Cliente Logística SA Actualizado")
                 .externalId("CLI-001")
+                .taxId("NES800101XYZ")
                 .status("ACTIVE")
                 .build();
     }
@@ -103,6 +107,7 @@ class ClientServiceTest {
     @Test
     void whenCreateClient_withValidData_thenSuccess() {
         when(organizationRepositoryPort.findById(orgId)).thenReturn(Optional.of(orgEntity));
+        when(clientRepositoryPort.existsByOrganizationIdAndTaxId(orgId, "NES800101XYZ")).thenReturn(false);
         when(clientMapper.toEntity(createRequest)).thenReturn(clientEntity);
         when(securityAuditHelper.getCurrentUsername()).thenReturn("admin");
         when(clientRepositoryPort.save(any(ClientEntity.class))).thenReturn(clientEntity);
@@ -116,9 +121,40 @@ class ClientServiceTest {
     }
 
     @Test
+    void whenCreateClient_withDuplicateSpecificTaxId_thenThrowValidationException() {
+        when(organizationRepositoryPort.findById(orgId)).thenReturn(Optional.of(orgEntity));
+        when(clientRepositoryPort.existsByOrganizationIdAndTaxId(orgId, "NES800101XYZ")).thenReturn(true);
+
+        assertThrows(ValidationException.class, () -> clientService.createClient(createRequest));
+        verify(clientRepositoryPort, never()).save(any());
+    }
+
+    @Test
+    void whenCreateClient_withGenericTaxId_thenSuccessEvenIfDuplicate() {
+        CreateClientRequest genericRequest = CreateClientRequest.builder()
+                .organizationId(orgId)
+                .name("Cliente Público General")
+                .taxId("XAXX010101000")
+                .build();
+
+        when(organizationRepositoryPort.findById(orgId)).thenReturn(Optional.of(orgEntity));
+        when(clientMapper.toEntity(genericRequest)).thenReturn(clientEntity);
+        when(securityAuditHelper.getCurrentUsername()).thenReturn("admin");
+        when(clientRepositoryPort.save(any(ClientEntity.class))).thenReturn(clientEntity);
+        when(clientMapper.toResponse(clientEntity)).thenReturn(clientResponse);
+
+        ClientResponse response = clientService.createClient(genericRequest);
+
+        assertNotNull(response);
+        verify(clientRepositoryPort, never()).existsByOrganizationIdAndTaxId(any(), any());
+        verify(clientRepositoryPort, times(1)).save(any(ClientEntity.class));
+    }
+
+    @Test
     void whenUpdateClient_withValidData_thenSuccess() {
         when(clientRepositoryPort.findById(clientId)).thenReturn(Optional.of(clientEntity));
         when(organizationRepositoryPort.findById(orgId)).thenReturn(Optional.of(orgEntity));
+        when(clientRepositoryPort.existsByOrganizationIdAndTaxIdAndIdNot(orgId, "NES800101XYZ", clientId)).thenReturn(false);
         when(securityAuditHelper.getCurrentUsername()).thenReturn("admin");
         when(clientRepositoryPort.save(any(ClientEntity.class))).thenReturn(clientEntity);
         when(clientMapper.toResponse(clientEntity)).thenReturn(clientResponse);

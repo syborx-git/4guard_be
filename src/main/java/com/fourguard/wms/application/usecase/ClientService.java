@@ -6,6 +6,7 @@ import com.fourguard.wms.application.dto.response.ClientResponse;
 import com.fourguard.wms.application.dto.response.audit.ClientAuditResponse;
 import com.fourguard.wms.application.mapper.ClientMapper;
 import com.fourguard.wms.domain.exception.EntityNotFoundException;
+import com.fourguard.wms.domain.exception.ValidationException;
 import com.fourguard.wms.domain.ports.in.ClientUseCase;
 import com.fourguard.wms.domain.ports.out.AuditLogRepositoryPort;
 import com.fourguard.wms.domain.ports.out.ClientRepositoryPort;
@@ -25,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -32,6 +34,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 public class ClientService implements ClientUseCase {
+
+    private static final Set<String> GENERIC_RFCS = Set.of("XAXX010101000", "XEXX010101000");
 
     private final ClientRepositoryPort clientRepositoryPort;
     private final OrganizationRepositoryPort organizationRepositoryPort;
@@ -47,6 +51,8 @@ public class ClientService implements ClientUseCase {
         log.info("Creating client: {} under organization: {}", request.getName(), request.getOrganizationId());
         OrganizationEntity organization = organizationRepositoryPort.findById(request.getOrganizationId())
                 .orElseThrow(() -> new EntityNotFoundException("Organización no encontrada con ID: " + request.getOrganizationId()));
+
+        validateTaxIdUniqueness(request.getOrganizationId(), request.getTaxId(), null);
 
         ClientEntity entity = clientMapper.toEntity(request);
         entity.setOrganization(organization);
@@ -70,6 +76,8 @@ public class ClientService implements ClientUseCase {
 
         OrganizationEntity organization = organizationRepositoryPort.findById(request.getOrganizationId())
                 .orElseThrow(() -> new EntityNotFoundException("Organización no encontrada con ID: " + request.getOrganizationId()));
+
+        validateTaxIdUniqueness(request.getOrganizationId(), request.getTaxId(), request.getId());
 
         Map<String, Object> beforeState = buildAuditState(existing);
 
@@ -166,13 +174,33 @@ public class ClientService implements ClientUseCase {
         logAuditChange(currentUser, "CLIENT_DELETED", id, beforeState, null);
     }
 
-    // ── Audit Helpers ─────────────────────────────────────────────────────────
+    // ── Audit Helpers & Business Validations ─────────────────────────────────
+
+    private void validateTaxIdUniqueness(UUID organizationId, String taxId, UUID currentClientId) {
+        if (taxId == null || taxId.isBlank()) {
+            return;
+        }
+        String normalizedTaxId = taxId.trim().toUpperCase();
+        if (GENERIC_RFCS.contains(normalizedTaxId)) {
+            return; // RFC genérico (XAXX010101000 / XEXX010101000) permitido múltiples veces por organización
+        }
+        boolean exists;
+        if (currentClientId == null) {
+            exists = clientRepositoryPort.existsByOrganizationIdAndTaxId(organizationId, normalizedTaxId);
+        } else {
+            exists = clientRepositoryPort.existsByOrganizationIdAndTaxIdAndIdNot(organizationId, normalizedTaxId, currentClientId);
+        }
+        if (exists) {
+            throw new ValidationException("El RFC / Tax ID '" + normalizedTaxId + "' ya se encuentra registrado para otro cliente en esta organización.");
+        }
+    }
 
     private Map<String, Object> buildAuditState(ClientEntity entity) {
         if (entity == null) return null;
         Map<String, Object> state = new HashMap<>();
         state.put("name", entity.getName());
         state.put("externalId", entity.getExternalId());
+        state.put("taxId", entity.getTaxId());
         state.put("status", entity.getStatus());
         if (entity.getOrganization() != null) {
             state.put("organizationId", entity.getOrganization().getId());

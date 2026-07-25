@@ -34,6 +34,10 @@ public class UpdateClientRequest {
     @Schema(description = "Identificador externo del cliente (ERP, SAP, etc.)", example = "NESTLE-TEST-001")
     String externalId;
 
+    @Size(max = 30, message = "El RFC / Tax ID no puede superar 30 caracteres")
+    @Schema(description = "RFC o Tax ID del cliente (ej. XAXX010101000 para RFC genérico)", example = "XAXX010101000")
+    String taxId;
+
     @Schema(description = "Estado del cliente. Si no se envía se respeta el valor actual en BD", example = "ACTIVE")
     String status;
 
