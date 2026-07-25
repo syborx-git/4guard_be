@@ -171,4 +171,23 @@ public class RoleController {
         RoleResponse response = roleUseCase.assignPermissions(id, permissionIds);
         return ResponseEntity.ok(ApiResponse.ok("Permisos asignados con éxito", response));
     }
+
+    @GetMapping("/{id}/audit")
+    @PreAuthorize("hasAuthority('ROLES_READ')")
+    @Operation(
+        summary     = "Obtener historial de auditoría de rol",
+        description = "Recupera la bitácora de cambios y asignaciones de permisos para un rol específico por su UUID."
+    )
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Historial de auditoría recuperado con éxito"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "No autorizado"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Permisos insuficientes"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Rol no encontrado")
+    })
+    public ResponseEntity<ApiResponse<List<com.fourguard.wms.application.dto.response.audit.RoleAuditResponse>>> getRoleAuditLogs(
+            @Parameter(description = "UUID del rol", required = true)
+            @PathVariable UUID id) {
+        List<com.fourguard.wms.application.dto.response.audit.RoleAuditResponse> response = roleUseCase.getRoleAuditLogs(id);
+        return ResponseEntity.ok(ApiResponse.ok("Historial de auditoría recuperado con éxito", response));
+    }
 }
