@@ -39,4 +39,12 @@ public class ProductSkuEntity extends BaseVersionedEntity {
 
     @Column(nullable = false, length = 20)
     private String unit;
+
+    @Column(length = 20)
+    @Builder.Default
+    private String status = "ACTIVE";
+
+    @Column(name = "is_deleted")
+    @Builder.Default
+    private Boolean isDeleted = false;
 }

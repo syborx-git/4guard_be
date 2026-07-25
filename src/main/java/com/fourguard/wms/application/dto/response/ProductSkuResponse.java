@@ -19,6 +19,8 @@ public class ProductSkuResponse {
     private final String description;
     private final BigDecimal weight;
     private final String unit;
+    private final String status;
+    private final Boolean isDeleted;
     private final Long version;
     private final OffsetDateTime createdAt;
     private final OffsetDateTime updatedAt;

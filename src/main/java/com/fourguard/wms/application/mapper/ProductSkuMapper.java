@@ -18,6 +18,16 @@ public interface ProductSkuMapper {
     @Mapping(target = "version", ignore = true)
     ProductSkuEntity toEntity(CreateProductSkuRequest request);
 
+    @AfterMapping
+    default void applyDefaultsOnCreate(CreateProductSkuRequest request, @MappingTarget ProductSkuEntity entity) {
+        if (entity.getStatus() == null || entity.getStatus().isBlank()) {
+            entity.setStatus("ACTIVE");
+        }
+        if (entity.getIsDeleted() == null) {
+            entity.setIsDeleted(false);
+        }
+    }
+
     @Mapping(source = "client.id", target = "clientId")
     @Mapping(source = "client.name", target = "clientName")
     ProductSkuResponse toResponse(ProductSkuEntity entity);

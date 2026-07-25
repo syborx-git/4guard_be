@@ -19,6 +19,8 @@ public class ProductSku {
     private String description;
     private BigDecimal weight;
     private String unit;
+    private String status;
+    private Boolean isDeleted;
     private Long version;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;

@@ -87,6 +87,37 @@ public class ProductSkuController {
         return ResponseEntity.ok(ApiResponse.ok("Lista de SKUs recuperada con éxito", response));
     }
 
+    @PatchMapping("/{id}/status")
+    @PreAuthorize("hasAuthority('INVENTORY_UPDATE') or hasRole('OPERATIONS_MANAGER')")
+    @Operation(summary = "Cambiar estatus de SKU", description = "Actualiza el estatus de un SKU entre ACTIVE e INACTIVE por su ID.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Estatus de SKU actualizado con éxito"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Estatus no válido"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "No autorizado"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Permisos insuficientes"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "SKU no encontrado")
+    })
+    public ResponseEntity<ApiResponse<ProductSkuResponse>> updateProductSkuStatus(
+            @PathVariable UUID id,
+            @RequestParam String status) {
+        ProductSkuResponse response = productSkuUseCase.updateProductSkuStatus(id, status);
+        return ResponseEntity.ok(ApiResponse.ok("Estatus de SKU actualizado con éxito", response));
+    }
+
+    @PatchMapping("/{id}/soft-delete")
+    @PreAuthorize("hasAuthority('INVENTORY_DELETE') or hasRole('OPERATIONS_MANAGER')")
+    @Operation(summary = "Borrado lógico de SKU", description = "Marca un SKU como eliminado lógicamente (isDeleted = true) y desactiva su estatus.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "SKU eliminado lógicamente con éxito"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "No autorizado"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Permisos insuficientes"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "SKU no encontrado")
+    })
+    public ResponseEntity<ApiResponse<Void>> softDeleteProductSku(@PathVariable UUID id) {
+        productSkuUseCase.softDeleteProductSku(id);
+        return ResponseEntity.ok(ApiResponse.ok("SKU eliminado lógicamente con éxito"));
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('INVENTORY_DELETE') or hasRole('OPERATIONS_MANAGER')")
     @Operation(summary = "Eliminar SKU", description = "Elimina físicamente un SKU del catálogo por su ID.")
@@ -99,5 +130,19 @@ public class ProductSkuController {
     public ResponseEntity<ApiResponse<Void>> deleteProductSku(@PathVariable UUID id) {
         productSkuUseCase.deleteProductSku(id);
         return ResponseEntity.ok(ApiResponse.ok("SKU eliminado con éxito"));
+    }
+
+    @GetMapping("/{id}/audit")
+    @PreAuthorize("hasAuthority('INVENTORY_READ') or hasRole('OPERATIONS_MANAGER')")
+    @Operation(summary = "Obtener historial de auditoría de producto/SKU", description = "Recupera la bitácora de cambios para un producto/SKU específico por su UUID.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Historial de auditoría recuperado con éxito"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "No autorizado"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Permisos insuficientes"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "SKU no encontrado")
+    })
+    public ResponseEntity<ApiResponse<List<com.fourguard.wms.application.dto.response.audit.ProductSkuAuditResponse>>> getProductSkuAuditLogs(@PathVariable UUID id) {
+        List<com.fourguard.wms.application.dto.response.audit.ProductSkuAuditResponse> response = productSkuUseCase.getProductSkuAuditLogs(id);
+        return ResponseEntity.ok(ApiResponse.ok("Historial de auditoría recuperado con éxito", response));
     }
 }
