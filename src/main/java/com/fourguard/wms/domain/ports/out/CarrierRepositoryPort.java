@@ -13,4 +13,8 @@ public interface CarrierRepositoryPort {
     CarrierEntity           save(CarrierEntity carrier);
     void                   deleteById(UUID id);
     List<CarrierEntity>     findAll();
+    boolean                 existsByTaxId(String taxId);
+    boolean                 existsByTaxIdAndIdNot(String taxId, UUID excludeId);
+    boolean                 existsByOrganizationIdAndTaxId(UUID organizationId, String taxId);
+    boolean                 existsByOrganizationIdAndTaxIdAndIdNot(UUID organizationId, String taxId, UUID excludeId);
 }

@@ -62,6 +62,11 @@ public class CarrierService implements CarrierUseCase {
             throw new ValidationException("Ya existe un transportista registrado con el nombre '" + request.getName() + "' en esta organización.");
         }
 
+        // Validar unicidad de RFC (tax_id)
+        if (request.getTaxId() != null && !request.getTaxId().isBlank()) {
+            validateTaxId(request.getTaxId(), request.getOrganizationId(), null);
+        }
+
         CarrierEntity entity = carrierMapper.toEntity(request);
         entity.setOrganization(organization);
         
@@ -107,6 +112,11 @@ public class CarrierService implements CarrierUseCase {
             if (nameExists) {
                 throw new ValidationException("Ya existe otro transportista registrado con el nombre '" + request.getName() + "' en esta organización.");
             }
+        }
+
+        // Validar unicidad del RFC si es que cambia o se envía
+        if (request.getTaxId() != null && !request.getTaxId().isBlank()) {
+            validateTaxId(request.getTaxId(), request.getOrganizationId(), request.getId());
         }
 
         // Tomar snapshot para la auditoría antes de modificar
@@ -325,5 +335,30 @@ public class CarrierService implements CarrierUseCase {
         }
         state.put("organizationId", entity.getOrganization() != null ? entity.getOrganization().getId().toString() : null);
         return state;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public void validateTaxId(String taxId, UUID organizationId, UUID excludeId) {
+        if (taxId == null || taxId.isBlank()) {
+            throw new ValidationException("El RFC (tax_id) es obligatorio para realizar la validación.");
+        }
+
+        String cleanedTaxId = taxId.trim();
+        boolean exists;
+
+        if (organizationId != null && excludeId != null) {
+            exists = carrierRepositoryPort.existsByOrganizationIdAndTaxIdAndIdNot(organizationId, cleanedTaxId, excludeId);
+        } else if (organizationId != null) {
+            exists = carrierRepositoryPort.existsByOrganizationIdAndTaxId(organizationId, cleanedTaxId);
+        } else if (excludeId != null) {
+            exists = carrierRepositoryPort.existsByTaxIdAndIdNot(cleanedTaxId, excludeId);
+        } else {
+            exists = carrierRepositoryPort.existsByTaxId(cleanedTaxId);
+        }
+
+        if (exists) {
+            throw new ValidationException("El RFC '" + cleanedTaxId + "' ya existe para otro transportista.");
+        }
     }
 }

@@ -20,4 +20,24 @@ public class CarrierPersistenceAdapter implements CarrierRepositoryPort {
     @Override public CarrierEntity           save(CarrierEntity c)             { return repository.save(c); }
     @Override public void                   deleteById(UUID id)              { repository.deleteById(id); }
     @Override public List<CarrierEntity>     findAll()                        { return repository.findAll(); }
+
+    @Override
+    public boolean existsByTaxId(String taxId) {
+        return repository.existsByTaxIdIgnoreCase(taxId);
+    }
+
+    @Override
+    public boolean existsByTaxIdAndIdNot(String taxId, UUID excludeId) {
+        return repository.existsByTaxIdIgnoreCaseAndIdNot(taxId, excludeId);
+    }
+
+    @Override
+    public boolean existsByOrganizationIdAndTaxId(UUID organizationId, String taxId) {
+        return repository.existsByOrganizationIdAndTaxIdIgnoreCase(organizationId, taxId);
+    }
+
+    @Override
+    public boolean existsByOrganizationIdAndTaxIdAndIdNot(UUID organizationId, String taxId, UUID excludeId) {
+        return repository.existsByOrganizationIdAndTaxIdIgnoreCaseAndIdNot(organizationId, taxId, excludeId);
+    }
 }
