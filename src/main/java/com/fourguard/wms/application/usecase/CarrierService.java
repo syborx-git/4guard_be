@@ -54,17 +54,15 @@ public class CarrierService implements CarrierUseCase {
         OrganizationEntity organization = organizationRepositoryPort.findById(request.getOrganizationId())
                 .orElseThrow(() -> new EntityNotFoundException("Organización no encontrada con ID: " + request.getOrganizationId()));
 
-        // Validar unicidad de nombre en la misma organización
+        // 1. Validar unicidad de RFC (tax_id) obligatoriamente
+        validateTaxId(request.getTaxId(), request.getOrganizationId(), null);
+
+        // 2. Validar unicidad de nombre en la misma organización
         List<CarrierEntity> existingCarriers = carrierRepositoryPort.findByOrganizationId(request.getOrganizationId());
         boolean nameExists = existingCarriers.stream()
                 .anyMatch(c -> c.getName().equalsIgnoreCase(request.getName()));
         if (nameExists) {
             throw new ValidationException("Ya existe un transportista registrado con el nombre '" + request.getName() + "' en esta organización.");
-        }
-
-        // Validar unicidad de RFC (tax_id)
-        if (request.getTaxId() != null && !request.getTaxId().isBlank()) {
-            validateTaxId(request.getTaxId(), request.getOrganizationId(), null);
         }
 
         CarrierEntity entity = carrierMapper.toEntity(request);
