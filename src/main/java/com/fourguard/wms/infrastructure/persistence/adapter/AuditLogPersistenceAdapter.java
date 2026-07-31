@@ -4,9 +4,12 @@ import com.fourguard.wms.domain.ports.out.AuditLogRepositoryPort;
 import com.fourguard.wms.infrastructure.persistence.entity.AuditLogEntity;
 import com.fourguard.wms.infrastructure.persistence.repository.AuditLogJpaRepository;
 import lombok.RequiredArgsConstructor;
+import jakarta.persistence.criteria.Predicate;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
 
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -45,7 +48,30 @@ public class AuditLogPersistenceAdapter implements AuditLogRepositoryPort {
 
     @Override
     public List<AuditLogEntity> findUserActivity(UUID userId, String action, OffsetDateTime fromDate, OffsetDateTime toDate) {
-        return repository.findUserActivity(userId, action, fromDate, toDate);
+        Specification<AuditLogEntity> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+
+            if (userId != null) {
+                predicates.add(cb.equal(root.get("userId"), userId));
+            }
+            if (action != null && !action.isBlank()) {
+                predicates.add(cb.equal(cb.lower(root.get("action")), action.trim().toLowerCase()));
+            }
+            if (fromDate != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("createdAt"), fromDate));
+            }
+            if (toDate != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("createdAt"), toDate));
+            }
+
+            if (query != null) {
+                query.orderBy(cb.desc(root.get("createdAt")));
+            }
+
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+
+        return repository.findAll(spec);
     }
 }
 
