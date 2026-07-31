@@ -15,5 +15,7 @@ public interface AuditLogRepositoryPort {
     List<AuditLogEntity> findByUserId(UUID userId);
     List<AuditLogEntity> findByActionAndCreatedAtAfter(String action, OffsetDateTime since);
     Optional<AuditLogEntity> findLastLogoutForUserAfter(UUID userId, OffsetDateTime timestamp);
+    List<AuditLogEntity> findUserActivity(UUID userId, String action, OffsetDateTime fromDate, OffsetDateTime toDate);
 }
+
 
