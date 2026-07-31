@@ -42,5 +42,11 @@ public class AuditLogPersistenceAdapter implements AuditLogRepositoryPort {
     public Optional<AuditLogEntity> findLastLogoutForUserAfter(UUID userId, OffsetDateTime timestamp) {
         return repository.findLastLogoutForUserAfter(userId, timestamp);
     }
+
+    @Override
+    public List<AuditLogEntity> findUserActivity(UUID userId, String action, OffsetDateTime fromDate, OffsetDateTime toDate) {
+        return repository.findUserActivity(userId, action, fromDate, toDate);
+    }
 }
+
 
