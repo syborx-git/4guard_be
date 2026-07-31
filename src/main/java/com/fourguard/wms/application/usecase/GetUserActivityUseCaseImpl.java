@@ -59,7 +59,8 @@ public class GetUserActivityUseCaseImpl implements GetUserActivityUseCase {
         }
 
         // 2. Fetch logs from repository
-        List<AuditLogEntity> logs = auditLogRepositoryPort.findUserActivity(userId, action, fromDate, toDate);
+        String searchAction = (action != null && !action.isBlank()) ? action.trim().toLowerCase() : null;
+        List<AuditLogEntity> logs = auditLogRepositoryPort.findUserActivity(userId, searchAction, fromDate, toDate);
 
         if (logs.isEmpty()) {
             return Collections.emptyList();

@@ -30,7 +30,7 @@ public interface AuditLogJpaRepository extends JpaRepository<AuditLogEntity, UUI
 
     @Query("SELECT a FROM AuditLogEntity a WHERE " +
            "(:userId IS NULL OR a.userId = :userId) AND " +
-           "(:action IS NULL OR LOWER(a.action) = LOWER(:action)) AND " +
+           "(:action IS NULL OR LOWER(a.action) = :action) AND " +
            "(:fromDate IS NULL OR a.createdAt >= :fromDate) AND " +
            "(:toDate IS NULL OR a.createdAt <= :toDate) " +
            "ORDER BY a.createdAt DESC")

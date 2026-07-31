@@ -77,7 +77,7 @@ class GetUserActivityUseCaseImplTest {
                 ))
                 .build();
 
-        when(auditLogRepositoryPort.findUserActivity(targetUserId, "LOGIN", null, null))
+        when(auditLogRepositoryPort.findUserActivity(targetUserId, "login", null, null))
                 .thenReturn(List.of(logEntity));
 
         UserEntity targetUser = UserEntity.builder()
