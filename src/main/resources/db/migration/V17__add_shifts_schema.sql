@@ -234,7 +234,7 @@ ON CONFLICT DO NOTHING;
 -- 6. Seed User Shift Allocations for Test Users (enrique, Chris4G, Romel4G)
 INSERT INTO wms.user_shifts (id, user_id, shift_id, effective_start_date, created_by)
 VALUES
-    ('u13f0907-9fa5-4bdf-87db-2eb5e7683901', 'f33f0907-9fa5-4bdf-87db-2eb5e7683937', 'f13f0907-9fa5-4bdf-87db-2eb5e7683951', '2026-01-01', 'enrique'),
-    ('u13f0907-9fa5-4bdf-87db-2eb5e7683902', 'afe4de7c-d10e-44b9-8970-46a0fda50626', 'f13f0907-9fa5-4bdf-87db-2eb5e7683952', '2026-01-01', 'enrique'),
-    ('u13f0907-9fa5-4bdf-87db-2eb5e7683903', 'fb31fe4c-bc27-4b1c-8846-7288812f84bf', 'f13f0907-9fa5-4bdf-87db-2eb5e7683953', '2026-01-01', 'enrique')
+    ('a13f0907-9fa5-4bdf-87db-2eb5e7683901', 'f33f0907-9fa5-4bdf-87db-2eb5e7683937', 'f13f0907-9fa5-4bdf-87db-2eb5e7683951', '2026-01-01', 'enrique'),
+    ('a13f0907-9fa5-4bdf-87db-2eb5e7683902', 'afe4de7c-d10e-44b9-8970-46a0fda50626', 'f13f0907-9fa5-4bdf-87db-2eb5e7683952', '2026-01-01', 'enrique'),
+    ('a13f0907-9fa5-4bdf-87db-2eb5e7683903', 'fb31fe4c-bc27-4b1c-8846-7288812f84bf', 'f13f0907-9fa5-4bdf-87db-2eb5e7683953', '2026-01-01', 'enrique')
 ON CONFLICT DO NOTHING;
