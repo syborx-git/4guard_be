@@ -27,6 +27,15 @@ public class JwtService {
         return extractClaim(token, Claims::getSubject);
     }
 
+    public Date extractIssuedAt(String token) {
+        return extractClaim(token, Claims::getIssuedAt);
+    }
+
+    public java.util.UUID extractUserId(String token) {
+        String userIdStr = extractClaim(token, claims -> claims.get(SecurityConstants.CLAIM_USER_ID, String.class));
+        return userIdStr != null ? java.util.UUID.fromString(userIdStr) : null;
+    }
+
     public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
         final Claims claims = extractAllClaims(token);
         return claimsResolver.apply(claims);
