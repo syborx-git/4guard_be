@@ -26,7 +26,7 @@ public interface AuditLogJpaRepository extends JpaRepository<AuditLogEntity, UUI
 
     List<AuditLogEntity> findByActionAndCreatedAtAfter(String action, OffsetDateTime since);
 
-    @Query("SELECT a FROM AuditLogEntity a WHERE a.userId = :userId AND a.action = 'LOGOUT' AND a.createdAt > :timestamp ORDER BY a.createdAt DESC")
+    @Query("SELECT a FROM AuditLogEntity a WHERE a.userId = :userId AND a.action IN ('LOGOUT', 'REVOKE_SESSION') AND a.createdAt > :timestamp ORDER BY a.createdAt DESC")
     Optional<AuditLogEntity> findLastLogoutForUserAfter(@Param("userId") UUID userId, @Param("timestamp") OffsetDateTime timestamp);
 }
 

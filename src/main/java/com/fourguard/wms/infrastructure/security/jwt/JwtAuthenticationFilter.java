@@ -21,6 +21,8 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 
+import com.fourguard.wms.domain.ports.out.TokenBlacklistPort;
+
 /**
  * Filter that intercepts HTTP requests, extracts Bearer JWT from headers,
  * validates it, and sets the SecurityContext if valid.
@@ -32,6 +34,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final UserDetailsService userDetailsService;
+    private final TokenBlacklistPort tokenBlacklistPort;
     private final AntPathMatcher antPathMatcher = new AntPathMatcher();
 
     // List of paths that should not be filtered by this JWT filter
@@ -75,6 +78,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             jwt = authHeader.substring(SecurityConstants.BEARER_PREFIX.length());
             username = jwtService.extractUsername(jwt);
+            java.util.UUID userId = jwtService.extractUserId(jwt);
+            java.util.Date issuedAt = jwtService.extractIssuedAt(jwt);
+
+            if (userId != null && tokenBlacklistPort.isUserRevoked(userId, issuedAt)) {
+                log.warn("[Security] Request rejected for revoked user session: {}", username);
+                filterChain.doFilter(request, response);
+                return;
+            }
 
             if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                 UserDetails userDetails = this.userDetailsService.loadUserByUsername(username);
