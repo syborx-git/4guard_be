@@ -37,13 +37,17 @@ public class ShiftPersistenceAdapter implements ShiftRepositoryPort {
 
     @Override
     public List<ShiftEntity> findAll(ShiftFilterRequest filter) {
+        String searchPattern = (filter.getSearch() != null && !filter.getSearch().isBlank())
+                ? "%" + filter.getSearch().trim().toLowerCase() + "%"
+                : null;
+
         return repository.findWithFilters(
                 filter.getBranchId(),
                 filter.getWarehouseSectionId(),
                 filter.getStatus(),
                 filter.getScopeType(),
                 filter.getDayOfWeek(),
-                filter.getSearch()
+                searchPattern
         );
     }
 

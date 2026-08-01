@@ -49,12 +49,12 @@ public interface ShiftJpaRepository extends JpaRepository<ShiftEntity, UUID> {
     @Query("""
         SELECT DISTINCT s FROM ShiftEntity s LEFT JOIN s.operatingDays d
         WHERE s.isDeleted = false
-          AND (:branchId IS NULL OR s.branch.id = :branchId)
-          AND (:sectionId IS NULL OR s.warehouseSection.id = :sectionId)
+          AND (CAST(:branchId AS string) IS NULL OR s.branch.id = :branchId)
+          AND (CAST(:sectionId AS string) IS NULL OR s.warehouseSection.id = :sectionId)
           AND (:status IS NULL OR s.status = :status)
           AND (:scopeType IS NULL OR s.scopeType = :scopeType)
-          AND (:day IS NULL OR d = :day)
-          AND (:search IS NULL OR LOWER(s.name) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(s.code) LIKE LOWER(CONCAT('%', :search, '%')))
+          AND (CAST(:day AS string) IS NULL OR d = :day)
+          AND (CAST(:search AS string) IS NULL OR LOWER(s.name) LIKE :search OR LOWER(s.code) LIKE :search)
         ORDER BY s.createdAt DESC
     """)
     List<ShiftEntity> findWithFilters(
