@@ -125,9 +125,16 @@ public interface SupplierMapper {
     // CATALOG RESPONSES
     // =========================================================================
 
-    @Mapping(source = "sortOrder", target = "sortOrder")
-    SupplierTypeResponse toTypeResponse(CatSupplierTypeEntity entity);
-
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "organizationId", ignore = true)
+    @Mapping(target = "isBase", ignore = true)
+    @Mapping(target = "decimalPlaces", ignore = true)
+    @Mapping(target = "createdAt", ignore = true)
+    @Mapping(target = "createdBy", ignore = true)
+    @Mapping(target = "updatedAt", ignore = true)
+    @Mapping(target = "updatedBy", ignore = true)
+    @Mapping(source = "label", target = "name")
+    @Mapping(source = "active", target = "status", expression = "java(entity.getActive() != null && entity.getActive() ? com.fourguard.wms.domain.enums.CurrencyStatus.ACTIVE : com.fourguard.wms.domain.enums.CurrencyStatus.INACTIVE)")
     CurrencyResponse toCurrencyResponse(CatCurrencyEntity entity);
 
     // =========================================================================
