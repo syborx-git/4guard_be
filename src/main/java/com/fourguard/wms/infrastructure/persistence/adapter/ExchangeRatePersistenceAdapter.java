@@ -54,7 +54,12 @@ public class ExchangeRatePersistenceAdapter implements ExchangeRateRepositoryPor
 
     @Override
     public List<ExchangeRate> findActiveRatesByOrganizationId(UUID organizationId) {
-        List<ExchangeRateEntity> entities = repository.findAllByOrganizationIdAndStatus(organizationId, ExchangeRateStatus.ACTIVE);
+        List<ExchangeRateEntity> entities;
+        if (organizationId != null) {
+            entities = repository.findAllByOrganizationIdAndStatus(organizationId, ExchangeRateStatus.ACTIVE);
+        } else {
+            entities = repository.findAllByStatus(ExchangeRateStatus.ACTIVE);
+        }
         return enrichDomainList(entities.stream().map(this::toDomain).collect(Collectors.toList()));
     }
 

@@ -41,7 +41,7 @@ public class ExchangeRateController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "No autorizado")
     })
     public ResponseEntity<ApiResponse<List<ExchangeRateResponse>>> getExchangeRates(
-            @RequestParam UUID organizationId,
+            @RequestParam(required = false) UUID organizationId,
             @RequestParam(required = false) String fromCode,
             @RequestParam(required = false) String toCode,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
@@ -56,7 +56,7 @@ public class ExchangeRateController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Matriz de paridades devuelta con éxito"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "No autorizado")
     })
-    public ResponseEntity<ApiResponse<ParityMatrixResponse>> getLatestParityMatrix(@RequestParam UUID organizationId) {
+    public ResponseEntity<ApiResponse<ParityMatrixResponse>> getLatestParityMatrix(@RequestParam(required = false) UUID organizationId) {
         ParityMatrixResponse response = exchangeRateUseCase.getLatestParityMatrix(organizationId);
         return ResponseEntity.ok(ApiResponse.ok("Matriz de paridades devuelta con éxito", response));
     }

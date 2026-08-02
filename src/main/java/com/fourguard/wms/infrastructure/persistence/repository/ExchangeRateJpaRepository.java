@@ -15,7 +15,7 @@ import java.util.UUID;
 @Repository
 public interface ExchangeRateJpaRepository extends JpaRepository<ExchangeRateEntity, UUID> {
 
-    @Query("SELECT e FROM ExchangeRateEntity e WHERE e.organizationId = :organizationId " +
+    @Query("SELECT e FROM ExchangeRateEntity e WHERE (:organizationId IS NULL OR e.organizationId = :organizationId) " +
            "AND e.fromCurrencyId = :fromCurrencyId AND e.toCurrencyId = :toCurrencyId " +
            "AND e.effectiveDate <= :date AND e.status = 'ACTIVE' " +
            "ORDER BY e.effectiveDate DESC, e.createdAt DESC")
@@ -24,7 +24,7 @@ public interface ExchangeRateJpaRepository extends JpaRepository<ExchangeRateEnt
                                           @Param("toCurrencyId") UUID toCurrencyId,
                                           @Param("date") LocalDate date);
 
-    @Query("SELECT e FROM ExchangeRateEntity e WHERE e.organizationId = :organizationId " +
+    @Query("SELECT e FROM ExchangeRateEntity e WHERE (:organizationId IS NULL OR e.organizationId = :organizationId) " +
            "AND (:fromCurrencyId IS NULL OR e.fromCurrencyId = :fromCurrencyId) " +
            "AND (:toCurrencyId IS NULL OR e.toCurrencyId = :toCurrencyId) " +
            "AND (:date IS NULL OR e.effectiveDate = :date) " +
@@ -35,4 +35,5 @@ public interface ExchangeRateJpaRepository extends JpaRepository<ExchangeRateEnt
                                              @Param("date") LocalDate date);
 
     List<ExchangeRateEntity> findAllByOrganizationIdAndStatus(UUID organizationId, ExchangeRateStatus status);
+    List<ExchangeRateEntity> findAllByStatus(ExchangeRateStatus status);
 }

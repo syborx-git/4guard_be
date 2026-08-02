@@ -15,7 +15,7 @@ import java.util.UUID;
 @Repository
 public interface CurrencyExchangeAuditJpaRepository extends JpaRepository<CurrencyExchangeAuditEntity, UUID> {
 
-    @Query("SELECT a FROM CurrencyExchangeAuditEntity a WHERE a.organizationId = :organizationId " +
+    @Query("SELECT a FROM CurrencyExchangeAuditEntity a WHERE (:organizationId IS NULL OR a.organizationId = :organizationId) " +
            "AND (:entityType IS NULL OR a.entityType = :entityType) " +
            "AND (:entityId IS NULL OR a.entityId = :entityId) " +
            "AND (:action IS NULL OR a.action = :action) " +

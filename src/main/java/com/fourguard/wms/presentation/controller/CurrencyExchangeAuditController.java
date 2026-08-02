@@ -36,7 +36,7 @@ public class CurrencyExchangeAuditController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "No autorizado")
     })
     public ResponseEntity<ApiResponse<List<CurrencyAuditResponse>>> getAuditLogs(
-            @RequestParam UUID organizationId,
+            @RequestParam(required = false) UUID organizationId,
             @RequestParam(required = false) String entityType,
             @RequestParam(required = false) UUID entityId,
             @RequestParam(required = false) String action,
