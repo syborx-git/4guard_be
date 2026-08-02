@@ -138,7 +138,7 @@ public class WmsLicenseController {
         return ResponseEntity.ok(ApiResponse.ok("Clave de licencia regenerada con éxito", response));
     }
 
-    @GetMapping("/{id}/history")
+    @GetMapping({"/{id}/audit", "/{id}/history"})
     @PreAuthorize("hasAuthority('LICENSES_READ') or hasAuthority('AUDIT_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER')")
     @Operation(summary = "Consultar bitácora de historial de la licencia", description = "Obtiene la bitácora inmutable de cambios y renovaciones de una licencia.")
     @ApiResponses({
