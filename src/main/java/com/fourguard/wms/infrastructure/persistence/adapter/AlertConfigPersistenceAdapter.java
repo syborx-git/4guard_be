@@ -80,6 +80,11 @@ public class AlertConfigPersistenceAdapter implements AlertConfigRepositoryPort 
 
     @Override
     public void softDelete(UUID id) {
-        repository.softDelete(id);
+        repository.findById(id).ifPresent(entity -> {
+            entity.setIsDeleted(true);
+            entity.setStatus(com.fourguard.wms.domain.enums.AlertStatus.INACTIVE);
+            entity.setDeletedAt(java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC));
+            repository.save(entity);
+        });
     }
 }

@@ -59,7 +59,9 @@ public class AlertConfigController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Regla no encontrada")
     })
     public ResponseEntity<ApiResponse<AlertConfigResponse>> updateAlertConfig(@PathVariable UUID id, @Valid @RequestBody UpdateAlertConfigRequest request) {
-        if (!id.equals(request.getId())) {
+        if (request.getId() == null) {
+            request.setId(id);
+        } else if (!id.equals(request.getId())) {
             throw new ValidationException("El ID del path no coincide con el ID del cuerpo de la solicitud");
         }
         AlertConfigResponse response = alertConfigUseCase.updateAlertConfig(id, request);

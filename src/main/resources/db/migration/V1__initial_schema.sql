@@ -120,6 +120,8 @@ CREATE TABLE wms.locations (
     id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     branch_id         UUID        NOT NULL REFERENCES wms.branches(id),
     section_id        UUID                 REFERENCES wms.warehouse_sections(id) ON DELETE CASCADE,
+    code              VARCHAR(30) UNIQUE,
+    name              VARCHAR(150),
     zone              VARCHAR(10) NOT NULL,
     aisle             VARCHAR(10),
     rack              VARCHAR(10),
@@ -130,6 +132,7 @@ CREATE TABLE wms.locations (
     coord_z           INTEGER,
     type              VARCHAR(20) CHECK (type IN ('PALLET', 'BIN', 'SHELF', 'RAMP')),
     status            VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+    status_reason     VARCHAR(300),
     is_active         BOOLEAN     NOT NULL DEFAULT TRUE,
     is_deleted        BOOLEAN     NOT NULL DEFAULT FALSE,
     notes             TEXT,
@@ -142,6 +145,26 @@ CREATE TABLE wms.locations (
     updated_at        TIMESTAMPTZ DEFAULT NOW(),
     created_by        VARCHAR(36),
     updated_by        VARCHAR(36)
+);
+
+CREATE TABLE wms.notifications (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    organization_id UUID NOT NULL REFERENCES wms.organizations(id) ON DELETE CASCADE,
+    recipient_id    UUID REFERENCES wms.users(id) ON DELETE CASCADE,
+    type            VARCHAR(50) NOT NULL,
+    title           VARCHAR(200) NOT NULL,
+    message         TEXT NOT NULL,
+    is_read         BOOLEAN NOT NULL DEFAULT FALSE,
+    metadata        JSONB DEFAULT '{}',
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE wms.organization_settings (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    organization_id UUID NOT NULL REFERENCES wms.organizations(id) ON DELETE CASCADE,
+    setting_key     VARCHAR(100) NOT NULL,
+    setting_value   TEXT,
+    CONSTRAINT uk_org_setting_key UNIQUE (organization_id, setting_key)
 );
 
 -- =============================================================================

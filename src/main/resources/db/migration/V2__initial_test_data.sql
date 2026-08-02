@@ -329,12 +329,12 @@ INSERT INTO wms.warehouse_sections (id, branch_id, code, name, created_by, updat
     ('d13f0907-9fa5-4bdf-87db-2eb5e7683913', 'b73f0907-9fa5-4bdf-87db-2eb5e7683936', 'SEC-RAMP',   'Andenes de Carga y Descarga',   'SYSTEM', 'SYSTEM')
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO wms.locations (id, branch_id, section_id, zone, aisle, rack, level, position, coord_x, coord_y, coord_z, type, capacity_units, current_occupancy, is_blocked, created_by, updated_by) VALUES
-    ('e13f0907-9fa5-4bdf-87db-2eb5e7683921', 'b73f0907-9fa5-4bdf-87db-2eb5e7683936', 'd13f0907-9fa5-4bdf-87db-2eb5e7683911', 'ZA', '01', '01', 1, 'A', 5, 10, 1, 'PALLET', 1, 0, FALSE, 'SYSTEM', 'SYSTEM'),
-    ('e13f0907-9fa5-4bdf-87db-2eb5e7683922', 'b73f0907-9fa5-4bdf-87db-2eb5e7683936', 'd13f0907-9fa5-4bdf-87db-2eb5e7683911', 'ZA', '01', '01', 2, 'A', 5, 10, 2, 'PALLET', 1, 0, FALSE, 'SYSTEM', 'SYSTEM'),
-    ('e13f0907-9fa5-4bdf-87db-2eb5e7683923', 'b73f0907-9fa5-4bdf-87db-2eb5e7683936', 'd13f0907-9fa5-4bdf-87db-2eb5e7683911', 'ZA', '01', '02', 1, 'B', 8, 10, 1, 'PALLET', 1, 0, FALSE, 'SYSTEM', 'SYSTEM'),
-    ('e13f0907-9fa5-4bdf-87db-2eb5e7683924', 'b73f0907-9fa5-4bdf-87db-2eb5e7683936', 'd13f0907-9fa5-4bdf-87db-2eb5e7683912', 'ZB', '03', '05', 3, 'C', 15, 20, 3, 'BIN',    1, 0, FALSE, 'SYSTEM', 'SYSTEM'),
-    ('e13f0907-9fa5-4bdf-87db-2eb5e7683925', 'b73f0907-9fa5-4bdf-87db-2eb5e7683936', 'd13f0907-9fa5-4bdf-87db-2eb5e7683913', 'ZC', '00', '00', 0, 'R1', 1, 1, 0,   'RAMP',   1, 0, FALSE, 'SYSTEM', 'SYSTEM')
+INSERT INTO wms.locations (id, branch_id, section_id, code, name, zone, aisle, rack, level, position, coord_x, coord_y, coord_z, type, capacity_units, current_occupancy, is_blocked, created_by, updated_by) VALUES
+    ('e13f0907-9fa5-4bdf-87db-2eb5e7683921', 'b73f0907-9fa5-4bdf-87db-2eb5e7683936', 'd13f0907-9fa5-4bdf-87db-2eb5e7683911', 'LOC-ZA-01-01-1A', 'Rack Pallet A-01-N1', 'ZA', '01', '01', 1, 'A', 5, 10, 1, 'PALLET', 1, 0, FALSE, 'SYSTEM', 'SYSTEM'),
+    ('e13f0907-9fa5-4bdf-87db-2eb5e7683922', 'b73f0907-9fa5-4bdf-87db-2eb5e7683936', 'd13f0907-9fa5-4bdf-87db-2eb5e7683911', 'LOC-ZA-01-01-2A', 'Rack Pallet A-01-N2', 'ZA', '01', '01', 2, 'A', 5, 10, 2, 'PALLET', 1, 0, FALSE, 'SYSTEM', 'SYSTEM'),
+    ('e13f0907-9fa5-4bdf-87db-2eb5e7683923', 'b73f0907-9fa5-4bdf-87db-2eb5e7683936', 'd13f0907-9fa5-4bdf-87db-2eb5e7683911', 'LOC-ZA-01-02-1B', 'Rack Pallet A-02-N1', 'ZA', '01', '02', 1, 'B', 8, 10, 1, 'PALLET', 1, 0, FALSE, 'SYSTEM', 'SYSTEM'),
+    ('e13f0907-9fa5-4bdf-87db-2eb5e7683924', 'b73f0907-9fa5-4bdf-87db-2eb5e7683936', 'd13f0907-9fa5-4bdf-87db-2eb5e7683912', 'LOC-ZB-03-05-3C', 'Picking Manual B-05-N3', 'ZB', '03', '05', 3, 'C', 15, 20, 3, 'BIN',    1, 0, FALSE, 'SYSTEM', 'SYSTEM'),
+    ('e13f0907-9fa5-4bdf-87db-2eb5e7683925', 'b73f0907-9fa5-4bdf-87db-2eb5e7683936', 'd13f0907-9fa5-4bdf-87db-2eb5e7683913', 'LOC-RAMP-01', 'Anden Rampa 1', 'ZC', '00', '00', 0, 'R1', 1, 1, 0,   'RAMP',   1, 0, FALSE, 'SYSTEM', 'SYSTEM')
 ON CONFLICT (id) DO NOTHING;
 
 -- =============================================================================

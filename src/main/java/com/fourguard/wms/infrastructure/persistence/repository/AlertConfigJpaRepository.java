@@ -17,8 +17,4 @@ public interface AlertConfigJpaRepository extends JpaRepository<AlertConfigEntit
     boolean existsByOrganizationIdAndNameAndIsDeletedFalse(UUID organizationId, String name);
 
     boolean existsByOrganizationIdAndNameAndIdNotAndIsDeletedFalse(UUID organizationId, String name, UUID id);
-
-    @Modifying
-    @Query("UPDATE AlertConfigEntity a SET a.isDeleted = true, a.status = 'INACTIVE', a.deletedAt = CURRENT_TIMESTAMP WHERE a.id = :id")
-    void softDelete(@Param("id") UUID id);
 }

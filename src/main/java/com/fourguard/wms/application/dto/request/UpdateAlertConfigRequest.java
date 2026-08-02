@@ -18,7 +18,6 @@ import java.util.UUID;
 @Builder
 public class UpdateAlertConfigRequest {
 
-    @NotNull(message = "El ID de la regla es obligatorio")
     private UUID id;
 
     @NotBlank(message = "El nombre de la regla es obligatorio")
