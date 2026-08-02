@@ -18,7 +18,7 @@ import java.util.UUID;
 
 /** REST controller for WMS License Management. */
 @RestController
-@RequestMapping("/api/v1/licenses")
+@RequestMapping("/licenses")
 @RequiredArgsConstructor
 @Tag(name = "Licencias WMS", description = "Endpoints para la gestión, emisión, actualización, renovación y auditoría de licencias WMS")
 public class WmsLicenseController {
