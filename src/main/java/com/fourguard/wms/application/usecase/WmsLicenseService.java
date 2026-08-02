@@ -20,6 +20,7 @@ import com.fourguard.wms.infrastructure.persistence.repository.OrganizationJpaRe
 import com.fourguard.wms.domain.ports.out.UserRepositoryPort;
 import com.fourguard.wms.shared.audit.AuditService;
 import com.fourguard.wms.shared.audit.SecurityAuditHelper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -47,6 +48,7 @@ public class WmsLicenseService implements WmsLicenseUseCase {
     private final SecurityAuditHelper securityAuditHelper;
     private final AuditService auditService;
     private final PasswordEncoder passwordEncoder;
+    private final ObjectMapper objectMapper;
 
     @Override
     @Transactional
@@ -428,12 +430,18 @@ public class WmsLicenseService implements WmsLicenseUseCase {
 
     private String buildStateJson(WmsLicense license) {
         if (license == null) return null;
-        return String.format("{\"plan\":\"%s\",\"maxUsers\":%d,\"maxConcurrentUsers\":%d,\"adminStatus\":\"%s\",\"enabledModules\":%s}",
-                license.getPlan(),
-                license.getMaxUsers() != null ? license.getMaxUsers() : 0,
-                license.getMaxConcurrentUsers() != null ? license.getMaxConcurrentUsers() : 0,
-                license.getAdminStatus(),
-                license.getEnabledModules() != null ? license.getEnabledModules().toString() : "[]");
+        try {
+            Map<String, Object> map = new LinkedHashMap<>();
+            map.put("plan", license.getPlan() != null ? license.getPlan().name() : null);
+            map.put("maxUsers", license.getMaxUsers() != null ? license.getMaxUsers() : 0);
+            map.put("maxConcurrentUsers", license.getMaxConcurrentUsers() != null ? license.getMaxConcurrentUsers() : 0);
+            map.put("adminStatus", license.getAdminStatus() != null ? license.getAdminStatus().name() : null);
+            map.put("enabledModules", license.getEnabledModules() != null ? license.getEnabledModules() : Collections.emptyList());
+            return objectMapper.writeValueAsString(map);
+        } catch (Exception e) {
+            log.error("Failed to build state JSON for license", e);
+            return "{}";
+        }
     }
 
     private Map<String, Object> buildStateMap(WmsLicense license) {

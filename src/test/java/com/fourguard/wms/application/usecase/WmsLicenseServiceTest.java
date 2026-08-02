@@ -18,6 +18,7 @@ import com.fourguard.wms.infrastructure.persistence.entity.OrganizationEntity;
 import com.fourguard.wms.infrastructure.persistence.repository.OrganizationJpaRepository;
 import com.fourguard.wms.shared.audit.AuditService;
 import com.fourguard.wms.shared.audit.SecurityAuditHelper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -49,6 +50,8 @@ class WmsLicenseServiceTest {
     private UserRepositoryPort userRepositoryPort;
     @Spy
     private WmsLicenseMapper wmsLicenseMapper = new WmsLicenseMapper();
+    @Spy
+    private ObjectMapper objectMapper = new ObjectMapper();
     @Mock
     private SecurityAuditHelper securityAuditHelper;
     @Mock

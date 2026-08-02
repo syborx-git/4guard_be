@@ -1,6 +1,8 @@
 package com.fourguard.wms.application.dto.request;
 
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fourguard.wms.domain.enums.LicensePlan;
+import com.fourguard.wms.shared.jackson.FlexibleOffsetDateTimeDeserializer;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
@@ -14,6 +16,7 @@ import java.time.OffsetDateTime;
 public class RenewLicenseRequest {
 
     @NotNull(message = "La nueva fecha de vencimiento es obligatoria")
+    @JsonDeserialize(using = FlexibleOffsetDateTimeDeserializer.class)
     private OffsetDateTime newValidUntil;
 
     private LicensePlan newPlan;
