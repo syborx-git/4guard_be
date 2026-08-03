@@ -293,12 +293,12 @@ ON CONFLICT DO NOTHING;
 -- Password hash: 'admin123' -> '$2a$12$C.In8jGhHR4dRJQpkyIWoeN5bLIeLh7S7rZ9azVdP26ssfuOR6Hw.'
 -- =============================================================================
 
-INSERT INTO wms.users (id, username, email, password, first_name, last_name, organization_id, branch_id, role_id, status, is_enabled)
+INSERT INTO wms.users (id, username, email, password, first_name, last_name, organization_id, branch_id, role_id, status, is_enabled, change_password_required)
 VALUES 
-    ('f33f0907-9fa5-4bdf-87db-2eb5e7683937', 'enrique', 'enrique@4guard.com', '$2a$12$C.In8jGhHR4dRJQpkyIWoeN5bLIeLh7S7rZ9azVdP26ssfuOR6Hw.', 'Enrique', 'Architect', 'a53f0907-9fa5-4bdf-87db-2eb5e7683935', 'b73f0907-9fa5-4bdf-87db-2eb5e7683936', '88888888-8888-8888-8888-888888888888', 'ACTIVE', TRUE),
-    ('afe4de7c-d10e-44b9-8970-46a0fda50626', 'Chris4G', 'christian@4guard.mx', '$2a$12$clSxIMQpelhyCewjyiKAt.iyyBgViyojwf.fIzaHGfrjFy26duUFG', 'Christian', 'Duran Garcia', 'a53f0907-9fa5-4bdf-87db-2eb5e7683935', 'b73f0907-9fa5-4bdf-87db-2eb5e7683936', '88888888-8888-8888-8888-888888888888', 'ACTIVE', TRUE),
-    ('fb31fe4c-bc27-4b1c-8846-7288812f84bf', 'Romel4G', 'romel@4guard.mx', '$2a$12$R8b0a8RAUEV5MLOsAMYFGO9ztDab5sXaTSGyJfY68SQxJTEDXzuqC', 'Romel', 'Salgado', 'a53f0907-9fa5-4bdf-87db-2eb5e7683935', 'b73f0907-9fa5-4bdf-87db-2eb5e7683936', '88888888-8888-8888-8888-888888888888', 'ACTIVE', TRUE)
-ON CONFLICT (username) DO NOTHING;
+    ('f33f0907-9fa5-4bdf-87db-2eb5e7683937', 'enrique', 'enrique@4guard.com', '$2a$12$C.In8jGhHR4dRJQpkyIWoeN5bLIeLh7S7rZ9azVdP26ssfuOR6Hw.', 'Enrique', 'Architect', 'a53f0907-9fa5-4bdf-87db-2eb5e7683935', 'b73f0907-9fa5-4bdf-87db-2eb5e7683936', '88888888-8888-8888-8888-888888888888', 'ACTIVE', TRUE, FALSE),
+    ('afe4de7c-d10e-44b9-8970-46a0fda50626', 'Chris4G', 'christian@4guard.mx', '$2a$12$C.In8jGhHR4dRJQpkyIWoeN5bLIeLh7S7rZ9azVdP26ssfuOR6Hw.', 'Christian', 'Duran Garcia', 'a53f0907-9fa5-4bdf-87db-2eb5e7683935', 'b73f0907-9fa5-4bdf-87db-2eb5e7683936', '88888888-8888-8888-8888-888888888888', 'ACTIVE', TRUE, FALSE),
+    ('fb31fe4c-bc27-4b1c-8846-7288812f84bf', 'Romel4G', 'romel@4guard.mx', '$2a$12$C.In8jGhHR4dRJQpkyIWoeN5bLIeLh7S7rZ9azVdP26ssfuOR6Hw.', 'Romel', 'Salgado', 'a53f0907-9fa5-4bdf-87db-2eb5e7683935', 'b73f0907-9fa5-4bdf-87db-2eb5e7683936', '88888888-8888-8888-8888-888888888888', 'ACTIVE', TRUE, FALSE)
+ON CONFLICT (username) DO UPDATE SET change_password_required = FALSE;
 
 -- =============================================================================
 -- 6. CLIENTS AND SKUS

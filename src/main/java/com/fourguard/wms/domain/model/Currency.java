@@ -1,4 +1,4 @@
-package com.fourguard.wms.application.dto.response;
+package com.fourguard.wms.domain.model;
 
 import com.fourguard.wms.domain.enums.CurrencyStatus;
 import lombok.*;
@@ -10,8 +10,8 @@ import java.util.UUID;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
-public class CurrencyResponse {
+@Builder(toBuilder = true)
+public class Currency {
 
     private UUID id;
     private UUID organizationId;
