@@ -5,6 +5,9 @@ import com.fourguard.wms.domain.enums.CurrencyAuditEntityType;
 import jakarta.persistence.*;
 import lombok.*;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.UUID;
@@ -40,9 +43,11 @@ public class CurrencyExchangeAuditEntity {
     @Column(name = "description", nullable = false, columnDefinition = "TEXT")
     private String description;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "previous_value", columnDefinition = "JSONB")
     private String previousValue;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "new_value", columnDefinition = "JSONB")
     private String newValue;
 
