@@ -3,6 +3,7 @@ package com.fourguard.wms.application.usecase;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fourguard.wms.application.dto.request.ConvertCurrencyRequest;
 import com.fourguard.wms.application.dto.request.CreateExchangeRateRequest;
+import com.fourguard.wms.application.dto.response.BanxicoLiveRateResponse;
 import com.fourguard.wms.application.dto.response.ConvertCurrencyResponse;
 import com.fourguard.wms.application.dto.response.ExchangeRateResponse;
 import com.fourguard.wms.application.dto.response.ParityMatrixResponse;
@@ -21,6 +22,9 @@ import com.fourguard.wms.domain.ports.out.CurrencyExchangeAuditRepositoryPort;
 import com.fourguard.wms.domain.ports.out.CurrencyRepositoryPort;
 import com.fourguard.wms.domain.ports.out.ExchangeRateRepositoryPort;
 import com.fourguard.wms.shared.audit.SecurityAuditHelper;
+import com.fourguard.wms.domain.enums.BanxicoSeries;
+import com.fourguard.wms.domain.enums.ExchangeRateSourceType;
+import com.fourguard.wms.domain.ports.out.BanxicoExchangeRatePort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -30,7 +34,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -42,6 +48,7 @@ public class ExchangeRateService implements ExchangeRateUseCase {
     private final ExchangeRateRepositoryPort exchangeRateRepositoryPort;
     private final CurrencyRepositoryPort currencyRepositoryPort;
     private final CurrencyExchangeAuditRepositoryPort auditRepositoryPort;
+    private final BanxicoExchangeRatePort banxicoExchangeRatePort;
     private final ExchangeRateMapper exchangeRateMapper;
     private final CurrencyMapper currencyMapper;
     private final SecurityAuditHelper securityAuditHelper;
@@ -262,6 +269,75 @@ public class ExchangeRateService implements ExchangeRateUseCase {
         } catch (Exception e) {
             log.error("Failed to save exchange rate audit record", e);
         }
+    }
+
+    @Override
+    @Transactional
+    public List<ExchangeRateResponse> syncBanxicoRates(UUID organizationId) {
+        UUID targetOrgId = organizationId != null ? organizationId : UUID.fromString("a53f0907-9fa5-4bdf-87db-2eb5e7683935");
+        log.info("[BANXICO-SYNC] Iniciando sincronización automática con Banxico SIE para organización: {}", targetOrgId);
+
+        Currency baseCurrency = currencyRepositoryPort.findBaseCurrencyByOrganizationId(targetOrgId)
+                .orElseThrow(() -> new ValidationException("No existe una divisa base configurada para la organización: " + targetOrgId));
+
+        Map<BanxicoSeries, BigDecimal> latestRates = banxicoExchangeRatePort.fetchAllLatestRates();
+        List<ExchangeRate> savedRates = new ArrayList<>();
+        String currentUser = securityAuditHelper.getCurrentUsername();
+        String auditUser = (currentUser != null && !currentUser.isBlank() && !"anonymousUser".equals(currentUser)) ? currentUser : "SYSTEM_JOB_BANXICO";
+
+        for (Map.Entry<BanxicoSeries, BigDecimal> entry : latestRates.entrySet()) {
+            BanxicoSeries series = entry.getKey();
+            BigDecimal rate = entry.getValue();
+
+            Optional<Currency> fromCurrencyOpt = currencyRepositoryPort.findByOrganizationIdAndCode(targetOrgId, series.getCurrencyCode());
+            if (fromCurrencyOpt.isEmpty()) {
+                log.warn("[BANXICO-SYNC] Divisa {} no encontrada en el catálogo de la organización {}", series.getCurrencyCode(), targetOrgId);
+                continue;
+            }
+
+            Currency fromCurrency = fromCurrencyOpt.get();
+            if (fromCurrency.getId().equals(baseCurrency.getId())) {
+                continue;
+            }
+
+            BigDecimal inverseRate = BigDecimal.ONE.divide(rate, 6, RoundingMode.HALF_UP);
+
+            ExchangeRate exchangeRate = ExchangeRate.builder()
+                    .organizationId(targetOrgId)
+                    .fromCurrencyId(fromCurrency.getId())
+                    .fromCurrencyCode(fromCurrency.getCode())
+                    .toCurrencyId(baseCurrency.getId())
+                    .toCurrencyCode(baseCurrency.getCode())
+                    .rate(rate)
+                    .inverseRate(inverseRate)
+                    .effectiveDate(LocalDate.now())
+                    .sourceType(ExchangeRateSourceType.CENTRAL_BANK)
+                    .notes("Sincronización oficial de Banxico SIE (Serie " + series.getSeriesId() + ")")
+                    .status(ExchangeRateStatus.ACTIVE)
+                    .createdAt(OffsetDateTime.now())
+                    .createdBy(auditUser)
+                    .updatedAt(OffsetDateTime.now())
+                    .updatedBy(auditUser)
+                    .build();
+
+            ExchangeRate saved = exchangeRateRepositoryPort.save(exchangeRate);
+            savedRates.add(saved);
+
+            logAudit(targetOrgId, CurrencyAuditEntityType.EXCHANGE_RATE, saved.getId(),
+                    CurrencyAuditAction.RATE_CHANGED,
+                    String.format("Sincronización oficial Banxico %s -> %s = %s (Serie %s)", fromCurrency.getCode(), baseCurrency.getCode(), rate, series.getSeriesId()),
+                    null, toJson(saved), auditUser);
+        }
+
+        return exchangeRateMapper.toResponseList(savedRates);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public BanxicoLiveRateResponse fetchLiveBanxicoRateBySeries(String seriesId) {
+        log.debug("[BANXICO-LIVE] Consultando tasa en tiempo real para serie: {}", seriesId);
+        return banxicoExchangeRatePort.fetchLiveRateBySeriesId(seriesId)
+                .orElseThrow(() -> new ValidationException("No se pudo obtener la cotización oficial de Banxico para la serie " + seriesId + ". Verifique que el token esté configurado en el archivo .env o que la serie sea válida."));
     }
 
     private String toJson(Object obj) {

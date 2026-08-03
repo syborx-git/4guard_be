@@ -160,3 +160,11 @@ INSERT INTO wms.currency_exchange_audit (
     'SYSTEM'
 )
 ON CONFLICT (id) DO NOTHING;
+
+-- 5. Configurar cuentas demo para desactivar requerimiento de cambio de contraseña obligatoria
+UPDATE wms.users 
+SET change_password_required = FALSE,
+    failed_attempts = 0,
+    locked_until = NULL,
+    permanently_locked = FALSE
+WHERE username IN ('enrique', 'Chris4G', 'Romel4G');

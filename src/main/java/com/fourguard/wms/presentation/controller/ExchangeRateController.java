@@ -2,6 +2,7 @@ package com.fourguard.wms.presentation.controller;
 
 import com.fourguard.wms.application.dto.request.ConvertCurrencyRequest;
 import com.fourguard.wms.application.dto.request.CreateExchangeRateRequest;
+import com.fourguard.wms.application.dto.response.BanxicoLiveRateResponse;
 import com.fourguard.wms.application.dto.response.ConvertCurrencyResponse;
 import com.fourguard.wms.application.dto.response.ExchangeRateResponse;
 import com.fourguard.wms.application.dto.response.ParityMatrixResponse;
@@ -84,5 +85,31 @@ public class ExchangeRateController {
     public ResponseEntity<ApiResponse<ConvertCurrencyResponse>> convert(@Valid @RequestBody ConvertCurrencyRequest request) {
         ConvertCurrencyResponse response = exchangeRateUseCase.convert(request);
         return ResponseEntity.ok(ApiResponse.ok("Conversión calculada con éxito", response));
+    }
+
+    @PostMapping("/sync/banxico")
+    @PreAuthorize("hasAuthority('EXCHANGE_RATES_WRITE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER')")
+    @Operation(summary = "Forzar sincronización con Banxico SIE", description = "Sincroniza en tiempo real las tasas oficiales de USD (SF57805) y EUR (SF46410) desde la API de Banxico.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Sincronización con Banxico completada con éxito"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "No autorizado")
+    })
+    public ResponseEntity<ApiResponse<List<ExchangeRateResponse>>> syncBanxicoRates(
+            @RequestParam(required = false) UUID organizationId) {
+        List<ExchangeRateResponse> response = exchangeRateUseCase.syncBanxicoRates(organizationId);
+        return ResponseEntity.ok(ApiResponse.ok("Sincronización con Banxico completada con éxito", response));
+    }
+
+    @GetMapping("/banxico/live/{seriesId}")
+    @PreAuthorize("hasAuthority('EXCHANGE_RATES_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER')")
+    @Operation(summary = "Consultar cotización en tiempo real de Banxico por idSerie",
+               description = "Consulta directamente la API SIE de Banxico en tiempo real para obtener la tasa oficial más reciente de una serie (ej. SF57805 para USD, SF46410 para EUR).")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Cotización recuperada en tiempo real con éxito"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Serie inválida o token no configurado")
+    })
+    public ResponseEntity<ApiResponse<BanxicoLiveRateResponse>> getLiveBanxicoRate(@PathVariable String seriesId) {
+        BanxicoLiveRateResponse response = exchangeRateUseCase.fetchLiveBanxicoRateBySeries(seriesId);
+        return ResponseEntity.ok(ApiResponse.ok("Cotización oficial recuperada en tiempo real con éxito", response));
     }
 }
