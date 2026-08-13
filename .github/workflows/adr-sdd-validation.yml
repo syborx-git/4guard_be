@@ -1,0 +1,246 @@
+name: 📋 ADR & SDD Validation
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+  push:
+    branches: [ main, develop ]
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────
+  # JOB 1: Validar estructura y contenido de los ADRs
+  # ─────────────────────────────────────────────────────────────────
+  validate-adrs:
+    name: ✅ Validate ADRs
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check ADR directory exists
+        run: |
+          if [ ! -d "docs/adr" ]; then
+            echo "❌ ERROR: docs/adr directory does not exist"
+            exit 1
+          fi
+          echo "✅ docs/adr directory found"
+
+      - name: Check ADR template exists
+        run: |
+          if [ ! -f "docs/adr/template.md" ]; then
+            echo "❌ ERROR: docs/adr/template.md does not exist"
+            exit 1
+          fi
+          echo "✅ docs/adr/template.md found"
+
+      - name: Validate ADR file naming convention (NNN-title.md)
+        run: |
+          ERRORS=0
+          for file in docs/adr/*.md; do
+            basename=$(basename "$file")
+            # Skip README and template
+            if [[ "$basename" == "README.md" || "$basename" == "template.md" ]]; then
+              continue
+            fi
+            # Check naming convention: starts with 3 digits
+            if ! [[ "$basename" =~ ^[0-9]{3}-.+\.md$ ]]; then
+              echo "❌ Invalid ADR file name: $basename (expected format: NNN-title.md)"
+              ERRORS=$((ERRORS + 1))
+            else
+              echo "✅ Valid ADR: $basename"
+            fi
+          done
+          if [ $ERRORS -gt 0 ]; then
+            echo "❌ Found $ERRORS naming convention error(s)"
+            exit 1
+          fi
+          echo "✅ All ADR files follow the naming convention"
+
+      - name: Validate ADR required sections
+        run: |
+          ERRORS=0
+          REQUIRED_SECTIONS=("## Estado" "## Fecha" "## Contexto" "## Decision" "## Consecuencias")
+          for file in docs/adr/[0-9]*.md; do
+            echo "Checking sections in: $file"
+            for section in "${REQUIRED_SECTIONS[@]}"; do
+              if ! grep -q "$section" "$file"; then
+                echo "❌ Missing section '$section' in $file"
+                ERRORS=$((ERRORS + 1))
+              fi
+            done
+          done
+          if [ $ERRORS -gt 0 ]; then
+            echo "❌ Found $ERRORS missing section(s) in ADRs"
+            exit 1
+          fi
+          echo "✅ All ADRs have the required sections"
+
+      - name: Validate ADR status values
+        run: |
+          VALID_STATUSES=("Propuesto" "Aprobado" "Rechazado" "Superseded")
+          ERRORS=0
+          for file in docs/adr/[0-9]*.md; do
+            # Extract the line after "## Estado"
+            STATUS=$(grep -A1 "## Estado" "$file" | tail -n1 | tr -d '`' | xargs)
+            VALID=false
+            for valid_status in "${VALID_STATUSES[@]}"; do
+              if echo "$STATUS" | grep -qi "$valid_status"; then
+                VALID=true
+                break
+              fi
+            done
+            if [ "$VALID" = false ]; then
+              echo "❌ Invalid status in $file: '$STATUS'"
+              ERRORS=$((ERRORS + 1))
+            else
+              echo "✅ Valid status in $(basename $file): $STATUS"
+            fi
+          done
+          if [ $ERRORS -gt 0 ]; then
+            exit 1
+          fi
+
+      - name: Check ADR README index is up to date
+        run: |
+          # Count actual ADR files (excluding README and template)
+          ADR_FILES=$(ls docs/adr/[0-9]*.md 2>/dev/null | wc -l)
+          # Count entries in README table (lines starting with | [NNN])
+          README_ENTRIES=$(grep -c "^\| \[0" docs/adr/README.md 2>/dev/null || echo 0)
+          echo "ADR files: $ADR_FILES | README entries: $README_ENTRIES"
+          if [ "$ADR_FILES" -ne "$README_ENTRIES" ]; then
+            echo "❌ ADR count mismatch: $ADR_FILES files but $README_ENTRIES entries in README"
+            echo "   Please update docs/adr/README.md with the new ADR"
+            exit 1
+          fi
+          echo "✅ ADR README index is up to date"
+
+  # ─────────────────────────────────────────────────────────────────
+  # JOB 2: Validar estructura del SDD
+  # ─────────────────────────────────────────────────────────────────
+  validate-sdd:
+    name: 📄 Validate SDD
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check SDD file exists
+        run: |
+          if [ ! -f "docs/sdd/index.md" ]; then
+            echo "❌ ERROR: docs/sdd/index.md does not exist"
+            exit 1
+          fi
+          echo "✅ docs/sdd/index.md found"
+
+      - name: Validate SDD required sections
+        run: |
+          REQUIRED_SECTIONS=(
+            "## 1" "## 2" "## 3" "## 4" "## 5"
+            "## 8" "## 11" "## 12" "## 13" "## 14"
+            "## 15" "## 16"
+          )
+          ERRORS=0
+          for section in "${REQUIRED_SECTIONS[@]}"; do
+            if ! grep -q "$section" docs/sdd/index.md; then
+              echo "❌ Missing section starting with '$section' in SDD"
+              ERRORS=$((ERRORS + 1))
+            fi
+          done
+          if [ $ERRORS -gt 0 ]; then
+            echo "❌ SDD is missing $ERRORS required section(s)"
+            exit 1
+          fi
+          echo "✅ SDD contains all required sections"
+
+      - name: Validate SDD historial is updated
+        run: |
+          # Check that the changelog table has at least one entry
+          ENTRIES=$(grep -c "| [0-9]\+\.[0-9]\+\.[0-9]\+" docs/sdd/index.md 2>/dev/null || echo 0)
+          if [ "$ENTRIES" -eq 0 ]; then
+            echo "❌ SDD has no entries in the Historial de Cambios section"
+            exit 1
+          fi
+          echo "✅ SDD Historial has $ENTRIES entry(ies)"
+
+  # ─────────────────────────────────────────────────────────────────
+  # JOB 3: Lint de Markdown (remark-lint)
+  # ─────────────────────────────────────────────────────────────────
+  lint-markdown:
+    name: 📝 Lint Markdown
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install remark-cli and plugins
+        run: |
+          npm install --global \
+            remark-cli \
+            remark-lint \
+            remark-preset-lint-recommended
+
+      - name: Lint docs/adr/*.md
+        run: |
+          remark --use remark-preset-lint-recommended docs/adr/[0-9]*.md || true
+          echo "✅ Markdown lint completed for ADRs"
+
+      - name: Lint docs/sdd/index.md
+        run: |
+          remark --use remark-preset-lint-recommended docs/sdd/index.md || true
+          echo "✅ Markdown lint completed for SDD"
+
+  # ─────────────────────────────────────────────────────────────────
+  # JOB 4: Build y Pruebas del proyecto Spring Boot
+  # ─────────────────────────────────────────────────────────────────
+  build-and-test:
+    name: 🏗️ Build & Test
+    runs-on: ubuntu-latest
+    needs: [ validate-adrs, validate-sdd ]
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: fourguard_wms_test
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Build and run tests
+        run: mvn clean test
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/fourguard_wms_test
+          SPRING_DATASOURCE_USERNAME: test
+          SPRING_DATASOURCE_PASSWORD: test
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: target/surefire-reports/
