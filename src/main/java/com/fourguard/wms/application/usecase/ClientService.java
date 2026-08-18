@@ -81,6 +81,7 @@ public class ClientService implements ClientUseCase {
         if (request.getContacts() != null) {
             request.getContacts().forEach(dto -> {
                 ClientContactEntity contact = clientMapper.toContactEntity(dto);
+                contact.setId(null);
                 entity.addContact(contact);
             });
         }
@@ -90,6 +91,7 @@ public class ClientService implements ClientUseCase {
             request.getDestinations().forEach(dto -> {
                 validateDestinationCodeForNew(entity, dto.getDestinationCode());
                 ClientDestinationEntity dest = clientMapper.toDestinationEntity(dto);
+                dest.setId(null);
                 if (dest.getStatus() == null || dest.getStatus().isBlank()) {
                     dest.setStatus("ACTIVO");
                 }
@@ -383,8 +385,9 @@ public class ClientService implements ClientUseCase {
                 existing.setEmail(dto.getEmail());
                 existing.setIsPrimary(Boolean.TRUE.equals(dto.getIsPrimary()));
             } else {
-                // Agregar nuevo contacto
+                // Agregar nuevo contacto (asegurar id nulo para auto-generación de UUID)
                 ClientContactEntity newContact = clientMapper.toContactEntity(dto);
+                newContact.setId(null);
                 entity.addContact(newContact);
             }
         });
@@ -423,6 +426,7 @@ public class ClientService implements ClientUseCase {
                 existing.setNotes(dto.getNotes());
             } else {
                 ClientDestinationEntity newDest = clientMapper.toDestinationEntity(dto);
+                newDest.setId(null);
                 if (newDest.getStatus() == null || newDest.getStatus().isBlank()) {
                     newDest.setStatus("ACTIVO");
                 }

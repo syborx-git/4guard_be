@@ -81,7 +81,6 @@ public interface ClientMapper {
     @Mapping(target = "updatedAt",  ignore = true)
     ClientContactEntity toContactEntity(ClientContactDto dto);
 
-    @Mapping(source = "client.id",  target = "id",        ignore = false)
     ClientContactDto toContactDto(ClientContactEntity entity);
 
     @Mapping(target = "client",     ignore = true)
