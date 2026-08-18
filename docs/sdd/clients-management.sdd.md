@@ -1,38 +1,42 @@
 # SDD — Backend: Gestión de Clientes, Contactos Corporativos y Destinos Físicos
 
 > **Módulo:** `clients`
-> **Repositorio:** `4guard_be` · **Rama:** `edj-cliente-destino-be`
+> **Repositorio:** `4guard_be` · **Rama:** `develop` (MERGED)
 > **Arquitectura:** Hexagonal (Ports & Adapters)
-> **Versión:** 2.0 (Multi-Contacto & Multi-Bodega)
-> **Estado:** 🟢 Implementado
+> **Versión:** 2.0 (Multi-Contacto & Multi-Bodega / Ship-to Locations)
+> **Estado:** 🟢 Implementado y Verificado (10/10 Tests PASS)
 
 ---
 
 ## 1. Objetivo
 
-Proveer la capa de persistencia, validaciones de negocio y API REST para la gestión completa de **Clientes Depositantes / Owners 3PL** en el WMS 4GUARD, con soporte para:
+Proveer la capa de persistencia, validaciones de negocio y API REST para la gestión integral de **Clientes Depositantes / Owners 3PL** en el WMS 4GUARD, con soporte nativo para:
 
-1. **Datos Corporativos y Fiscales:** Razón Social, RFC/Tax ID, Dirección Fiscal, Teléfono, Email y Contraseña Portal.
-2. **Matriz Dinámica de Contactos Corporativos (1:N):** Múltiples contactos por cliente con roles: Logística, Finanzas, Calidad, Compras.
-3. **Direcciones Físicas de Destino / Bodegas / Plantas (1:N):** Ship-to Locations para el módulo de Despacho/Outbound.
-4. **Auditoría Transaccional:** Bitácora detallada de cambios antes/después de cada operación.
+1. **Datos Corporativos y Fiscales:** Razón Social, RFC/Tax ID, Dirección Fiscal, Teléfono, Email y Contraseña Portal de Autoservicio (`webPortalPassword`).
+2. **Matriz Dinámica de Contactos Corporativos (1:N):** Múltiples contactos por cliente categorizados por área (Logística, Finanzas, Calidad, Compras, etc.) con indicador de contacto principal (`isPrimary`).
+3. **Direcciones Físicas de Destino / Bodegas / Plantas (1:N):** *Ship-to Locations* utilizadas por los módulos de Despacho/Outbound.
+4. **Auditoría Transaccional Relacional:** Bitácora detallada de cambios antes/después (*delta*) por usuario, IP y transacción.
 
 ---
 
 ## 2. Esquema de Base de Datos (PostgreSQL / schema `wms`)
 
-### Migración: `V5__client_destinations_and_contacts.sql`
+### Migración Flyway: `V5__client_destinations_and_contacts.sql`
 
 ```sql
--- TABLA wms.clients (MODIFICADA en V5)
+-- 1. AMPLIAR TABLA MAESTRA DE CLIENTES
 ALTER TABLE wms.clients
-    ADD COLUMN address             VARCHAR(300),
-    ADD COLUMN phone               VARCHAR(50),
-    ADD COLUMN email               VARCHAR(150),
-    ADD COLUMN web_portal_password VARCHAR(255);
+    ADD COLUMN IF NOT EXISTS address             VARCHAR(300),
+    ADD COLUMN IF NOT EXISTS phone               VARCHAR(50),
+    ADD COLUMN IF NOT EXISTS email               VARCHAR(150),
+    ADD COLUMN IF NOT EXISTS web_portal_password VARCHAR(255);
 
--- TABLA wms.client_contacts (NUEVA en V5)
-CREATE TABLE wms.client_contacts (
+CREATE UNIQUE INDEX IF NOT EXISTS uk_clients_org_external_id
+    ON wms.clients (organization_id, external_id)
+    WHERE external_id IS NOT NULL;
+
+-- 2. TABLA DE MATRIZ DE CONTACTOS CORPORATIVOS (1:N)
+CREATE TABLE IF NOT EXISTS wms.client_contacts (
     id          UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
     client_id   UUID        NOT NULL REFERENCES wms.clients(id) ON DELETE CASCADE,
     name        VARCHAR(150) NOT NULL,
@@ -46,32 +50,38 @@ CREATE TABLE wms.client_contacts (
     updated_by  VARCHAR(36)
 );
 
--- TABLA wms.client_destinations (NUEVA en V5)
-CREATE TABLE wms.client_destinations (
-    id                UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
-    client_id         UUID        NOT NULL REFERENCES wms.clients(id) ON DELETE CASCADE,
-    destination_code  VARCHAR(50)  NOT NULL,
-    plant_name        VARCHAR(200) NOT NULL,
-    full_address      VARCHAR(500) NOT NULL,
-    contact_person    VARCHAR(150) NOT NULL,
-    phone             VARCHAR(50)  NOT NULL,
-    status            VARCHAR(20)  DEFAULT 'ACTIVO',
-    notes             TEXT,
-    version           BIGINT       DEFAULT 1,
-    created_at        TIMESTAMPTZ  DEFAULT NOW(),
-    updated_at        TIMESTAMPTZ  DEFAULT NOW(),
-    created_by        VARCHAR(36),
-    updated_by        VARCHAR(36),
+CREATE UNIQUE INDEX IF NOT EXISTS uk_client_contacts_primary
+    ON wms.client_contacts (client_id)
+    WHERE is_primary = TRUE;
+
+CREATE INDEX IF NOT EXISTS idx_client_contacts_client_id
+    ON wms.client_contacts (client_id);
+
+-- 3. TABLA DE DIRECCIONES FÍSICAS DE DESTINO (1:N / Multi-Bodega)
+CREATE TABLE IF NOT EXISTS wms.client_destinations (
+    id                  UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+    client_id           UUID        NOT NULL REFERENCES wms.clients(id) ON DELETE CASCADE,
+    destination_code    VARCHAR(50)  NOT NULL,
+    plant_name          VARCHAR(200) NOT NULL,
+    full_address        VARCHAR(500) NOT NULL,
+    contact_person      VARCHAR(150) NOT NULL,
+    phone               VARCHAR(50)  NOT NULL,
+    status              VARCHAR(20)  DEFAULT 'ACTIVO',
+    notes               TEXT,
+    version             BIGINT       DEFAULT 1,
+    created_at          TIMESTAMPTZ  DEFAULT NOW(),
+    updated_at          TIMESTAMPTZ  DEFAULT NOW(),
+    created_by          VARCHAR(36),
+    updated_by          VARCHAR(36),
     CONSTRAINT uk_client_destination_code UNIQUE (client_id, destination_code)
 );
-```
 
-### Relación Entidad-Relación
+CREATE INDEX IF NOT EXISTS idx_client_destinations_client_id
+    ON wms.client_destinations (client_id);
 
-```
-organizations (1) ──────< clients (N)
-clients       (1) ──────< client_contacts (N)     [ON DELETE CASCADE]
-clients       (1) ──────< client_destinations (N) [ON DELETE CASCADE]
+CREATE INDEX IF NOT EXISTS idx_client_destinations_active
+    ON wms.client_destinations (client_id, status)
+    WHERE status = 'ACTIVO';
 ```
 
 ---
@@ -80,111 +90,108 @@ clients       (1) ──────< client_destinations (N) [ON DELETE CASCADE
 
 ### 3.1 Domain Layer
 
-| Clase | Descripción |
-|---|---|
-| `domain/model/Client.java` | Modelo de dominio con todos los campos y listas de contactos/destinos |
-| `domain/model/ClientContact.java` | Modelo de dominio para contacto corporativo |
-| `domain/model/ClientDestination.java` | Modelo de dominio para destino físico (Ship-to) |
-| `domain/ports/in/ClientUseCase.java` | Puerto de entrada con CRUD + toggle + destinos granulares |
-| `domain/ports/out/ClientRepositoryPort.java` | Puerto de salida con validaciones de unicidad |
-| `domain/ports/out/ClientDestinationRepositoryPort.java` | Puerto de salida para operaciones de destinos |
+| Componente | Ruta | Descripción |
+|---|---|---|
+| `Client` | `domain/model/Client.java` | Entidad raíz de dominio con colecciones de contactos y destinos |
+| `ClientContact` | `domain/model/ClientContact.java` | Modelo de dominio para contactos corporativos |
+| `ClientDestination` | `domain/model/ClientDestination.java` | Modelo de dominio para destinos físicos |
+| `ClientUseCase` | `domain/ports/in/ClientUseCase.java` | Puerto de entrada (casos de uso de cliente y destinos) |
+| `ClientRepositoryPort` | `domain/ports/out/ClientRepositoryPort.java` | Puerto de persistencia de clientes |
+| `ClientDestinationRepositoryPort` | `domain/ports/out/ClientDestinationRepositoryPort.java` | Puerto de persistencia de destinos |
 
 ### 3.2 Application Layer
 
-| Clase | Descripción |
-|---|---|
-| `application/dto/common/ClientContactDto.java` | DTO reutilizable en request y response de contactos |
-| `application/dto/common/PhysicalDestinationDto.java` | DTO reutilizable en request y response de destinos |
-| `application/dto/request/CreateClientRequest.java` | DTO de creación con validaciones `@NotBlank`, `@Email`, `@Valid` en listas |
-| `application/dto/request/UpdateClientRequest.java` | DTO de actualización con campos opcionales |
-| `application/dto/response/ClientResponse.java` | Respuesta completa con `contacts[]` y `destinations[]` |
-| `application/mapper/ClientMapper.java` | MapStruct — mapeo entidades↔DTOs con sincronización de colecciones |
-| `application/usecase/ClientService.java` | Implementación de lógica de negocio con sincronización inteligente |
+| Componente | Ruta | Descripción |
+|---|---|---|
+| `ClientContactDto` | `application/dto/common/ClientContactDto.java` | DTO unificado de contactos (requests y response) |
+| `PhysicalDestinationDto` | `application/dto/common/PhysicalDestinationDto.java` | DTO unificado de destinos físicos |
+| `CreateClientRequest` | `application/dto/request/CreateClientRequest.java` | DTO de creación con validaciones `@Valid`, `@NotBlank`, `@Email` |
+| `UpdateClientRequest` | `application/dto/request/UpdateClientRequest.java` | DTO de actualización con soporte de sincronización completa |
+| `ClientResponse` | `application/dto/response/ClientResponse.java` | Response con listas embebidas `contacts[]` y `destinations[]` |
+| `ClientMapper` | `application/mapper/ClientMapper.java` | MapStruct mapper para transformaciones DTO ↔ Entidad |
+| `ClientService` | `application/usecase/ClientService.java` | Orquestador de casos de uso con sincronización inteligente |
 
 ### 3.3 Infrastructure Layer
 
-| Clase | Descripción |
-|---|---|
-| `persistence/entity/ClientEntity.java` | JPA con `@OneToMany(cascade = ALL, orphanRemoval = true)` |
-| `persistence/entity/ClientContactEntity.java` | JPA para `wms.client_contacts` |
-| `persistence/entity/ClientDestinationEntity.java` | JPA para `wms.client_destinations` con `@Version` |
-| `persistence/repository/ClientJpaRepository.java` | Spring Data JPA con query methods de unicidad |
-| `persistence/repository/ClientContactJpaRepository.java` | Spring Data JPA para contactos |
-| `persistence/repository/ClientDestinationJpaRepository.java` | Spring Data JPA para destinos |
-| `persistence/adapter/ClientPersistenceAdapter.java` | Adaptador que implementa `ClientRepositoryPort` |
-| `persistence/adapter/ClientDestinationPersistenceAdapter.java` | Adaptador que implementa `ClientDestinationRepositoryPort` |
+| Componente | Ruta | Descripción |
+|---|---|---|
+| `ClientEntity` | `persistence/entity/ClientEntity.java` | JPA con `@OneToMany(cascade = ALL, orphanRemoval = true)` |
+| `ClientContactEntity` | `persistence/entity/ClientContactEntity.java` | JPA para tabla `wms.client_contacts` |
+| `ClientDestinationEntity` | `persistence/entity/ClientDestinationEntity.java` | JPA para tabla `wms.client_destinations` con `@Version` |
+| `ClientJpaRepository` | `persistence/repository/ClientJpaRepository.java` | Queries de unicidad por RFC/External ID |
+| `ClientContactJpaRepository` | `persistence/repository/ClientContactJpaRepository.java` | Queries de contactos por cliente |
+| `ClientDestinationJpaRepository` | `persistence/repository/ClientDestinationJpaRepository.java` | Queries de destinos por cliente y estatus |
+| `ClientPersistenceAdapter` | `persistence/adapter/ClientPersistenceAdapter.java` | Implementación del puerto `ClientRepositoryPort` |
+| `ClientDestinationPersistenceAdapter` | `persistence/adapter/ClientDestinationPersistenceAdapter.java` | Implementación del puerto `ClientDestinationRepositoryPort` |
 
 ### 3.4 Presentation Layer
 
-| Clase | Descripción |
-|---|---|
-| `presentation/controller/ClientController.java` | REST Controller con 11 endpoints documentados en Swagger |
+| Componente | Ruta | Descripción |
+|---|---|---|
+| `ClientController` | `presentation/controller/ClientController.java` | REST Controller bajo `/clients` con 11 endpoints OpenAPI |
 
 ---
 
-## 4. Endpoints REST (OpenAPI)
+## 4. Endpoints REST (OpenAPI 3.0)
 
 | Método | Path | Permiso | Descripción |
 |---|---|---|---|
-| `POST` | `/api/v1/clients` | `CLIENTS_CREATE` | Crear cliente con contactos y destinos |
-| `PUT` | `/api/v1/clients` | `CLIENTS_UPDATE` | Actualizar cliente (sincronización inteligente) |
-| `GET` | `/api/v1/clients/{id}` | `CLIENTS_READ` | Obtener cliente por UUID |
+| `POST` | `/api/v1/clients` | `CLIENTS_CREATE` | Registrar cliente con contactos y destinos |
+| `PUT` | `/api/v1/clients` | `CLIENTS_UPDATE` | Actualizar cliente (sincronización de colecciones) |
+| `GET` | `/api/v1/clients/{id}` | `CLIENTS_READ` | Consultar cliente por UUID |
 | `GET` | `/api/v1/clients?organizationId=` | `CLIENTS_READ` | Listar clientes por organización |
-| `DELETE` | `/api/v1/clients/{id}` | `CLIENTS_DELETE` | Eliminar cliente (hard delete) |
-| `PATCH` | `/api/v1/clients/{id}/status` | `CLIENTS_UPDATE` | Toggle ACTIVE ↔ INACTIVE |
-| `GET` | `/api/v1/clients/{id}/audit` | `CLIENTS_READ` | Historial de auditoría |
-| `GET` | `/api/v1/clients/{id}/destinations` | `CLIENTS_READ` | Listar destinos del cliente |
-| `POST` | `/api/v1/clients/{id}/destinations` | `CLIENTS_UPDATE` | Agregar destino físico |
-| `PUT` | `/api/v1/clients/{id}/destinations/{destId}` | `CLIENTS_UPDATE` | Actualizar destino físico |
-| `DELETE` | `/api/v1/clients/{id}/destinations/{destId}` | `CLIENTS_UPDATE` | Eliminar destino físico |
+| `DELETE` | `/api/v1/clients/{id}` | `CLIENTS_DELETE` | Eliminación física del cliente |
+| `PATCH` | `/api/v1/clients/{id}/status` | `CLIENTS_UPDATE` | Baja lógica (toggle ACTIVE ↔ INACTIVE) |
+| `GET` | `/api/v1/clients/{id}/audit` | `CLIENTS_READ` | Bitácora de auditoría del cliente |
+| `GET` | `/api/v1/clients/{id}/destinations` | `CLIENTS_READ` | Listar destinos físicos de un cliente |
+| `POST` | `/api/v1/clients/{id}/destinations` | `CLIENTS_UPDATE` | Agregar destino físico individual |
+| `PUT` | `/api/v1/clients/{id}/destinations/{destId}` | `CLIENTS_UPDATE` | Actualizar destino físico individual |
+| `DELETE` | `/api/v1/clients/{id}/destinations/{destId}` | `CLIENTS_UPDATE` | Eliminar destino físico individual |
 
 ---
 
 ## 5. Reglas de Negocio Implementadas
 
-| ID | Regla | Implementación |
+| ID | Regla | Implementación Técnica |
 |---|---|---|
-| RN-CLI-001 | External ID único por organización (excepto RFCs genéricos) | `validateExternalIdUniqueness()` en `ClientService` |
-| RN-CLI-002 | Tax ID / RFC único por organización (excepto XAXX010101000 / XEXX010101000) | `validateTaxIdUniqueness()` en `ClientService` |
-| RN-CLI-003 | Código de destino (`destinationCode`) único por cliente | `validateDestinationCodeForNew()` + constraint `UNIQUE(client_id, destination_code)` |
-| RN-CLI-004 | Sincronización inteligente de contactos (add/update/delete en misma operación) | `syncContacts()` con `orphanRemoval = true` |
-| RN-CLI-005 | Sincronización inteligente de destinos | `syncDestinations()` con `orphanRemoval = true` |
-| RN-CLI-006 | Baja Lógica — clientes con historial no se borran físicamente | `PATCH /{id}/status` (`toggleClientStatus()`) |
-| RN-CLI-007 | Destinos INACTIVOS excluidos del módulo Outbound | Filtrado por `status = 'ACTIVO'` en `ClientDestinationJpaRepository` |
+| **RN-CLI-001** | External ID / Código ERP único por organización | `validateExternalIdUniqueness()` en `ClientService` + índice `uk_clients_org_external_id` |
+| **RN-CLI-002** | Tax ID / RFC único por organización (excepto genéricos `XAXX010101000` / `XEXX010101000`) | `validateTaxIdUniqueness()` en `ClientService` |
+| **RN-CLI-003** | Código de destino (`destinationCode`) único por cliente | `validateDestinationCodeForNew()` + constraint `uk_client_destination_code` |
+| **RN-CLI-004** | Sincronización inteligente de contactos | `syncContacts()` compara IDs existentes; agrega nuevos (`id=null`), actualiza modificados y elimina huérfanos vía `orphanRemoval = true` |
+| **RN-CLI-005** | Sincronización inteligente de destinos | `syncDestinations()` con misma estrategia transaccional |
+| **RN-CLI-006** | Baja Lógica operativa | `PATCH /{id}/status` cambia estado sin romper integridad referencial en inventario/pedidos |
+| **RN-CLI-007** | Consumo Outbound exclusivo de destinos activos | `ClientDestinationJpaRepository.findByClientIdAndStatus(clientId, "ACTIVO")` |
 
 ---
 
-## 6. Auditoría
+## 6. Sistema de Auditoría Transaccional
 
-Las acciones auditadas son:
-
-| Acción | Descripción |
-|---|---|
-| `CLIENT_CREATED` | Alta de nuevo cliente |
-| `CLIENT_UPDATED` | Modificación de datos del cliente |
-| `CLIENT_DELETED` | Eliminación del cliente |
-| `CLIENT_STATUS_CHANGED` | Cambio de estado ACTIVE ↔ INACTIVE |
-| `CLIENT_DESTINATION_ADDED` | Nueva bodega/planta vinculada |
-| `CLIENT_DESTINATION_UPDATED` | Actualización de destino físico |
-| `CLIENT_DESTINATION_DELETED` | Eliminación de destino físico |
-
-Todos los eventos se registran en `wms.audit_logs` con estado `beforeState` y `afterState` como JSON.
+* **Tabla Principal:** `wms.audit_logs` (registra `organization_id`, `user_id`, `action`, `entity_type = 'CLIENT'`, `entity_id`, `ip_address`, `user_agent`, `created_at`).
+* **Tabla Detalle:** `wms.audit_log_details` (registra `field_name`, `old_value`, `new_value`).
+* **Acciones Registradas:**
+  - `CLIENT_CREATED`: Registro inicial con todos los campos y conteos iniciales.
+  - `CLIENT_UPDATED`: Delta exacto campo por campo de los atributos modificados.
+  - `CLIENT_STATUS_CHANGED`: Registro del cambio `ACTIVE ↔ INACTIVE`.
+  - `CLIENT_DELETED`: Registro del borrado y estado final previo.
+  - `CLIENT_DESTINATION_ADDED`: Alta granular de bodega/planta.
+  - `CLIENT_DESTINATION_UPDATED`: Modificación granular de bodega/planta.
+  - `CLIENT_DESTINATION_DELETED`: Baja granular de bodega/planta.
 
 ---
 
-## 7. Cobertura de Pruebas
+## 7. Pruebas Unitarias (`ClientServiceTest.java`)
 
-**Clase:** `ClientServiceTest.java` (9 casos)
+```
+Tests run: 10, Failures: 0, Errors: 0, Skipped: 0 — BUILD SUCCESS
+```
 
-| Caso | Resultado esperado |
-|---|---|
-| Crear cliente con datos válidos | `ClientResponse` con id y status ACTIVE |
-| Crear con External ID duplicado | `ValidationException` |
-| Crear con RFC genérico | Éxito sin validar unicidad de Tax ID |
-| Actualizar cliente con datos válidos | `ClientResponse` actualizado |
-| Eliminar cliente existente | Llamada a `deleteById` verificada |
-| Obtener cliente con UUID inválido | `EntityNotFoundException` |
-| Toggle estado ACTIVE → INACTIVE | `save()` con status=INACTIVE |
-| Obtener logs de auditoría | Lista con acción `CLIENT_CREATED` |
-| Agregar destino con código único | `PhysicalDestinationDto` guardado |
-| Agregar destino con código duplicado | `ValidationException` |
+1. ✅ `whenCreateClient_withValidData_thenSuccess`
+2. ✅ `whenCreateClient_withDuplicateExternalId_thenThrowValidationException`
+3. ✅ `whenCreateClient_withGenericTaxId_thenSuccessEvenIfDuplicate`
+4. ✅ `whenUpdateClient_withValidData_thenSuccess`
+5. ✅ `whenDeleteClient_withExistingId_thenSuccess`
+6. ✅ `whenGetClientById_withInvalidId_thenThrowEntityNotFoundException`
+7. ✅ `whenToggleStatus_fromActive_thenBecomesInactive`
+8. ✅ `whenGetClientAuditLogs_withExistingId_thenReturnLogs`
+9. ✅ `whenAddDestination_withUniqueCode_thenSuccess`
+10. ✅ `whenAddDestination_withDuplicateCode_thenThrowValidationException`
