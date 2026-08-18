@@ -23,20 +23,17 @@ public interface ForkliftOperatorJpaRepository extends JpaRepository<ForkliftOpe
     /** List all active operators within an organization. */
     List<ForkliftOperatorEntity> findByOrganizationIdAndIsDeletedFalse(UUID organizationId);
 
-    /** Count active operators in an organization (used for code auto-generation). */
-    int countByOrganizationIdAndIsDeletedFalse(UUID organizationId);
-
-    /** Check code uniqueness within an organization. */
-    boolean existsByOrganizationIdAndCodeAndIsDeletedFalse(UUID organizationId, String code);
+    /** Check code uniqueness within an organization across ALL records (matches DB unique constraint). */
+    boolean existsByOrganizationIdAndCode(UUID organizationId, String code);
 
     /** Check code uniqueness excluding the record being updated. */
-    boolean existsByOrganizationIdAndCodeAndIdNotAndIsDeletedFalse(UUID organizationId, String code, UUID excludeId);
+    boolean existsByOrganizationIdAndCodeAndIdNot(UUID organizationId, String code, UUID excludeId);
 
-    /** Check DC-3 license uniqueness within an organization. */
-    boolean existsByOrganizationIdAndLicenseNumberDc3IgnoreCaseAndIsDeletedFalse(UUID organizationId, String licenseNumberDc3);
+    /** Check DC-3 license uniqueness within an organization across ALL records (matches DB unique constraint). */
+    boolean existsByOrganizationIdAndLicenseNumberDc3IgnoreCase(UUID organizationId, String licenseNumberDc3);
 
     /** Check DC-3 license uniqueness excluding the record being updated. */
-    boolean existsByOrganizationIdAndLicenseNumberDc3IgnoreCaseAndIdNotAndIsDeletedFalse(UUID organizationId, String licenseNumberDc3, UUID excludeId);
+    boolean existsByOrganizationIdAndLicenseNumberDc3IgnoreCaseAndIdNot(UUID organizationId, String licenseNumberDc3, UUID excludeId);
 
     /** Soft delete: set is_deleted = true and record who did it. */
     @Modifying

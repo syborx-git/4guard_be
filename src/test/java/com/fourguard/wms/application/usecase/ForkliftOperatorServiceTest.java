@@ -107,7 +107,7 @@ class ForkliftOperatorServiceTest {
 
         when(organizationRepositoryPort.findById(ORG_ID)).thenReturn(Optional.of(organization));
         when(operatorRepositoryPort.existsByOrganizationIdAndLicenseNumberDc3(ORG_ID, "LIC-MC-001")).thenReturn(false);
-        when(operatorRepositoryPort.countByOrganizationId(ORG_ID)).thenReturn(0);
+        when(operatorRepositoryPort.existsByOrganizationIdAndCode(ORG_ID, "MC-001")).thenReturn(false);
         when(mapper.toEntity(request)).thenReturn(operatorEntity);
         when(operatorRepositoryPort.save(any())).thenReturn(operatorEntity);
         when(mapper.toResponse(operatorEntity)).thenReturn(expectedResponse);

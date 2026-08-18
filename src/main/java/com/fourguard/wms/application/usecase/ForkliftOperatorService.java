@@ -89,9 +89,13 @@ public class ForkliftOperatorService implements ForkliftOperatorUseCase {
         ForkliftOperatorEntity entity = mapper.toEntity(request);
         entity.setOrganization(organization);
 
-        // Auto-generate code: MC-001, MC-002, etc.
-        int count = operatorRepositoryPort.countByOrganizationId(request.getOrganizationId());
-        entity.setCode(String.format("MC-%03d", count + 1));
+        // Auto-generate code: find the next available unique code (MC-001, MC-002, etc.)
+        int seq = 1;
+        String generatedCode;
+        do {
+            generatedCode = String.format("MC-%03d", seq++);
+        } while (operatorRepositoryPort.existsByOrganizationIdAndCode(request.getOrganizationId(), generatedCode));
+        entity.setCode(generatedCode);
 
         // Computed fields
         entity.setFullName(buildFullName(request.getFirstName(), request.getLastNamePaternal(), request.getLastNameMaternal()));

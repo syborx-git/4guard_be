@@ -54,26 +54,21 @@ public class ForkliftOperatorPersistenceAdapter implements ForkliftOperatorRepos
 
     @Override
     public boolean existsByOrganizationIdAndCode(UUID organizationId, String code) {
-        return repository.existsByOrganizationIdAndCodeAndIsDeletedFalse(organizationId, code);
+        return repository.existsByOrganizationIdAndCode(organizationId, code);
     }
 
     @Override
     public boolean existsByOrganizationIdAndCodeAndIdNot(UUID organizationId, String code, UUID excludeId) {
-        return repository.existsByOrganizationIdAndCodeAndIdNotAndIsDeletedFalse(organizationId, code, excludeId);
+        return repository.existsByOrganizationIdAndCodeAndIdNot(organizationId, code, excludeId);
     }
 
     @Override
     public boolean existsByOrganizationIdAndLicenseNumberDc3(UUID organizationId, String licenseNumberDc3) {
-        return repository.existsByOrganizationIdAndLicenseNumberDc3IgnoreCaseAndIsDeletedFalse(organizationId, licenseNumberDc3);
+        return repository.existsByOrganizationIdAndLicenseNumberDc3IgnoreCase(organizationId, licenseNumberDc3);
     }
 
     @Override
     public boolean existsByOrganizationIdAndLicenseNumberDc3AndIdNot(UUID organizationId, String licenseNumberDc3, UUID excludeId) {
-        return repository.existsByOrganizationIdAndLicenseNumberDc3IgnoreCaseAndIdNotAndIsDeletedFalse(organizationId, licenseNumberDc3, excludeId);
-    }
-
-    @Override
-    public int countByOrganizationId(UUID organizationId) {
-        return repository.countByOrganizationIdAndIsDeletedFalse(organizationId);
+        return repository.existsByOrganizationIdAndLicenseNumberDc3IgnoreCaseAndIdNot(organizationId, licenseNumberDc3, excludeId);
     }
 }

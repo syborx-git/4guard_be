@@ -31,7 +31,4 @@ public interface ForkliftOperatorRepositoryPort {
     boolean existsByOrganizationIdAndLicenseNumberDc3(UUID organizationId, String licenseNumberDc3);
 
     boolean existsByOrganizationIdAndLicenseNumberDc3AndIdNot(UUID organizationId, String licenseNumberDc3, UUID excludeId);
-
-    /** Returns the highest sequential code number for a given organization, used for code auto-generation. */
-    int countByOrganizationId(UUID organizationId);
 }
