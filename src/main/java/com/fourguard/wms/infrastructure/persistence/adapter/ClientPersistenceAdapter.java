@@ -10,9 +10,11 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+/** Adaptador de persistencia — Cliente Depositante / Owner 3PL. */
 @Component
 @RequiredArgsConstructor
 public class ClientPersistenceAdapter implements ClientRepositoryPort {
+
     private final ClientJpaRepository repository;
 
     @Override public Optional<ClientEntity> findById(UUID id)                { return repository.findById(id); }
@@ -21,6 +23,7 @@ public class ClientPersistenceAdapter implements ClientRepositoryPort {
     @Override public void                   deleteById(UUID id)              { repository.deleteById(id); }
     @Override public List<ClientEntity>     findAll()                        { return repository.findAll(); }
 
+    // Unicidad — Tax ID
     @Override
     public boolean existsByOrganizationIdAndTaxId(UUID organizationId, String taxId) {
         return repository.existsByOrganizationIdAndTaxIdIgnoreCase(organizationId, taxId);
@@ -29,5 +32,16 @@ public class ClientPersistenceAdapter implements ClientRepositoryPort {
     @Override
     public boolean existsByOrganizationIdAndTaxIdAndIdNot(UUID organizationId, String taxId, UUID id) {
         return repository.existsByOrganizationIdAndTaxIdIgnoreCaseAndIdNot(organizationId, taxId, id);
+    }
+
+    // Unicidad — External ID
+    @Override
+    public boolean existsByOrganizationIdAndExternalId(UUID organizationId, String externalId) {
+        return repository.existsByOrganizationIdAndExternalIdIgnoreCase(organizationId, externalId);
+    }
+
+    @Override
+    public boolean existsByOrganizationIdAndExternalIdAndIdNot(UUID organizationId, String externalId, UUID id) {
+        return repository.existsByOrganizationIdAndExternalIdIgnoreCaseAndIdNot(organizationId, externalId, id);
     }
 }
