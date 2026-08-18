@@ -35,7 +35,7 @@ public class ForkliftOperatorController {
     // ─── CREATE ─────────────────────────────────────────────────────────────────
 
     @PostMapping
-    @PreAuthorize("hasAuthority('FORKLIFT_OPERATORS_CREATE') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('FORKLIFT_OPERATORS_CREATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER')")
     @Operation(summary = "Registrar montacarguista",
                description = "Crea un nuevo operador en el catálogo maestro. El código (MC-XXX) se genera automáticamente.")
     @ApiResponses({
@@ -53,7 +53,7 @@ public class ForkliftOperatorController {
     // ─── UPDATE ─────────────────────────────────────────────────────────────────
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('FORKLIFT_OPERATORS_UPDATE') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('FORKLIFT_OPERATORS_UPDATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER')")
     @Operation(summary = "Actualizar montacarguista",
                description = "Actualiza los datos de un operador existente. El código operativo es inmutable.")
     @ApiResponses({
@@ -75,7 +75,7 @@ public class ForkliftOperatorController {
     // ─── GET BY ID ───────────────────────────────────────────────────────────────
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('FORKLIFT_OPERATORS_READ') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('WAREHOUSE_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('FORKLIFT_OPERATORS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('WAREHOUSE_SUPERVISOR')")
     @Operation(summary = "Obtener montacarguista por ID",
                description = "Retorna el detalle completo de un operador activo en el catálogo.")
     @ApiResponses({
@@ -89,7 +89,7 @@ public class ForkliftOperatorController {
     // ─── LIST ────────────────────────────────────────────────────────────────────
 
     @GetMapping
-    @PreAuthorize("hasAuthority('FORKLIFT_OPERATORS_READ') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER')")
+    @PreAuthorize("hasAuthority('FORKLIFT_OPERATORS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER')")
     @Operation(summary = "Listar montacarguistas",
                description = "Retorna la lista de montacarguistas con filtros opcionales por organización, sucursal, estatus, vigencia de licencia y búsqueda de texto libre.")
     public ResponseEntity<ApiResponse<List<ForkliftOperatorResponse>>> getOperators(
@@ -107,7 +107,7 @@ public class ForkliftOperatorController {
     // ─── DELETE ─────────────────────────────────────────────────────────────────
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('FORKLIFT_OPERATORS_DELETE') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('FORKLIFT_OPERATORS_DELETE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER')")
     @Operation(summary = "Eliminar montacarguista",
                description = "Realiza una baja lógica (soft delete) del operador. El registro permanece en BD para auditoría.")
     @ApiResponses({
@@ -122,7 +122,7 @@ public class ForkliftOperatorController {
     // ─── STATUS CHANGE ───────────────────────────────────────────────────────────
 
     @PatchMapping("/{id}/status")
-    @PreAuthorize("hasAuthority('FORKLIFT_OPERATORS_STATUS_CHANGE') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('WAREHOUSE_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('FORKLIFT_OPERATORS_STATUS_CHANGE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('WAREHOUSE_SUPERVISOR')")
     @Operation(summary = "Cambiar estatus de montacarguista",
                description = "Alterna el estatus entre ACTIVO e INACTIVO, con registro de motivo en auditoría.")
     @ApiResponses({
@@ -140,7 +140,7 @@ public class ForkliftOperatorController {
     // ─── AUDIT HISTORY ───────────────────────────────────────────────────────────
 
     @GetMapping("/{id}/audit")
-    @PreAuthorize("hasAuthority('FORKLIFT_OPERATORS_READ') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('FORKLIFT_OPERATORS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER')")
     @Operation(summary = "Historial de auditoría",
                description = "Retorna la bitácora de todos los cambios realizados sobre un montacarguista con deltas por campo.")
     public ResponseEntity<ApiResponse<List<ForkliftOperatorAuditResponse>>> getOperatorAuditLogs(@PathVariable UUID id) {
