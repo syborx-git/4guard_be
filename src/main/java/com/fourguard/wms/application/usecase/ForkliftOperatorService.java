@@ -180,7 +180,11 @@ public class ForkliftOperatorService implements ForkliftOperatorUseCase {
 
         log.debug("Listing forklift operators for organization: {}", organizationId);
 
-        return operatorRepositoryPort.findByOrganizationId(organizationId).stream()
+        List<ForkliftOperatorEntity> list = (organizationId != null)
+                ? operatorRepositoryPort.findByOrganizationId(organizationId)
+                : operatorRepositoryPort.findAll();
+
+        return list.stream()
                 .filter(op -> branchId == null
                         || (op.getBranch() != null && branchId.equals(op.getBranch().getId())))
                 .filter(op -> status == null || status.isBlank()

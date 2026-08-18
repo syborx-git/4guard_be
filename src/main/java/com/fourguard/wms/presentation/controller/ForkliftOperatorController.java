@@ -93,7 +93,7 @@ public class ForkliftOperatorController {
     @Operation(summary = "Listar montacarguistas",
                description = "Retorna la lista de montacarguistas con filtros opcionales por organización, sucursal, estatus, vigencia de licencia y búsqueda de texto libre.")
     public ResponseEntity<ApiResponse<List<ForkliftOperatorResponse>>> getOperators(
-            @RequestParam UUID organizationId,
+            @RequestParam(required = false) UUID organizationId,
             @RequestParam(required = false) UUID branchId,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String licenseStatus,
