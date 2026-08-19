@@ -1,10 +1,11 @@
 # SDD: Gestión de Montacarguistas — Backend
 
-> **Módulo:** Catálogo de Montacarguistas (Forklift Operators)
-> **HU:** HU-142 — Gestión de Montacarguistas
-> **Versión:** 1.0.0
-> **Estado:** ✅ Implementado
-> **Rama:** `catalogo-montacarga-be`
+> **Módulo:** Catálogo de Montacarguistas (Forklift Operators)  
+> **HU:** HU-142 — Gestión de Montacarguistas  
+> **Versión:** 1.0.0  
+> **Estado:** 🏁 CERRADO / LISTO PARA PR  
+> **Fecha de Cierre:** 2026-08-18  
+> **Rama:** `catalogo-montacarga-be`  
 
 ---
 
