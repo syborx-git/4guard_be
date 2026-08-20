@@ -106,9 +106,9 @@ public class WarehouseReceptionEntity extends BaseVersionedEntity {
     @Column(name = "expiration_date")
     private LocalDate expirationDate;
 
-    @Column(name = "pieces_per_pallet")
+    @Column(name = "pieces_per_pallet", precision = 10, scale = 2)
     @Builder.Default
-    private Double piecesPerPallet = 0.0;
+    private java.math.BigDecimal piecesPerPallet = java.math.BigDecimal.ZERO;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "pallet_type", length = 30)

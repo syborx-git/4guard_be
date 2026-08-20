@@ -97,9 +97,9 @@ public class WarehouseOutboundEntity extends BaseVersionedEntity {
     @Builder.Default
     private Integer totalPallets = 0;
 
-    @Column(name = "total_pieces", nullable = false)
+    @Column(name = "total_pieces", nullable = false, precision = 12, scale = 2)
     @Builder.Default
-    private Double totalPieces = 0.0;
+    private java.math.BigDecimal totalPieces = java.math.BigDecimal.ZERO;
 
     @Column(name = "distinct_skus", nullable = false)
     @Builder.Default

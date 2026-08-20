@@ -23,6 +23,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -115,7 +116,7 @@ public class WarehouseTransferService implements WarehouseTransferUseCase {
                 .reasonLabel(request.getReasonLabel())
                 .observations(request.getObservations())
                 .totalPallets(itemsToMove.size())
-                .totalPieces(totalPieces)
+                .totalPieces(BigDecimal.valueOf(totalPieces))
                 .distinctSkus(distinctSkuIds.size())
                 .build();
 
@@ -136,7 +137,7 @@ public class WarehouseTransferService implements WarehouseTransferUseCase {
             transferItems.add(WarehouseTransferItemEntity.builder()
                     .transfer(transfer)
                     .item(item)
-                    .pieces(item.getQuantity() != null ? item.getQuantity().doubleValue() : 0.0)
+                    .pieces(item.getQuantity() != null ? item.getQuantity() : BigDecimal.ZERO)
                     .palletCode(item.getSscc())
                     .build());
 

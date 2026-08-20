@@ -100,7 +100,7 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
                 .driverName(request.getDriverName())
                 .tractorPlates(request.getTractorPlates())
                 .boxPlates(request.getBoxPlates())
-                .piecesPerPallet(0.0)
+                .piecesPerPallet(BigDecimal.ZERO)
                 .palletType(PalletType.MADERA_ESTANDAR)
                 .build();
 
@@ -167,7 +167,7 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
         if (request.getLotNumber() != null) entity.setLotNumber(request.getLotNumber().trim());
         if (request.getElaborationDate() != null) entity.setElaborationDate(request.getElaborationDate());
         if (request.getExpirationDate() != null) entity.setExpirationDate(request.getExpirationDate());
-        if (request.getPiecesPerPallet() != null) entity.setPiecesPerPallet(request.getPiecesPerPallet());
+        if (request.getPiecesPerPallet() != null) entity.setPiecesPerPallet(BigDecimal.valueOf(request.getPiecesPerPallet()));
         if (request.getPalletType() != null) {
             try {
                 entity.setPalletType(PalletType.valueOf(request.getPalletType()));
@@ -248,7 +248,7 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
                     .palletCode(code)
                     .sku(reception.getSku())
                     .supplier(reception.getSupplier())
-                    .pieces(item.getPieces())
+                    .pieces(BigDecimal.valueOf(item.getPieces()))
                     .palletType(pType)
                     .observations(item.getObservations())
                     .build();
@@ -265,8 +265,8 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
         WarehouseReceptionPalletEntity pallet = palletRepositoryPort.findByReceptionIdAndId(receptionId, palletId)
                 .orElseThrow(() -> new EntityNotFoundException("Tarima no encontrada con ID: " + palletId));
 
-        Double oldPieces = pallet.getPieces();
-        if (request.getPieces() != null) pallet.setPieces(request.getPieces());
+        BigDecimal oldPieces = pallet.getPieces();
+        if (request.getPieces() != null) pallet.setPieces(BigDecimal.valueOf(request.getPieces()));
         if (request.getPalletType() != null) {
             try {
                 pallet.setPalletType(PalletType.valueOf(request.getPalletType()));
@@ -277,8 +277,8 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
         WarehouseReceptionPalletEntity saved = palletRepositoryPort.save(pallet);
 
         logAudit(receptionId, "TARIMA_EDITADA",
-                Map.of("palletCode", saved.getPalletCode(), "pieces", String.valueOf(oldPieces)),
-                Map.of("palletCode", saved.getPalletCode(), "pieces", String.valueOf(saved.getPieces())));
+                Map.of("palletCode", saved.getPalletCode(), "pieces", oldPieces != null ? oldPieces.toString() : "0"),
+                Map.of("palletCode", saved.getPalletCode(), "pieces", saved.getPieces() != null ? saved.getPieces().toString() : "0"));
 
         return receptionMapper.toPalletResponse(saved);
     }
@@ -332,7 +332,7 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
                     .sku(reception.getSku())
                     .location(reception.getStorageLocation())
                     .state(InventoryState.AVAILABLE)
-                    .quantity(BigDecimal.valueOf(pallet.getPieces()))
+                    .quantity(pallet.getPieces())
                     .batchNumber(reception.getLotNumber())
                     .manufacturingDate(reception.getElaborationDate())
                     .expirationDate(reception.getExpirationDate())
@@ -357,7 +357,7 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
 
         WarehouseReceptionEntity saved = receptionRepositoryPort.save(reception);
 
-        double totalPieces = pallets.stream().mapToDouble(WarehouseReceptionPalletEntity::getPieces).sum();
+        double totalPieces = pallets.stream().mapToDouble(p -> p.getPieces() != null ? p.getPieces().doubleValue() : 0.0).sum();
         logAudit(saved.getId(), "RECEPCION_COMPLETADA",
                 Map.of("status", "REGISTERED"),
                 Map.of("status", "COMPLETED",

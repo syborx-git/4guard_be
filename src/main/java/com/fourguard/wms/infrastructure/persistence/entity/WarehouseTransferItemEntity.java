@@ -33,9 +33,9 @@ public class WarehouseTransferItemEntity {
     @JoinColumn(name = "item_id", nullable = false)
     private InventoryItemEntity item;
 
-    @Column(nullable = false)
+    @Column(nullable = false, precision = 10, scale = 2)
     @Builder.Default
-    private Double pieces = 0.0;
+    private java.math.BigDecimal pieces = java.math.BigDecimal.ZERO;
 
     @Column(name = "pallet_code", length = 50)
     private String palletCode;

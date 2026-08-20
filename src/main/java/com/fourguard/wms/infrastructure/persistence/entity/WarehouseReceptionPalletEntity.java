@@ -50,9 +50,9 @@ public class WarehouseReceptionPalletEntity extends BaseAuditEntity {
     @JoinColumn(name = "supplier_id")
     private SupplierEntity supplier;
 
-    @Column(nullable = false)
+    @Column(nullable = false, precision = 10, scale = 2)
     @Builder.Default
-    private Double pieces = 0.0;
+    private java.math.BigDecimal pieces = java.math.BigDecimal.ZERO;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "pallet_type", nullable = false, length = 30)

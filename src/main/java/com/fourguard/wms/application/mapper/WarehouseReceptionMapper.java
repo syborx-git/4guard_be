@@ -41,7 +41,7 @@ public interface WarehouseReceptionMapper {
     @Mapping(source = "seals", target = "sealNumbers", qualifiedByName = "mapSealsToStrings")
     @Mapping(source = "pallets", target = "pallets")
     @Mapping(target = "totalPallets", expression = "java(entity.getPallets() != null ? entity.getPallets().size() : 0)")
-    @Mapping(target = "totalPieces", expression = "java(entity.getPallets() != null ? entity.getPallets().stream().mapToDouble(p -> p.getPieces() != null ? p.getPieces() : 0.0).sum() : 0.0)")
+    @Mapping(target = "totalPieces", expression = "java(entity.getPallets() != null ? entity.getPallets().stream().mapToDouble(p -> p.getPieces() != null ? p.getPieces().doubleValue() : 0.0).sum() : 0.0)")
     ReceptionResponse toResponse(WarehouseReceptionEntity entity);
 
     @Mapping(source = "client.id", target = "clientId")
@@ -56,7 +56,7 @@ public interface WarehouseReceptionMapper {
     @Mapping(source = "status", target = "status", qualifiedByName = "receptionStatusToString")
     @Mapping(source = "createdBy", target = "capturedBy")
     @Mapping(target = "totalPallets", expression = "java(entity.getPallets() != null ? entity.getPallets().size() : 0)")
-    @Mapping(target = "totalPieces", expression = "java(entity.getPallets() != null ? entity.getPallets().stream().mapToDouble(p -> p.getPieces() != null ? p.getPieces() : 0.0).sum() : 0.0)")
+    @Mapping(target = "totalPieces", expression = "java(entity.getPallets() != null ? entity.getPallets().stream().mapToDouble(p -> p.getPieces() != null ? p.getPieces().doubleValue() : 0.0).sum() : 0.0)")
     ReceptionSummaryResponse toSummaryResponse(WarehouseReceptionEntity entity);
 
     @Mapping(source = "sku.id", target = "skuId")

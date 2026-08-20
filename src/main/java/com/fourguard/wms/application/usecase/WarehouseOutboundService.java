@@ -25,6 +25,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -130,7 +131,7 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
                 .sealNumber(request.getSealNumber())
                 .remisionNo(request.getRemisionNo())
                 .totalPallets(itemsToDispatch.size())
-                .totalPieces(totalPieces)
+                .totalPieces(BigDecimal.valueOf(totalPieces))
                 .distinctSkus(distinctSkuIds.size())
                 .build();
 
@@ -153,7 +154,7 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
             outboundItems.add(WarehouseOutboundItemEntity.builder()
                     .outbound(outbound)
                     .item(item)
-                    .pieces(item.getQuantity() != null ? item.getQuantity().doubleValue() : 0.0)
+                    .pieces(item.getQuantity() != null ? item.getQuantity() : BigDecimal.ZERO)
                     .palletCode(item.getSscc())
                     .lotNumber(item.getBatchNumber())
                     .expirationDate(item.getExpirationDate())
