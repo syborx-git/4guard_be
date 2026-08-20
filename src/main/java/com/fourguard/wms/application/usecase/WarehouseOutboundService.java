@@ -210,7 +210,8 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
         }
         String cleanSearch = (search != null && !search.isBlank()) ? search.trim() : null;
 
-        List<WarehouseOutboundEntity> list = outboundJpaRepository.findWithFilters(organizationId, branchId, obStatus, cleanSearch);
+        List<WarehouseOutboundEntity> list = outboundJpaRepository.findAll(
+                WarehouseOutboundSpecification.withFilters(organizationId, branchId, obStatus, cleanSearch));
         return list.stream().map(outboundMapper::toSummaryResponse).collect(Collectors.toList());
     }
 

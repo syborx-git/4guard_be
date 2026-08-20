@@ -189,7 +189,8 @@ public class WarehouseTransferService implements WarehouseTransferUseCase {
         }
         String cleanSearch = (search != null && !search.isBlank()) ? search.trim() : null;
 
-        List<WarehouseTransferEntity> list = transferJpaRepository.findWithFilters(organizationId, branchId, trStatus, cleanSearch);
+        List<WarehouseTransferEntity> list = transferJpaRepository.findAll(
+                WarehouseTransferSpecification.withFilters(organizationId, branchId, trStatus, cleanSearch));
         return list.stream().map(transferMapper::toSummaryResponse).collect(Collectors.toList());
     }
 

@@ -207,7 +207,8 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
         }
         String cleanSearch = (search != null && !search.isBlank()) ? search.trim() : null;
 
-        List<WarehouseReceptionEntity> entities = receptionJpaRepository.findWithFilters(organizationId, branchId, recStatus, cleanSearch);
+        List<WarehouseReceptionEntity> entities = receptionJpaRepository.findAll(
+                WarehouseReceptionSpecification.withFilters(organizationId, branchId, recStatus, cleanSearch));
         return entities.stream().map(receptionMapper::toSummaryResponse).collect(Collectors.toList());
     }
 
