@@ -231,11 +231,6 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
 
         for (AddReceptionPalletsRequest.PalletItemRequest item : request.getPallets()) {
             String code = item.getPalletCode().trim();
-            if (palletRepositoryPort.existsByReceptionIdAndPalletCode(receptionId, code)) {
-                throw new ValidationException("El código de tarima/UA '" + code + "' ya existe en esta recepción.");
-            }
-
-            currentCount++;
             PalletType pType = reception.getPalletType();
             if (item.getPalletType() != null && !item.getPalletType().isBlank()) {
                 try {
@@ -243,6 +238,19 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
                 } catch (IllegalArgumentException ignored) {}
             }
 
+            Optional<WarehouseReceptionPalletEntity> existing = palletRepositoryPort.findByReceptionIdAndPalletCode(receptionId, code);
+            if (existing.isPresent()) {
+                WarehouseReceptionPalletEntity p = existing.get();
+                p.setPieces(BigDecimal.valueOf(item.getPieces()));
+                p.setPalletType(pType);
+                p.setObservations(item.getObservations());
+                p.setSku(reception.getSku());
+                p.setSupplier(reception.getSupplier());
+                palletRepositoryPort.save(p);
+                continue;
+            }
+
+            currentCount++;
             WarehouseReceptionPalletEntity palletEntity = WarehouseReceptionPalletEntity.builder()
                     .reception(reception)
                     .palletNumber(currentCount)
