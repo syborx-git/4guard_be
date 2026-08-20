@@ -1,11 +1,12 @@
 package com.fourguard.wms.infrastructure.persistence.entity;
 
 import com.fourguard.wms.domain.enums.PalletType;
-import com.fourguard.wms.shared.audit.BaseAuditEntity;
 import jakarta.persistence.*;
 import lombok.*;
-import lombok.experimental.SuperBuilder;
 
+import java.math.BigDecimal;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.UUID;
 
 /**
@@ -23,8 +24,9 @@ import java.util.UUID;
 @Getter
 @Setter
 @NoArgsConstructor
-@SuperBuilder(toBuilder = true)
-public class WarehouseReceptionPalletEntity extends BaseAuditEntity {
+@AllArgsConstructor
+@Builder(toBuilder = true)
+public class WarehouseReceptionPalletEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -52,7 +54,7 @@ public class WarehouseReceptionPalletEntity extends BaseAuditEntity {
 
     @Column(nullable = false, precision = 10, scale = 2)
     @Builder.Default
-    private java.math.BigDecimal pieces = java.math.BigDecimal.ZERO;
+    private BigDecimal pieces = BigDecimal.ZERO;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "pallet_type", nullable = false, length = 30)
@@ -65,4 +67,22 @@ public class WarehouseReceptionPalletEntity extends BaseAuditEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "inventory_item_id")
     private InventoryItemEntity inventoryItem;
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private OffsetDateTime createdAt;
+
+    @Column(name = "updated_at", nullable = false)
+    private OffsetDateTime updatedAt;
+
+    @PrePersist
+    protected void onPrePersist() {
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        if (createdAt == null) createdAt = now;
+        if (updatedAt == null) updatedAt = now;
+    }
+
+    @PreUpdate
+    protected void onPreUpdate() {
+        updatedAt = OffsetDateTime.now(ZoneOffset.UTC);
+    }
 }
