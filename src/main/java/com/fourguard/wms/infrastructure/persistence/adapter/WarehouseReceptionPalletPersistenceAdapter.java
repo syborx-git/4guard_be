@@ -32,6 +32,11 @@ public class WarehouseReceptionPalletPersistenceAdapter implements WarehouseRece
     }
 
     @Override
+    public Optional<WarehouseReceptionPalletEntity> findByReceptionIdAndPalletCode(UUID receptionId, String palletCode) {
+        return repository.findByReceptionIdAndPalletCode(receptionId, palletCode);
+    }
+
+    @Override
     public boolean existsByReceptionIdAndPalletCode(UUID receptionId, String palletCode) {
         return repository.existsByReceptionIdAndPalletCode(receptionId, palletCode);
     }

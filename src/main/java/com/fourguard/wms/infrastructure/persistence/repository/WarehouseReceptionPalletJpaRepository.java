@@ -15,6 +15,8 @@ public interface WarehouseReceptionPalletJpaRepository extends JpaRepository<War
 
     Optional<WarehouseReceptionPalletEntity> findByReceptionIdAndId(UUID receptionId, UUID palletId);
 
+    Optional<WarehouseReceptionPalletEntity> findByReceptionIdAndPalletCode(UUID receptionId, String palletCode);
+
     boolean existsByReceptionIdAndPalletCode(UUID receptionId, String palletCode);
 
     int countByReceptionId(UUID receptionId);

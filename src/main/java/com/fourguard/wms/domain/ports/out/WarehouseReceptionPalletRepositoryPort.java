@@ -18,6 +18,8 @@ public interface WarehouseReceptionPalletRepositoryPort {
 
     Optional<WarehouseReceptionPalletEntity> findByReceptionIdAndId(UUID receptionId, UUID palletId);
 
+    Optional<WarehouseReceptionPalletEntity> findByReceptionIdAndPalletCode(UUID receptionId, String palletCode);
+
     boolean existsByReceptionIdAndPalletCode(UUID receptionId, String palletCode);
 
     WarehouseReceptionPalletEntity save(WarehouseReceptionPalletEntity entity);
