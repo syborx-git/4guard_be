@@ -65,3 +65,12 @@ logging:
   level:
     root: INFO
     org.springframework.security: INFO
+
+# ── Banxico SIE API Integration ────────────────────────────────────────────────
+banxico:
+  api:
+    url: ${BANXICO_API_URL:https://www.banxico.org.mx/SieAPIRest/service/v1/series}
+    series-usd: ${BANXICO_SERIES_USD:SF57805}
+    series-eur: ${BANXICO_SERIES_EUR:SF46410}
+    token: ${BANXICO_API_TOKEN:PON_TU_TOKEN_DE_BANXICO_AQUI}
+    enabled: ${BANXICO_API_ENABLED:true}

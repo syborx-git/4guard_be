@@ -1,13 +1,28 @@
 package com.fourguard.wms.application.dto.response;
 
-import lombok.Builder;
-import lombok.Getter;
+import com.fourguard.wms.domain.enums.CurrencyStatus;
+import lombok.*;
 
-/** Response DTO for a currency catalog entry (GET /api/suppliers/catalogs/currencies). */
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
 @Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
 @Builder
 public class CurrencyResponse {
-    private final String code;
-    private final String label;
-    private final String symbol;
+
+    private UUID id;
+    private UUID organizationId;
+    private String code;
+    private String name;
+    private String symbol;
+    private Boolean isBase;
+    private CurrencyStatus status;
+    private Integer decimalPlaces;
+    private OffsetDateTime createdAt;
+    private String createdBy;
+    private OffsetDateTime updatedAt;
+    private String updatedBy;
 }

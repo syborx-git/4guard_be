@@ -4,7 +4,6 @@ import com.fourguard.wms.application.dto.request.CreateCarrierRequest;
 import com.fourguard.wms.application.dto.request.UpdateCarrierRequest;
 import com.fourguard.wms.application.dto.response.CarrierResponse;
 import com.fourguard.wms.application.dto.response.audit.CarrierAuditResponse;
-import com.fourguard.wms.domain.enums.CarrierStatus;
 import com.fourguard.wms.domain.ports.in.CarrierUseCase;
 import com.fourguard.wms.shared.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -132,5 +131,22 @@ public class CarrierController {
     public ResponseEntity<ApiResponse<List<CarrierAuditResponse>>> getCarrierAuditLogs(@PathVariable UUID id) {
         List<CarrierAuditResponse> response = carrierUseCase.getCarrierAuditLogs(id);
         return ResponseEntity.ok(ApiResponse.ok("Historial de auditoría recuperado con éxito", response));
+    }
+
+    @GetMapping("/validate-rfc")
+    @PreAuthorize("hasAuthority('CARRIERS_READ') or hasRole('OPERATIONS_MANAGER')")
+    @Operation(summary = "Validar RFC de transportista", description = "Verifica que el RFC (tax_id) especificado no esté registrado previamente para otro transportista.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "RFC disponible"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "El RFC ya existe para otro transportista o dato inválido"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "No autorizado"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Permisos insuficientes")
+    })
+    public ResponseEntity<ApiResponse<String>> validateTaxId(
+            @RequestParam String taxId,
+            @RequestParam(required = false) UUID organizationId,
+            @RequestParam(required = false) UUID excludeId) {
+        carrierUseCase.validateTaxId(taxId, organizationId, excludeId);
+        return ResponseEntity.ok(ApiResponse.ok("El RFC '" + taxId.trim() + "' está disponible", taxId.trim()));
     }
 }

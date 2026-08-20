@@ -19,4 +19,5 @@ public interface CarrierUseCase {
     void deleteCarrier(UUID id);
     CarrierResponse updateCarrierStatus(UUID id, UpdateCarrierStatusRequest request);
     List<CarrierAuditResponse> getCarrierAuditLogs(UUID id);
+    void validateTaxId(String taxId, UUID organizationId, UUID excludeId);
 }

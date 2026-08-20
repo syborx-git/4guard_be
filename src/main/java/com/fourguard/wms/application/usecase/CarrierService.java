@@ -54,7 +54,10 @@ public class CarrierService implements CarrierUseCase {
         OrganizationEntity organization = organizationRepositoryPort.findById(request.getOrganizationId())
                 .orElseThrow(() -> new EntityNotFoundException("Organización no encontrada con ID: " + request.getOrganizationId()));
 
-        // Validar unicidad de nombre en la misma organización
+        // 1. Validar unicidad de RFC (tax_id) obligatoriamente
+        validateTaxId(request.getTaxId(), request.getOrganizationId(), null);
+
+        // 2. Validar unicidad de nombre en la misma organización
         List<CarrierEntity> existingCarriers = carrierRepositoryPort.findByOrganizationId(request.getOrganizationId());
         boolean nameExists = existingCarriers.stream()
                 .anyMatch(c -> c.getName().equalsIgnoreCase(request.getName()));
@@ -107,6 +110,11 @@ public class CarrierService implements CarrierUseCase {
             if (nameExists) {
                 throw new ValidationException("Ya existe otro transportista registrado con el nombre '" + request.getName() + "' en esta organización.");
             }
+        }
+
+        // Validar unicidad del RFC si es que cambia o se envía
+        if (request.getTaxId() != null && !request.getTaxId().isBlank()) {
+            validateTaxId(request.getTaxId(), request.getOrganizationId(), request.getId());
         }
 
         // Tomar snapshot para la auditoría antes de modificar
@@ -325,5 +333,30 @@ public class CarrierService implements CarrierUseCase {
         }
         state.put("organizationId", entity.getOrganization() != null ? entity.getOrganization().getId().toString() : null);
         return state;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public void validateTaxId(String taxId, UUID organizationId, UUID excludeId) {
+        if (taxId == null || taxId.isBlank()) {
+            throw new ValidationException("El RFC (tax_id) es obligatorio para realizar la validación.");
+        }
+
+        String cleanedTaxId = taxId.trim();
+        boolean exists;
+
+        if (organizationId != null && excludeId != null) {
+            exists = carrierRepositoryPort.existsByOrganizationIdAndTaxIdAndIdNot(organizationId, cleanedTaxId, excludeId);
+        } else if (organizationId != null) {
+            exists = carrierRepositoryPort.existsByOrganizationIdAndTaxId(organizationId, cleanedTaxId);
+        } else if (excludeId != null) {
+            exists = carrierRepositoryPort.existsByTaxIdAndIdNot(cleanedTaxId, excludeId);
+        } else {
+            exists = carrierRepositoryPort.existsByTaxId(cleanedTaxId);
+        }
+
+        if (exists) {
+            throw new ValidationException("El RFC '" + cleanedTaxId + "' ya existe para otro transportista.");
+        }
     }
 }
