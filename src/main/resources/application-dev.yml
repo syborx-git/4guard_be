@@ -7,8 +7,8 @@ spring:
     driver-class-name: org.postgresql.Driver
     hikari:
       pool-name: 4guard-dev-pool
-      maximum-pool-size: 10
-      minimum-idle: 2
+      maximum-pool-size: 5
+      minimum-idle: 1
       connection-timeout: 30000
       idle-timeout: 600000
       max-lifetime: 1800000
@@ -72,11 +72,11 @@ security:
       - "*"
     allow-credentials: true
 
-# ── Logging (dev — verbose) ───────────────────────────────────────────────────
+# ── Logging (dev) ───────────────────────────────────────────────────────────
 logging:
   level:
-    com.fourguard.wms: DEBUG
-    org.springframework.security: DEBUG
-    org.hibernate.SQL: DEBUG
-    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    com.fourguard.wms: INFO
+    org.springframework.security: INFO
+    org.hibernate.SQL: WARN
+    org.hibernate.type.descriptor.sql.BasicBinder: WARN
     org.flywaydb: INFO
