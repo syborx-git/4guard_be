@@ -8,11 +8,15 @@ spring:
     hikari:
       pool-name: 4guard-dev-pool
       maximum-pool-size: 5
-      minimum-idle: 1
-      connection-timeout: 30000
+      minimum-idle: 2
+      connection-timeout: 20000
       idle-timeout: 600000
       max-lifetime: 1800000
       auto-commit: false
+      data-source-properties:
+        reWriteBatchedInserts: true       # Agrupa inserciones en un solo round-trip JDBC
+        preparedStatementCacheQueries: 64 # Cache de queries preparadas en cliente JDBC
+        preparedStatementCacheSizeMiB: 2  # Tamaño máximo del cache de queries (MB)
 
   # ── JPA / Hibernate ───────────────────────────────────────────────────────
   jpa:
