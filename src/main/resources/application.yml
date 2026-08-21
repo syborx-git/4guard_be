@@ -24,9 +24,14 @@ server:
     context-path: /api/v1
   tomcat:
     threads:
-      max: 20
+      max: 15          # Sintonizado para 0.5 vCPU — evita context-switching excesivo
       min-spare: 2
+    accept-count: 50   # Cola de peticiones bajo picos de carga
     connection-timeout: 20000
+  compression:
+    enabled: true
+    mime-types: application/json,application/xml,text/html,text/plain,application/javascript,text/css
+    min-response-size: 1024  # Comprimir sólo respuestas > 1 KB
   error:
     include-message: always
     include-binding-errors: always
@@ -44,6 +49,8 @@ springdoc:
     try-it-out-enabled: true
   default-produces-media-type: application/json
   show-actuator: false
+  cache:
+    disabled: false  # Cachea el spec OpenAPI generado — evita re-inspección en cada petición
 
 # ── Cache (Redis desacoplado) ─────────────────────────────────────────────────
 cache:
