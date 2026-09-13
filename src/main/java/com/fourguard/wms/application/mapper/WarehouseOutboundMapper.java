@@ -22,6 +22,8 @@ public interface WarehouseOutboundMapper {
     @Mapping(source = "destination.id", target = "destinationId")
     @Mapping(source = "carrier.id", target = "carrierId")
     @Mapping(source = "carrier.name", target = "carrierName")
+    @Mapping(source = "forkliftOperator.id", target = "forkliftOperatorId")
+    @Mapping(source = "forkliftOperator.fullName", target = "forkliftOperatorName")
     @Mapping(source = "status", target = "status", qualifiedByName = "outboundStatusToString")
     @Mapping(source = "items", target = "items")
     OutboundResponse toResponse(WarehouseOutboundEntity entity);
@@ -31,6 +33,8 @@ public interface WarehouseOutboundMapper {
     @Mapping(source = "destination.id", target = "destinationId")
     @Mapping(source = "carrier.id", target = "carrierId")
     @Mapping(source = "carrier.name", target = "carrierName")
+    @Mapping(source = "forkliftOperator.id", target = "forkliftOperatorId")
+    @Mapping(source = "forkliftOperator.fullName", target = "forkliftOperatorName")
     @Mapping(source = "status", target = "status", qualifiedByName = "outboundStatusToString")
     OutboundSummaryResponse toSummaryResponse(WarehouseOutboundEntity entity);
 

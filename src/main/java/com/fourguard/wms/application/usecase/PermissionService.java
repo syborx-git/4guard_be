@@ -89,7 +89,7 @@ public class PermissionService implements PermissionUseCase {
     @Transactional(readOnly = true)
     public List<PermissionAuditResponse> getPermissionAuditLogs(UUID id) {
         log.debug("Fetching audit logs for permission: {}", id);
-        if (!permissionRepositoryPort.findById(id).isPresent()) {
+        if (permissionRepositoryPort.findById(id).isEmpty()) {
             throw new EntityNotFoundException("Permiso no encontrado con ID: " + id);
         }
 
@@ -100,7 +100,7 @@ public class PermissionService implements PermissionUseCase {
                     String username = "SYSTEM";
                     if (logEntry.getUserId() != null) {
                         username = userRepositoryPort.findById(logEntry.getUserId())
-                                .map(UserEntity::getUsername)
+                                .map(u -> u.getUsername())
                                 .orElse("UNKNOWN");
                     }
                     List<PermissionAuditResponse.AuditDetailResponse> detailResponses = logEntry.getDetails().stream()

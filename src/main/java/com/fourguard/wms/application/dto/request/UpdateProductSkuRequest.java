@@ -35,4 +35,7 @@ public class UpdateProductSkuRequest {
     @NotBlank(message = "La unidad de medida es requerida")
     @Size(max = 20, message = "La unidad no puede superar 20 caracteres")
     String unit;
+
+    @Size(max = 50, message = "La categoría no puede superar 50 caracteres")
+    String category;
 }

@@ -42,6 +42,8 @@ public class ReceptionSummaryResponse {
     private String skuCode;
     private String productName;
     private String lotNumber;
+    private UUID storageLocationId;
+    private String storageLocationCode;
     private Integer totalPallets;
     private Double totalPieces;
 

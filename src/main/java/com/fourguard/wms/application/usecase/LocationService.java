@@ -270,7 +270,7 @@ public class LocationService implements LocationUseCase {
     @Transactional(readOnly = true)
     public List<LocationAuditResponse> getLocationAuditLogs(UUID id) {
         log.debug("Fetching audit logs for location: {}", id);
-        if (!locationRepositoryPort.findById(id).isPresent()) {
+        if (locationRepositoryPort.findById(id).isEmpty()) {
             throw new EntityNotFoundException("Ubicación no encontrada con ID: " + id);
         }
 
@@ -281,7 +281,7 @@ public class LocationService implements LocationUseCase {
                     String username = "SYSTEM";
                     if (logEntry.getUserId() != null) {
                         username = userRepositoryPort.findById(logEntry.getUserId())
-                                .map(UserEntity::getUsername)
+                                .map(u -> u.getUsername())
                                 .orElse("UNKNOWN");
                     }
                     List<LocationAuditResponse.AuditDetailResponse> detailResponses = logEntry.getDetails().stream()

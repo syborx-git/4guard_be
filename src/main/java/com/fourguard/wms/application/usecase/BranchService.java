@@ -130,7 +130,7 @@ public class BranchService implements CreateBranchUseCase, UpdateBranchUseCase, 
     @Transactional(readOnly = true)
     public List<BranchAuditResponse> getBranchAuditLogs(UUID id) {
         log.debug("Fetching audit logs for branch: {}", id);
-        if (!branchRepositoryPort.findById(id).isPresent()) {
+        if (branchRepositoryPort.findById(id).isEmpty()) {
             throw new EntityNotFoundException("Sucursal no encontrada con ID: " + id);
         }
 
@@ -141,7 +141,7 @@ public class BranchService implements CreateBranchUseCase, UpdateBranchUseCase, 
                     String username = "SYSTEM";
                     if (logEntry.getUserId() != null) {
                         username = userRepositoryPort.findById(logEntry.getUserId())
-                                .map(UserEntity::getUsername)
+                                .map(u -> u.getUsername())
                                 .orElse("UNKNOWN");
                     }
                     List<BranchAuditResponse.AuditDetailResponse> detailResponses = logEntry.getDetails().stream()

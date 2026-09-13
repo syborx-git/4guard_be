@@ -3,6 +3,7 @@ package com.fourguard.wms.presentation.controller;
 import com.fourguard.wms.application.dto.request.CreateProductSkuRequest;
 import com.fourguard.wms.application.dto.request.UpdateProductSkuRequest;
 import com.fourguard.wms.application.dto.response.ProductSkuResponse;
+import com.fourguard.wms.application.dto.response.audit.ProductSkuAuditResponse;
 import com.fourguard.wms.domain.ports.in.ProductSkuUseCase;
 import com.fourguard.wms.shared.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -99,5 +100,19 @@ public class ProductSkuController {
     public ResponseEntity<ApiResponse<Void>> deleteProductSku(@PathVariable UUID id) {
         productSkuUseCase.deleteProductSku(id);
         return ResponseEntity.ok(ApiResponse.ok("SKU eliminado con éxito"));
+    }
+
+    @GetMapping("/{id}/audit")
+    @PreAuthorize("hasAuthority('INVENTORY_READ') or hasRole('OPERATIONS_MANAGER') or hasRole('AUDITOR')")
+    @Operation(summary = "Historial de auditoría del SKU", description = "Recupera la bitácora cronológica de cambios y eventos de auditoría para un SKU.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Historial de auditoría recuperado con éxito"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "No autorizado"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Permisos insuficientes"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "SKU no encontrado")
+    })
+    public ResponseEntity<ApiResponse<List<ProductSkuAuditResponse>>> getProductSkuAuditLogs(@PathVariable UUID id) {
+        List<ProductSkuAuditResponse> logs = productSkuUseCase.getProductSkuAuditLogs(id);
+        return ResponseEntity.ok(ApiResponse.ok("Historial de auditoría recuperado con éxito", logs));
     }
 }

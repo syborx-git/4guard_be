@@ -25,9 +25,8 @@ public class SupplierContactRequest {
     @Schema(description = "Correo electrónico del contacto", example = "cmendoza@empaquesnorte.com.mx")
     String email;
 
-    @NotBlank(message = "El teléfono del contacto es requerido")
-    @Size(min = 7, max = 25, message = "El teléfono debe tener entre 7 y 25 caracteres")
-    @Schema(description = "Teléfono principal del contacto", example = "8183456789")
+    @Size(max = 25, message = "El teléfono no puede superar 25 caracteres")
+    @Schema(description = "Teléfono principal del contacto (opcional)", example = "8183456789")
     String phone;
 
     @Size(max = 25, message = "El teléfono alterno no puede superar 25 caracteres")

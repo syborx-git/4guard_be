@@ -56,7 +56,7 @@ public class WarehouseTransferController {
     @Operation(summary = "Listar traspasos",
                description = "Retorna el historial de traspasos filtrado por organización, sucursal, estatus y término de búsqueda.")
     public ResponseEntity<ApiResponse<List<TransferSummaryResponse>>> getTransfers(
-            @RequestParam UUID organizationId,
+            @RequestParam(required = false) UUID organizationId,
             @RequestParam(required = false) UUID branchId,
             @RequestParam(required = false, defaultValue = "ALL") String status,
             @RequestParam(required = false) String search) {

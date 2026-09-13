@@ -204,7 +204,7 @@ public class UserService implements CreateUserUseCase, GetUserUseCase, UpdateUse
     @Transactional(readOnly = true)
     public List<UserAuditResponse> getUserAuditLogs(UUID id) {
         log.debug("Fetching audit logs for user: {}", id);
-        if (!userRepositoryPort.findById(id).isPresent()) {
+        if (userRepositoryPort.findById(id).isEmpty()) {
             throw new EntityNotFoundException("User not found with ID: " + id);
         }
 
@@ -215,7 +215,7 @@ public class UserService implements CreateUserUseCase, GetUserUseCase, UpdateUse
                     String username = "SYSTEM";
                     if (logEntry.getUserId() != null) {
                         username = userRepositoryPort.findById(logEntry.getUserId())
-                                .map(UserEntity::getUsername)
+                                .map(u -> u.getUsername())
                                 .orElse("UNKNOWN");
                     }
                     List<UserAuditResponse.AuditDetailResponse> detailResponses = logEntry.getDetails().stream()

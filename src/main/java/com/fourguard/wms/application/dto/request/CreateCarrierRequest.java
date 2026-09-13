@@ -34,35 +34,29 @@ public class CreateCarrierRequest {
     @Schema(description = "Nombre comercial", example = "TransNoreste")
     String tradeName;
 
-    @NotBlank(message = "El RFC / Tax ID es requerido")
     @Size(max = 30, message = "El tax ID / RFC no puede superar 30 caracteres")
-    @Pattern(regexp = "^[A-Z0-9&\\-\\.\\s]*$", message = "RFC con formato inválido")
-    @Schema(description = "RFC o Tax ID del transportista", example = "TN0890314AB2")
+    @Pattern(regexp = "^$|^[A-Z0-9&\\-\\.\\s]*$", message = "RFC con formato inválido")
+    @Schema(description = "RFC o Tax ID del transportista (opcional)", example = "TN0890314AB2")
     String taxId;
 
-    @NotBlank(message = "El tipo de transportista es requerido")
-    @Schema(description = "Tipo de transportista (INTERNAL, EXTERNAL, DEDICATED)", example = "EXTERNAL")
+    @Schema(description = "Tipo de transportista (EXTERNAL, CLIENT_TRANSPORT, OWN_TRANSPORT, THIRD_PARTY_3PL, PARCEL)", example = "EXTERNAL")
     String carrierType;
 
-    @NotBlank(message = "El nombre del contacto es requerido")
     @Size(max = 150, message = "El nombre del contacto no puede superar 150 caracteres")
-    @Schema(description = "Nombre del representante o contacto", example = "Roberto Garza Hernández")
+    @Schema(description = "Nombre del representante o contacto (opcional)", example = "Roberto Garza Hernández")
     String contactName;
 
-    @NotBlank(message = "El teléfono del contacto es requerido")
     @Size(max = 20, message = "El teléfono no puede superar 20 caracteres")
-    @Pattern(regexp = "^\\+?[0-9\\s\\-()]{7,20}$", message = "Formato de teléfono inválido")
-    @Schema(description = "Teléfono de contacto", example = "8181234567")
+    @Pattern(regexp = "^$|^\\+?[0-9\\s\\-()]{7,20}$", message = "Formato de teléfono inválido")
+    @Schema(description = "Teléfono de contacto (opcional)", example = "8181234567")
     String contactPhone;
 
-    @NotBlank(message = "El correo electrónico del contacto es requerido")
     @Email(message = "Debe proporcionar un correo electrónico válido")
     @Size(max = 255, message = "El correo no puede superar 255 caracteres")
-    @Schema(description = "Correo electrónico de contacto", example = "rgarza@transnoreste.com.mx")
+    @Schema(description = "Correo electrónico de contacto (opcional)", example = "rgarza@transnoreste.com.mx")
     String contactEmail;
 
-    @NotBlank(message = "El tipo de servicio es requerido")
-    @Schema(description = "Tipo de servicio (FTL, LTL, PARCEL, LOCAL)", example = "FTL")
+    @Schema(description = "Tipo de servicio (FTL, LTL, PARCEL, INTERMODAL, LAST_MILE, DEDICATED)", example = "FTL")
     String serviceType;
 
     @Schema(description = "Número de registro o permiso oficial (ej: permiso SCT)", example = "SCT-NL-00234-2022")

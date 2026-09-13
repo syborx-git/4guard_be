@@ -36,7 +36,7 @@ public class CarrierEntity extends BaseVersionedEntity {
     @Column(name = "trade_name", nullable = false, length = 200)
     private String tradeName;
 
-    @Column(name = "tax_id", nullable = false, length = 30)
+    @Column(name = "tax_id", length = 30)
     private String taxId;
 
     @Enumerated(EnumType.STRING)
@@ -49,13 +49,13 @@ public class CarrierEntity extends BaseVersionedEntity {
     @Builder.Default
     private CarrierStatus status = CarrierStatus.ACTIVE;
 
-    @Column(name = "contact_name", nullable = false, length = 150)
+    @Column(name = "contact_name", length = 150)
     private String contactName;
 
-    @Column(name = "contact_phone", nullable = false, length = 20)
+    @Column(name = "contact_phone", length = 20)
     private String contactPhone;
 
-    @Column(name = "contact_email", nullable = false, length = 255)
+    @Column(name = "contact_email", length = 255)
     private String contactEmail;
 
     @Enumerated(EnumType.STRING)

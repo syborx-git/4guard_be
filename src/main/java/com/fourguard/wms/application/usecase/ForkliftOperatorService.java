@@ -12,8 +12,10 @@ import com.fourguard.wms.domain.exception.EntityNotFoundException;
 import com.fourguard.wms.domain.exception.ValidationException;
 import com.fourguard.wms.domain.ports.in.ForkliftOperatorUseCase;
 import com.fourguard.wms.domain.ports.out.AuditLogRepositoryPort;
+import com.fourguard.wms.domain.ports.out.BranchRepositoryPort;
 import com.fourguard.wms.domain.ports.out.ForkliftOperatorRepositoryPort;
 import com.fourguard.wms.domain.ports.out.OrganizationRepositoryPort;
+import com.fourguard.wms.domain.ports.out.ShiftRepositoryPort;
 import com.fourguard.wms.domain.ports.out.UserRepositoryPort;
 import com.fourguard.wms.infrastructure.persistence.entity.AuditLogEntity;
 import com.fourguard.wms.infrastructure.persistence.entity.BranchEntity;
@@ -21,8 +23,6 @@ import com.fourguard.wms.infrastructure.persistence.entity.ForkliftOperatorEntit
 import com.fourguard.wms.infrastructure.persistence.entity.OrganizationEntity;
 import com.fourguard.wms.infrastructure.persistence.entity.ShiftEntity;
 import com.fourguard.wms.infrastructure.persistence.entity.UserEntity;
-import com.fourguard.wms.infrastructure.persistence.repository.BranchJpaRepository;
-import com.fourguard.wms.infrastructure.persistence.repository.ShiftJpaRepository;
 import com.fourguard.wms.shared.audit.AuditService;
 import com.fourguard.wms.shared.audit.SecurityAuditHelper;
 import lombok.RequiredArgsConstructor;
@@ -61,8 +61,8 @@ public class ForkliftOperatorService implements ForkliftOperatorUseCase {
     private final OrganizationRepositoryPort     organizationRepositoryPort;
     private final UserRepositoryPort             userRepositoryPort;
     private final AuditLogRepositoryPort         auditLogRepositoryPort;
-    private final ShiftJpaRepository             shiftJpaRepository;
-    private final BranchJpaRepository            branchJpaRepository;
+    private final ShiftRepositoryPort            shiftRepositoryPort;
+    private final BranchRepositoryPort           branchRepositoryPort;
     private final ForkliftOperatorMapper         mapper;
     private final SecurityAuditHelper            securityAuditHelper;
     private final AuditService                   auditService;
@@ -196,6 +196,7 @@ public class ForkliftOperatorService implements ForkliftOperatorUseCase {
                     String q = search.toLowerCase();
                     return op.getFullName().toLowerCase().contains(q)
                             || op.getCode().toLowerCase().contains(q)
+                            || (op.getJobTitle() != null && op.getJobTitle().toLowerCase().contains(q))
                             || op.getLicenseNumberDc3().toLowerCase().contains(q);
                 })
                 .map(mapper::toResponse)
@@ -267,7 +268,7 @@ public class ForkliftOperatorService implements ForkliftOperatorUseCase {
     public List<ForkliftOperatorAuditResponse> getOperatorAuditLogs(UUID id) {
         log.debug("Fetching audit logs for forklift operator: {}", id);
 
-        if (!operatorRepositoryPort.findActiveById(id).isPresent()) {
+        if (operatorRepositoryPort.findActiveById(id).isEmpty()) {
             throw new EntityNotFoundException("Montacarguista no encontrado con ID: " + id);
         }
 
@@ -278,7 +279,7 @@ public class ForkliftOperatorService implements ForkliftOperatorUseCase {
                     String username = "SYSTEM";
                     if (logEntry.getUserId() != null) {
                         username = userRepositoryPort.findById(logEntry.getUserId())
-                                .map(UserEntity::getUsername)
+                                .map(u -> u.getUsername())
                                 .orElse("UNKNOWN");
                     }
 
@@ -324,7 +325,7 @@ public class ForkliftOperatorService implements ForkliftOperatorUseCase {
             entity.setShiftName(null);
             return;
         }
-        ShiftEntity shift = shiftJpaRepository.findByIdAndIsDeletedFalse(shiftId)
+        ShiftEntity shift = shiftRepositoryPort.findById(shiftId)
                 .orElseThrow(() -> new EntityNotFoundException("Turno no encontrado con ID: " + shiftId));
         entity.setShift(shift);
         entity.setShiftName(shift.getName());
@@ -336,7 +337,7 @@ public class ForkliftOperatorService implements ForkliftOperatorUseCase {
             entity.setBranch(null);
             return;
         }
-        BranchEntity branch = branchJpaRepository.findById(branchId)
+        BranchEntity branch = branchRepositoryPort.findById(branchId)
                 .orElseThrow(() -> new EntityNotFoundException("Sucursal no encontrada con ID: " + branchId));
         entity.setBranch(branch);
     }
@@ -348,6 +349,7 @@ public class ForkliftOperatorService implements ForkliftOperatorUseCase {
                 .organization(source.getOrganization())
                 .branch(source.getBranch())
                 .code(source.getCode())
+                .jobTitle(source.getJobTitle())
                 .firstName(source.getFirstName())
                 .lastNamePaternal(source.getLastNamePaternal())
                 .lastNameMaternal(source.getLastNameMaternal())
@@ -397,6 +399,7 @@ public class ForkliftOperatorService implements ForkliftOperatorUseCase {
         Map<String, Object> state = new HashMap<>();
         state.put("id",                    entity.getId() != null ? entity.getId().toString() : null);
         state.put("code",                  entity.getCode());
+        state.put("jobTitle",              entity.getJobTitle());
         state.put("fullName",              entity.getFullName());
         state.put("firstName",             entity.getFirstName());
         state.put("lastNamePaternal",      entity.getLastNamePaternal());

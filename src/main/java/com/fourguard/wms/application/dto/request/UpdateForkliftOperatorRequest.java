@@ -29,6 +29,10 @@ public class UpdateForkliftOperatorRequest {
     @Schema(description = "UUID de la sucursal (opcional)", example = "b73f0907-9fa5-4bdf-87db-2eb5e7683936")
     UUID branchId;
 
+    @Size(max = 100, message = "El puesto no puede superar 100 caracteres")
+    @Schema(description = "Puesto o cargo operativo", example = "Almacenista Montacargista")
+    String jobTitle;
+
     @NotBlank(message = "El nombre(s) del operador es requerido")
     @Size(max = 100, message = "El nombre no puede superar 100 caracteres")
     @Schema(description = "Nombre(s) del montacarguista", example = "Juan Manuel")

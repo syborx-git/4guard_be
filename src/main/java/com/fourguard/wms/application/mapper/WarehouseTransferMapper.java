@@ -26,6 +26,7 @@ public interface WarehouseTransferMapper {
     @Mapping(source = "forkliftOperator.fullName", target = "forkliftOperatorName")
     @Mapping(source = "status", target = "status", qualifiedByName = "transferStatusToString")
     @Mapping(source = "reasonCode", target = "reasonCode", qualifiedByName = "transferReasonToString")
+    @Mapping(source = "createdBy", target = "createdBy")
     @Mapping(source = "items", target = "items")
     TransferResponse toResponse(WarehouseTransferEntity entity);
 
@@ -37,11 +38,14 @@ public interface WarehouseTransferMapper {
     @Mapping(source = "forkliftOperator.fullName", target = "forkliftOperatorName")
     @Mapping(source = "status", target = "status", qualifiedByName = "transferStatusToString")
     @Mapping(source = "reasonCode", target = "reasonCode", qualifiedByName = "transferReasonToString")
+    @Mapping(source = "createdBy", target = "createdBy")
     TransferSummaryResponse toSummaryResponse(WarehouseTransferEntity entity);
 
     @Mapping(source = "item.id", target = "itemId")
+    @Mapping(source = "palletCode", target = "palletCode")
     @Mapping(source = "item.sku.code", target = "skuCode")
     @Mapping(source = "item.sku.name", target = "skuDescription")
+    @Mapping(source = "pieces", target = "pieces")
     TransferItemResponse toItemResponse(WarehouseTransferItemEntity entity);
 
     List<TransferItemResponse> toItemResponseList(List<WarehouseTransferItemEntity> entities);

@@ -28,12 +28,16 @@ public class OutboundSummaryResponse {
 
     private UUID carrierId;
     private String carrierName;
+    private UUID forkliftOperatorId;
+    private String forkliftOperatorName;
     private String transportType;
     private String driverName;
+    private String economicNumber;
     private String tractorPlates;
     private String boxPlates;
     private String sealNumber;
     private String remisionNo;
+    private String destinationAddress;
 
     private Integer totalPallets;
     private Double totalPieces;

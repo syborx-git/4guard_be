@@ -26,6 +26,7 @@ public interface ForkliftOperatorMapper {
      * (code, fullName, licenseStatus, status, etc.) are set by the service.
      */
     @BeanMapping(ignoreByDefault = true)
+    @Mapping(target = "jobTitle",              source = "jobTitle")
     @Mapping(target = "firstName",             source = "firstName")
     @Mapping(target = "lastNamePaternal",      source = "lastNamePaternal")
     @Mapping(target = "lastNameMaternal",      source = "lastNameMaternal")
@@ -37,6 +38,7 @@ public interface ForkliftOperatorMapper {
      * Updates an existing entity with the user-supplied data from the update request.
      */
     @BeanMapping(ignoreByDefault = true)
+    @Mapping(target = "jobTitle",              source = "jobTitle")
     @Mapping(target = "firstName",             source = "firstName")
     @Mapping(target = "lastNamePaternal",      source = "lastNamePaternal")
     @Mapping(target = "lastNameMaternal",      source = "lastNameMaternal")

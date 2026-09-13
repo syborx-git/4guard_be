@@ -24,6 +24,9 @@ public class ForkliftOperatorResponse {
     /** Operational code: MC-001, MC-002, etc. */
     private final String code;
 
+    /** Job title / position (e.g. Almacenista Montacargista, Líder de Turno, Mesa de Control). */
+    private final String jobTitle;
+
     private final String firstName;
     private final String lastNamePaternal;
     private final String lastNameMaternal;

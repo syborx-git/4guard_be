@@ -34,9 +34,8 @@ public class ClientContactDto {
     @Schema(description = "Departamento o área del contacto", example = "Logística y Abasto")
     private final String department;
 
-    @NotBlank(message = "El teléfono directo es obligatorio")
     @Size(max = 50, message = "El teléfono no puede superar 50 caracteres")
-    @Schema(description = "Teléfono directo del contacto", example = "55 1234 5678")
+    @Schema(description = "Teléfono directo del contacto (opcional)", example = "55 1234 5678")
     private final String phone;
 
     @NotBlank(message = "El correo es obligatorio")

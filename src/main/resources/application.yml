@@ -79,5 +79,5 @@ banxico:
     url: ${BANXICO_API_URL:https://www.banxico.org.mx/SieAPIRest/service/v1/series}
     series-usd: ${BANXICO_SERIES_USD:SF57805}
     series-eur: ${BANXICO_SERIES_EUR:SF46410}
-    token: ${BANXICO_API_TOKEN:PON_TU_TOKEN_DE_BANXICO_AQUI}
+    token: ${BANXICO_API_TOKEN:69790db6b9a79d44368d4029aab1754cb590dddc7f8643ffcbeb788534bd52eb}
     enabled: ${BANXICO_API_ENABLED:true}

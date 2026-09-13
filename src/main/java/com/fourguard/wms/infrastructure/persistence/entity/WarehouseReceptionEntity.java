@@ -112,8 +112,7 @@ public class WarehouseReceptionEntity extends BaseVersionedEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "pallet_type", length = 30)
-    @Builder.Default
-    private PalletType palletType = PalletType.MADERA_ESTANDAR;
+    private PalletType palletType;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "storage_location_id")

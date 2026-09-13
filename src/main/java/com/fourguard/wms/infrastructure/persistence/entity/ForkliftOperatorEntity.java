@@ -47,6 +47,10 @@ public class ForkliftOperatorEntity extends BaseVersionedEntity {
     @Column(nullable = false, length = 30)
     private String code;
 
+    /** Job title / position (e.g. Almacenista Montacargista, Líder de Turno, Mesa de Control). */
+    @Column(name = "job_title", length = 100)
+    private String jobTitle;
+
     @Column(name = "first_name", nullable = false, length = 100)
     private String firstName;
 

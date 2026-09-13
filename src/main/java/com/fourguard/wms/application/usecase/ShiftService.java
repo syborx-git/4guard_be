@@ -82,7 +82,7 @@ public class ShiftService implements ShiftUseCase {
                     null
             );
             if (!overlaps.isEmpty()) {
-                String overlappingCodes = overlaps.stream().map(ShiftEntity::getCode).collect(Collectors.joining(", "));
+                String overlappingCodes = overlaps.stream().map(s -> s.getCode()).collect(Collectors.joining(", "));
                 throw new ValidationException("El turno genera solapamiento de horarios/días con los siguientes turnos activos: " + overlappingCodes);
             }
         }
@@ -141,7 +141,7 @@ public class ShiftService implements ShiftUseCase {
                     id
             );
             if (!overlaps.isEmpty()) {
-                String overlappingCodes = overlaps.stream().map(ShiftEntity::getCode).collect(Collectors.joining(", "));
+                String overlappingCodes = overlaps.stream().map(s -> s.getCode()).collect(Collectors.joining(", "));
                 throw new ValidationException("El turno genera solapamiento de horarios/días con los siguientes turnos activos: " + overlappingCodes);
             }
         }
@@ -241,7 +241,7 @@ public class ShiftService implements ShiftUseCase {
                     String username = "SYSTEM";
                     if (logEntry.getUserId() != null) {
                         username = userRepositoryPort.findById(logEntry.getUserId())
-                                .map(UserEntity::getUsername)
+                                .map(u -> u.getUsername())
                                 .orElse("UNKNOWN");
                     }
                     List<ShiftAuditResponse.AuditDetailResponse> details = logEntry.getDetails().stream()

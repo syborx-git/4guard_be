@@ -86,7 +86,9 @@ public class SupplierSpecification {
                 predicates.add(cb.or(searchPredicates.toArray(new Predicate[0])));
 
                 // Avoid duplicate results from joins with DISTINCT
-                query.distinct(true);
+                if (query != null) {
+                    query.distinct(true);
+                }
             }
 
             return cb.and(predicates.toArray(new Predicate[0]));

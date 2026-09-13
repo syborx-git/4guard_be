@@ -13,12 +13,12 @@ import com.fourguard.wms.domain.exception.ValidationException;
 import com.fourguard.wms.domain.ports.in.AlertConfigUseCase;
 import com.fourguard.wms.domain.ports.out.AlertConfigRepositoryPort;
 import com.fourguard.wms.domain.ports.out.AuditLogRepositoryPort;
+import com.fourguard.wms.domain.ports.out.OrganizationRepositoryPort;
 import com.fourguard.wms.domain.ports.out.UserRepositoryPort;
 import com.fourguard.wms.infrastructure.persistence.entity.AlertConfigEntity;
 import com.fourguard.wms.infrastructure.persistence.entity.AuditLogEntity;
 import com.fourguard.wms.infrastructure.persistence.entity.OrganizationEntity;
 import com.fourguard.wms.infrastructure.persistence.entity.UserEntity;
-import com.fourguard.wms.infrastructure.persistence.repository.OrganizationJpaRepository;
 import com.fourguard.wms.shared.audit.AuditService;
 import com.fourguard.wms.shared.audit.SecurityAuditHelper;
 import lombok.RequiredArgsConstructor;
@@ -41,7 +41,7 @@ import java.util.stream.Collectors;
 public class AlertConfigService implements AlertConfigUseCase {
 
     private final AlertConfigRepositoryPort alertConfigRepositoryPort;
-    private final OrganizationJpaRepository organizationJpaRepository;
+    private final OrganizationRepositoryPort organizationRepositoryPort;
     private final UserRepositoryPort userRepositoryPort;
     private final AuditLogRepositoryPort auditLogRepositoryPort;
     private final AlertConfigMapper alertConfigMapper;
@@ -214,7 +214,7 @@ public class AlertConfigService implements AlertConfigUseCase {
                     String username = "SYSTEM";
                     if (logEntry.getUserId() != null) {
                         username = userRepositoryPort.findById(logEntry.getUserId())
-                                .map(UserEntity::getUsername)
+                                .map(u -> u.getUsername())
                                 .orElse("UNKNOWN");
                     }
                     List<AlertConfigAuditResponse.AuditDetailResponse> details = logEntry.getDetails().stream()
@@ -240,7 +240,7 @@ public class AlertConfigService implements AlertConfigUseCase {
 
     private OrganizationEntity resolveOrganization(UUID reqOrgId, String username) {
         if (reqOrgId != null) {
-            return organizationJpaRepository.findById(reqOrgId)
+            return organizationRepositoryPort.findById(reqOrgId)
                     .orElseThrow(() -> new EntityNotFoundException("Organización no encontrada con ID: " + reqOrgId));
         }
 

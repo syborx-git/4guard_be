@@ -77,7 +77,7 @@ public class GetActiveSessionsUseCaseImpl implements GetActiveSessionsUseCase {
         // 3. Group by userId and pick the latest login event for each user
         Map<UUID, AuditLogEntity> latestLoginsByUser = loginEvents.stream()
                 .collect(Collectors.toMap(
-                        AuditLogEntity::getUserId,
+                        event -> event.getUserId(),
                         event -> event,
                         (existing, replacement) -> existing.getCreatedAt().isAfter(replacement.getCreatedAt()) ? existing : replacement
                 ));
@@ -97,13 +97,13 @@ public class GetActiveSessionsUseCaseImpl implements GetActiveSessionsUseCase {
 
         // 5. Enrich session records with user data in an optimized batch query
         List<UUID> activeUserIds = activeLogins.stream()
-                .map(AuditLogEntity::getUserId)
+                .map(event -> event.getUserId())
                 .distinct()
                 .collect(Collectors.toList());
 
         List<UserEntity> users = userRepositoryPort.findAllById(activeUserIds);
         Map<UUID, UserEntity> userMap = users.stream()
-                .collect(Collectors.toMap(UserEntity::getId, user -> user));
+                .collect(Collectors.toMap(user -> user.getId(), user -> user));
 
         // 6. Filter by target organization/branch and map to DTO response
         List<ActiveSessionResponse> responseList = new ArrayList<>();

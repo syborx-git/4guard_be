@@ -26,6 +26,10 @@ public class ProductSkuPersistenceAdapter implements ProductSkuRepositoryPort {
     public Optional<ProductSkuEntity> findByClientIdAndCode(UUID cid, String code)   { return repository.findByClientIdAndCode(cid, code); }
 
     @Override
+    @Cacheable(value = "catalogues", key = "'sku-code-' + #code", unless = "#result == null")
+    public Optional<ProductSkuEntity> findFirstByCode(String code)                   { return repository.findFirstByCode(code); }
+
+    @Override
     @Cacheable(value = "catalogues", key = "'skus-client-' + #cid")
     public List<ProductSkuEntity>     findByClientId(UUID cid)                       { return repository.findByClientId(cid); }
 

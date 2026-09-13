@@ -13,6 +13,7 @@ public interface ClientRepositoryPort {
     ClientEntity           save(ClientEntity client);
     void                   deleteById(UUID id);
     List<ClientEntity>     findAll();
+    List<ClientEntity>     findAllById(Iterable<UUID> ids);
 
     // Validaciones de unicidad — RFC / Tax ID (RN-CLI-001)
     boolean existsByOrganizationIdAndTaxId(UUID organizationId, String taxId);

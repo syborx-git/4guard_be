@@ -59,7 +59,7 @@ spring:
 security:
   jwt:
     secret: "4GUARD-WMS-dev-secret-key-for-local-development-only-256bits-minimum-length"
-    access-token-expiration: 1800000 # 30 minutos (ms)
+    access-token-expiration: 28800000 # 8 horas (ms) para evitar cierres de sesión inesperados en desarrollo local
     refresh-token-expiration: 604800000 # 7 días (ms)
   cors:
     allowed-origin-patterns:

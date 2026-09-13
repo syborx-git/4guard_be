@@ -273,7 +273,7 @@ public class SupplierService implements SupplierUseCase {
     @Transactional(readOnly = true)
     public List<SupplierAuditResponse> getSupplierAuditLogs(UUID id) {
         log.debug("Fetching audit logs for supplier: {}", id);
-        if (!findById(id).isPresent()) {
+        if (findById(id).isEmpty()) {
             throw new EntityNotFoundException("Proveedor no encontrado: " + id);
         }
 
@@ -437,7 +437,7 @@ public class SupplierService implements SupplierUseCase {
     private String resolveUsername(UUID userId) {
         if (userId == null) return "SYSTEM";
         return userJpaRepository.findById(userId)
-                .map(UserEntity::getUsername)
+                .map(u -> u.getUsername())
                 .orElse("UNKNOWN");
     }
 

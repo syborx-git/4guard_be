@@ -12,5 +12,6 @@ import java.util.UUID;
 public interface ProductSkuJpaRepository extends JpaRepository<ProductSkuEntity, UUID> {
     List<ProductSkuEntity> findByClientId(UUID clientId);
     Optional<ProductSkuEntity> findByClientIdAndCode(UUID clientId, String code);
+    Optional<ProductSkuEntity> findFirstByCode(String code);
     boolean existsByClientIdAndCode(UUID clientId, String code);
 }

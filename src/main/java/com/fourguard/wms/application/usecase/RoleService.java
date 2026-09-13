@@ -133,7 +133,7 @@ public class RoleService implements RoleUseCase {
     @Transactional(readOnly = true)
     public List<RoleAuditResponse> getRoleAuditLogs(UUID id) {
         log.debug("Fetching audit logs for role: {}", id);
-        if (!roleRepositoryPort.findById(id).isPresent()) {
+        if (roleRepositoryPort.findById(id).isEmpty()) {
             throw new EntityNotFoundException("Rol no encontrado con ID: " + id);
         }
 
@@ -144,7 +144,7 @@ public class RoleService implements RoleUseCase {
                     String username = "SYSTEM";
                     if (logEntry.getUserId() != null) {
                         username = userRepositoryPort.findById(logEntry.getUserId())
-                                .map(UserEntity::getUsername)
+                                .map(u -> u.getUsername())
                                 .orElse("UNKNOWN");
                     }
                     List<RoleAuditResponse.AuditDetailResponse> detailResponses = logEntry.getDetails().stream()
@@ -262,7 +262,7 @@ public class RoleService implements RoleUseCase {
         if (entity.getPermissions() != null) {
             state.put("permissionsCount", entity.getPermissions().size());
             List<String> permNames = entity.getPermissions().stream()
-                    .map(PermissionEntity::getName)
+                    .map(p -> p.getName())
                     .sorted()
                     .collect(Collectors.toList());
             state.put("permissions", String.join(", ", permNames));

@@ -67,6 +67,10 @@ public class WarehouseOutboundEntity extends BaseVersionedEntity {
 
     // ── Transporte y Chofer ─────────────────────────────────────────────────
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "forklift_operator_id")
+    private ForkliftOperatorEntity forkliftOperator;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "carrier_id")
     private CarrierEntity carrier;
 
@@ -79,6 +83,9 @@ public class WarehouseOutboundEntity extends BaseVersionedEntity {
 
     @Column(name = "economic_number", length = 30)
     private String economicNumber;
+
+    @Column(name = "box_economic_number", length = 30)
+    private String boxEconomicNumber;
 
     @Column(name = "tractor_plates", nullable = false, length = 20)
     private String tractorPlates;

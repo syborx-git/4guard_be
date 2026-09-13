@@ -47,9 +47,8 @@ public class CreateClientRequest {
     @Schema(description = "Dirección Fiscal / Corporativa principal", example = "Av. Ejército Nacional 453, Granada, Miguel Hidalgo, CDMX")
     String address;
 
-    @NotBlank(message = "El teléfono corporativo es requerido")
     @Size(max = 50, message = "El teléfono no puede superar 50 caracteres")
-    @Schema(description = "Teléfono corporativo principal", example = "55 5268 2000")
+    @Schema(description = "Teléfono corporativo principal (opcional)", example = "55 5268 2000")
     String phone;
 
     @Email(message = "Formato de correo electrónico inválido")

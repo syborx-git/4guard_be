@@ -62,13 +62,13 @@ public class ExchangeRateService implements ExchangeRateUseCase {
         UUID fromId = null;
         if (fromCode != null && !fromCode.isBlank()) {
             fromId = currencyRepositoryPort.findByOrganizationIdAndCode(organizationId, fromCode.toUpperCase())
-                    .map(Currency::getId).orElse(null);
+                    .map(c -> c.getId()).orElse(null);
         }
 
         UUID toId = null;
         if (toCode != null && !toCode.isBlank()) {
             toId = currencyRepositoryPort.findByOrganizationIdAndCode(organizationId, toCode.toUpperCase())
-                    .map(Currency::getId).orElse(null);
+                    .map(c -> c.getId()).orElse(null);
         }
 
         List<ExchangeRate> rates = exchangeRateRepositoryPort.findRatesWithFilters(organizationId, fromId, toId, date);

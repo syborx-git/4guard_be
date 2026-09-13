@@ -10,6 +10,7 @@ import java.util.UUID;
 public interface ProductSkuRepositoryPort {
     Optional<ProductSkuEntity> findById(UUID id);
     Optional<ProductSkuEntity> findByClientIdAndCode(UUID clientId, String code);
+    Optional<ProductSkuEntity> findFirstByCode(String code);
     List<ProductSkuEntity>     findByClientId(UUID clientId);
     ProductSkuEntity           save(ProductSkuEntity sku);
     void                       deleteById(UUID id);

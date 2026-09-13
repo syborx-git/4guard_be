@@ -468,7 +468,7 @@ public class ClientService implements ClientUseCase {
     private String resolveUsername(UUID userId) {
         if (userId == null) return "SYSTEM";
         return userRepositoryPort.findById(userId)
-                .map(UserEntity::getUsername)
+                .map(u -> u.getUsername())
                 .orElse("UNKNOWN");
     }
 }

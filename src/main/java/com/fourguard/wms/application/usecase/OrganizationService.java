@@ -108,7 +108,7 @@ public class OrganizationService implements CreateOrganizationUseCase, UpdateOrg
     @Transactional(readOnly = true)
     public List<OrganizationAuditResponse> getOrganizationAuditLogs(UUID id) {
         log.debug("Fetching audit logs for organization: {}", id);
-        if (!organizationRepositoryPort.findById(id).isPresent()) {
+        if (organizationRepositoryPort.findById(id).isEmpty()) {
             throw new EntityNotFoundException("Organización no encontrada con ID: " + id);
         }
 
@@ -119,7 +119,7 @@ public class OrganizationService implements CreateOrganizationUseCase, UpdateOrg
                     String username = "SYSTEM";
                     if (logEntry.getUserId() != null) {
                         username = userRepositoryPort.findById(logEntry.getUserId())
-                                .map(UserEntity::getUsername)
+                                .map(u -> u.getUsername())
                                 .orElse("UNKNOWN");
                     }
                     List<OrganizationAuditResponse.AuditDetailResponse> detailResponses = logEntry.getDetails().stream()

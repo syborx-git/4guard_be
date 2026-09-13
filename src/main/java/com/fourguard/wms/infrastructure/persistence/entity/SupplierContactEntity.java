@@ -41,7 +41,7 @@ public class SupplierContactEntity {
     @Column(name = "email", length = 150, nullable = false)
     private String email;
 
-    @Column(name = "phone", length = 25, nullable = false)
+    @Column(name = "phone", length = 25)
     private String phone;
 
     @Column(name = "alt_phone", length = 25)

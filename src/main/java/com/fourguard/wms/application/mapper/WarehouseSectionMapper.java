@@ -25,6 +25,7 @@ public interface WarehouseSectionMapper {
     @Mapping(target = "status", expression = "java(entity.getStatus() != null ? entity.getStatus().name() : com.fourguard.wms.domain.enums.WarehouseSectionStatus.ACTIVE.name())")
     WarehouseSectionResponse toResponse(WarehouseSectionEntity entity);
 
+    @Mapping(target = "id", ignore = true)
     @Mapping(target = "branch", ignore = true)
     @Mapping(target = "locations", ignore = true)
     @Mapping(target = "status", ignore = true)

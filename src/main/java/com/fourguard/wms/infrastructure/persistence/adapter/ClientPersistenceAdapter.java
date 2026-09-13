@@ -22,6 +22,7 @@ public class ClientPersistenceAdapter implements ClientRepositoryPort {
     @Override public ClientEntity           save(ClientEntity c)             { return repository.save(c); }
     @Override public void                   deleteById(UUID id)              { repository.deleteById(id); }
     @Override public List<ClientEntity>     findAll()                        { return repository.findAll(); }
+    @Override public List<ClientEntity>     findAllById(Iterable<UUID> ids)  { return repository.findAllById(ids); }
 
     // Unicidad — Tax ID
     @Override

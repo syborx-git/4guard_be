@@ -14,26 +14,26 @@ import java.util.UUID;
 @Data
 public class CreateTransferRequest {
 
-    @NotNull(message = "organizationId es obligatorio")
     private UUID organizationId;
-
-    @NotNull(message = "branchId es obligatorio")
     private UUID branchId;
 
-    @NotNull(message = "originLocationId es obligatorio")
     private UUID originLocationId;
+    private String originLocationCode;
 
-    @NotNull(message = "destinationLocationId es obligatorio")
     private UUID destinationLocationId;
+    private String destinationLocationCode;
 
     private UUID forkliftOperatorId;
+    private String forkliftOperatorName;
 
     @NotBlank(message = "reasonCode es obligatorio")
     private String reasonCode;
 
     private String reasonLabel;
     private String observations;
+    private String transferredBy;
 
-    @NotEmpty(message = "Se debe seleccionar al menos una tarima / item para trasladar")
     private List<UUID> selectedItemIds;
+    private List<String> palletCodes;
+    private List<String> palletIds;
 }

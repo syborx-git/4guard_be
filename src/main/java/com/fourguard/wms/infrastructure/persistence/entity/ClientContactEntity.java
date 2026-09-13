@@ -31,7 +31,7 @@ public class ClientContactEntity extends BaseAuditEntity {
     @Column(nullable = false, length = 100)
     private String department;
 
-    @Column(nullable = false, length = 50)
+    @Column(length = 50)
     private String phone;
 
     @Column(nullable = false, length = 150)
