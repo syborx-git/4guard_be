@@ -23,6 +23,8 @@ public class OutboundItemResponse {
     private String palletCode;
     private String skuCode;
     private String skuDescription;
+    private String clientName;
+    private String inboundRemisionNo;
     private String lotNumber;
     private LocalDate expirationDate;
     private String locationCode;

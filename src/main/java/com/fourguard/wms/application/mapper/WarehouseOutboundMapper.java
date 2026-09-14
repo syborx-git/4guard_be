@@ -41,6 +41,8 @@ public interface WarehouseOutboundMapper {
     @Mapping(source = "item.id", target = "itemId")
     @Mapping(source = "item.sku.code", target = "skuCode")
     @Mapping(source = "item.sku.name", target = "skuDescription")
+    @Mapping(source = "item.sapFolio", target = "inboundRemisionNo")
+    @Mapping(source = "item.client.name", target = "clientName")
     OutboundItemResponse toItemResponse(WarehouseOutboundItemEntity entity);
 
     List<OutboundItemResponse> toItemResponseList(List<WarehouseOutboundItemEntity> entities);
