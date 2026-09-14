@@ -2,9 +2,11 @@ package com.fourguard.wms.presentation.controller;
 
 import com.fourguard.wms.application.dto.request.outbound.CancelOutboundRequest;
 import com.fourguard.wms.application.dto.request.outbound.CreateOutboundRequest;
+import com.fourguard.wms.application.dto.request.outbound.ValidatePalletsRequest;
 import com.fourguard.wms.application.dto.response.outbound.InventoryBatchResponse;
 import com.fourguard.wms.application.dto.response.outbound.OutboundResponse;
 import com.fourguard.wms.application.dto.response.outbound.OutboundSummaryResponse;
+import com.fourguard.wms.application.dto.response.outbound.ScanPalletResponse;
 import com.fourguard.wms.application.dto.response.reception.MovementAuditResponse;
 import com.fourguard.wms.domain.ports.in.WarehouseOutboundUseCase;
 import com.fourguard.wms.shared.response.ApiResponse;
@@ -83,14 +85,41 @@ public class WarehouseOutboundController {
     @GetMapping("/inventory-batches")
     @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('WAREHOUSE_SUPERVISOR')")
     @Operation(summary = "Consultar lotes disponibles con sugerencia FIFO/FEFO",
-               description = "Retorna los lotes de inventario agrupados y marca con sugerencia FIFO/FEFO el lote más antiguo.")
+               description = "Retorna los lotes de inventario agrupados con ordenamiento FEFO indexado y búsqueda rápida.")
     public ResponseEntity<ApiResponse<List<InventoryBatchResponse>>> getInventoryBatches(
             @RequestParam(required = false) UUID organizationId,
             @RequestParam(required = false) UUID branchId,
             @RequestParam(required = false) UUID clientId,
-            @RequestParam(required = false) UUID skuId) {
-        List<InventoryBatchResponse> batches = outboundUseCase.getInventoryBatches(organizationId, branchId, clientId, skuId);
+            @RequestParam(required = false) UUID skuId,
+            @RequestParam(required = false) String search) {
+        List<InventoryBatchResponse> batches = outboundUseCase.getInventoryBatches(organizationId, branchId, clientId, skuId, search);
         return ResponseEntity.ok(ApiResponse.ok("Lotes de inventario obtenidos con éxito", batches));
+    }
+
+    // ─── SCAN PALLET (FAST RF BARCODE LOOKUP) ──────────────────────────────────
+
+    @GetMapping("/scan-pallet")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('FORKLIFT_OPERATOR')")
+    @Operation(summary = "Escanear / Consultar tarima o UA por código de barras",
+               description = "Búsqueda rápida en sub-10ms por SSCC o código de barras de tarima para escaneo masivo con pistola RF o tablet.")
+    public ResponseEntity<ApiResponse<ScanPalletResponse>> scanPallet(
+            @RequestParam String barcode,
+            @RequestParam(required = false) UUID organizationId,
+            @RequestParam(required = false) UUID branchId) {
+        ScanPalletResponse response = outboundUseCase.scanPallet(barcode, organizationId, branchId);
+        return ResponseEntity.ok(ApiResponse.ok("Tarima encontrada", response));
+    }
+
+    // ─── VALIDATE PALLETS (BATCH LOOKUP) ───────────────────────────────────────
+
+    @PostMapping("/validate-pallets")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('FORKLIFT_OPERATOR')")
+    @Operation(summary = "Validar lote de tarimas escaneadas",
+               description = "Valida y retorna metadatos de un listado de códigos de barras / SSCCs escaneados.")
+    public ResponseEntity<ApiResponse<List<ScanPalletResponse>>> validatePallets(
+            @Valid @RequestBody ValidatePalletsRequest request) {
+        List<ScanPalletResponse> response = outboundUseCase.validatePallets(request);
+        return ResponseEntity.ok(ApiResponse.ok("Tarimas validadas con éxito", response));
     }
 
     // ─── AUDIT LOGS ───────────────────────────────────────────────────────────
