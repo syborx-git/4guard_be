@@ -2,9 +2,11 @@ package com.fourguard.wms.application.usecase;
 
 import com.fourguard.wms.application.dto.request.outbound.CancelOutboundRequest;
 import com.fourguard.wms.application.dto.request.outbound.CreateOutboundRequest;
+import com.fourguard.wms.application.dto.request.outbound.ValidatePalletsRequest;
 import com.fourguard.wms.application.dto.response.outbound.InventoryBatchResponse;
 import com.fourguard.wms.application.dto.response.outbound.OutboundResponse;
 import com.fourguard.wms.application.dto.response.outbound.OutboundSummaryResponse;
+import com.fourguard.wms.application.dto.response.outbound.ScanPalletResponse;
 import com.fourguard.wms.application.dto.response.reception.MovementAuditResponse;
 import com.fourguard.wms.application.mapper.WarehouseOutboundMapper;
 import com.fourguard.wms.domain.enums.InventoryState;
@@ -97,17 +99,20 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
         int year = LocalDate.now().getYear();
         String folio = String.format("SAL-%d-%06d", year, seq);
 
-        // Fetch and validate selected items
-        List<InventoryItemEntity> itemsToDispatch = new ArrayList<>();
-        for (UUID itemId : request.getSelectedItemIds()) {
-            InventoryItemEntity item = inventoryItemRepositoryPort.findById(itemId)
-                    .orElseThrow(() -> new EntityNotFoundException("Ítem de inventario no encontrado: " + itemId));
+        // Batch fetch and validate selected items in a single query
+        List<InventoryItemEntity> itemsToDispatch = inventoryItemJpaRepository.findAllByIdInWithDetails(request.getSelectedItemIds());
+        if (itemsToDispatch.size() != request.getSelectedItemIds().size()) {
+            Set<UUID> foundIds = itemsToDispatch.stream().map(InventoryItemEntity::getId).collect(Collectors.toSet());
+            List<UUID> missingIds = request.getSelectedItemIds().stream()
+                    .filter(id -> !foundIds.contains(id))
+                    .collect(Collectors.toList());
+            throw new EntityNotFoundException("Uno o más ítems de inventario no fueron encontrados: " + missingIds);
+        }
 
+        for (InventoryItemEntity item : itemsToDispatch) {
             if (item.getState() != InventoryState.AVAILABLE && item.getState() != InventoryState.EXPIRED) {
                 throw new ValidationException("La tarima " + item.getSscc() + " no está disponible para despacho (Estado actual: " + item.getState() + ")");
             }
-
-            itemsToDispatch.add(item);
         }
 
         Set<UUID> distinctSkuIds = itemsToDispatch.stream().map(i -> i.getSku().getId()).collect(Collectors.toSet());
@@ -285,32 +290,12 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
 
     @Override
     @Transactional(readOnly = true)
-    public List<InventoryBatchResponse> getInventoryBatches(UUID organizationId, UUID branchId, UUID clientId, UUID skuId) {
-        List<InventoryItemEntity> availableItems;
-        if (skuId != null) {
-            availableItems = inventoryItemJpaRepository.findAvailableBySkuOrderedByFefo(skuId);
-        } else {
-            availableItems = inventoryItemJpaRepository.findAll().stream()
-                    .filter(i -> i.getState() == InventoryState.AVAILABLE)
-                    .collect(Collectors.toList());
-        }
+    public List<InventoryBatchResponse> getInventoryBatches(UUID organizationId, UUID branchId, UUID clientId, UUID skuId, String search) {
+        String cleanSearch = (search != null && !search.isBlank()) ? search.trim() : null;
 
-        // Filter by organization, branch and client if provided
-        if (organizationId != null) {
-            availableItems = availableItems.stream()
-                    .filter(i -> i.getOrganization() != null && i.getOrganization().getId().equals(organizationId))
-                    .collect(Collectors.toList());
-        }
-        if (branchId != null) {
-            availableItems = availableItems.stream()
-                    .filter(i -> i.getBranch() != null && i.getBranch().getId().equals(branchId))
-                    .collect(Collectors.toList());
-        }
-        if (clientId != null) {
-            availableItems = availableItems.stream()
-                    .filter(i -> i.getClient() != null && i.getClient().getId().equals(clientId))
-                    .collect(Collectors.toList());
-        }
+        // High performance single DB query with JOIN FETCH
+        List<InventoryItemEntity> availableItems = inventoryItemJpaRepository.findAvailableBatchesWithFilters(
+                organizationId, branchId, clientId, skuId, cleanSearch);
 
         // Group by (sapFolio / remisionNo, lotNumber, expirationDate, sku)
         Map<String, List<InventoryItemEntity>> grouped = availableItems.stream().collect(
@@ -367,7 +352,7 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
 
         // Sort by expirationDate ASC and mark the oldest as isFifoSuggested = true
         batches.sort(Comparator.comparing(
-                b -> b.getExpirationDate(),
+                InventoryBatchResponse::getExpirationDate,
                 Comparator.nullsLast(Comparator.naturalOrder())
         ));
 
@@ -376,6 +361,94 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
         }
 
         return batches;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ScanPalletResponse scanPallet(String barcode, UUID organizationId, UUID branchId) {
+        if (barcode == null || barcode.isBlank()) {
+            throw new ValidationException("El código de barras / SSCC no puede estar vacío.");
+        }
+        String cleanBarcode = barcode.trim();
+        InventoryItemEntity item = inventoryItemJpaRepository.findAvailableBySsccOrExternalUa(cleanBarcode, organizationId, branchId)
+                .or(() -> {
+                    try {
+                        UUID itemId = UUID.fromString(cleanBarcode);
+                        return inventoryItemJpaRepository.findById(itemId);
+                    } catch (IllegalArgumentException e) {
+                        return Optional.empty();
+                    }
+                })
+                .orElseThrow(() -> new EntityNotFoundException("Tarima o código de barras no encontrado en inventario disponible: " + cleanBarcode));
+
+        return mapToScanPalletResponse(item);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ScanPalletResponse> validatePallets(ValidatePalletsRequest request) {
+        if (request.getBarcodes() == null || request.getBarcodes().isEmpty()) {
+            return List.of();
+        }
+        List<InventoryItemEntity> items = inventoryItemJpaRepository.findByBarcodesIn(
+                request.getBarcodes(),
+                request.getOrganizationId(),
+                request.getBranchId());
+
+        return items.stream().map(this::mapToScanPalletResponse).collect(Collectors.toList());
+    }
+
+    private ScanPalletResponse mapToScanPalletResponse(InventoryItemEntity item) {
+        LocalDate exp = item.getExpirationDate();
+        long daysRemaining = 999;
+        String pabloStatus = "OPTIMAL";
+        String pabloLabel = "Óptimo";
+
+        if (exp != null) {
+            daysRemaining = java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(), exp);
+            if (daysRemaining <= 0) {
+                pabloStatus = "EXPIRED";
+                pabloLabel = "Caduco / Bloqueado (" + daysRemaining + "d)";
+            } else if (daysRemaining <= 30) {
+                pabloStatus = "PABLO_ALERT";
+                pabloLabel = "Alerta Pablo (" + daysRemaining + "d)";
+            } else {
+                pabloStatus = "OPTIMAL";
+                pabloLabel = "Óptimo (" + daysRemaining + "d)";
+            }
+        }
+
+        String locCode = item.getLocation() != null ? item.getLocation().getCode() : "N/A";
+        String skuCode = item.getSku() != null ? item.getSku().getCode() : "";
+        String skuName = item.getSku() != null ? item.getSku().getName() : "";
+        String category = item.getSku() != null && item.getSku().getCategory() != null ? item.getSku().getCategory().getName() : "GENERAL";
+        String clientName = item.getClient() != null ? item.getClient().getName() : "";
+        Double pieces = item.getQuantity() != null ? item.getQuantity().doubleValue() : 0.0;
+
+        return ScanPalletResponse.builder()
+                .itemId(item.getId())
+                .palletCode(item.getSscc())
+                .externalUa(item.getExternalUa())
+                .skuId(item.getSku() != null ? item.getSku().getId() : null)
+                .skuCode(skuCode)
+                .productName(skuName)
+                .category(category)
+                .clientId(item.getClient() != null ? item.getClient().getId() : null)
+                .clientName(clientName)
+                .lotNumber(item.getBatchNumber())
+                .inboundRemisionNo(item.getSapFolio())
+                .manufacturingDate(item.getManufacturingDate())
+                .expirationDate(item.getExpirationDate())
+                .daysRemaining(daysRemaining)
+                .pabloStatus(pabloStatus)
+                .pabloLabel(pabloLabel)
+                .isSuggestedFefo(pabloStatus.equals("PABLO_ALERT") || (daysRemaining > 0 && daysRemaining <= 60))
+                .pieces(pieces)
+                .palletTypeId("MADERA_ESTANDAR")
+                .palletTypeLabel("Madera Estándar")
+                .locationCode(locCode)
+                .state(item.getState() != null ? item.getState().name() : "AVAILABLE")
+                .build();
     }
 
     @Override

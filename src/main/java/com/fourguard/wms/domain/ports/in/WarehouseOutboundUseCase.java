@@ -2,9 +2,11 @@ package com.fourguard.wms.domain.ports.in;
 
 import com.fourguard.wms.application.dto.request.outbound.CancelOutboundRequest;
 import com.fourguard.wms.application.dto.request.outbound.CreateOutboundRequest;
+import com.fourguard.wms.application.dto.request.outbound.ValidatePalletsRequest;
 import com.fourguard.wms.application.dto.response.outbound.InventoryBatchResponse;
 import com.fourguard.wms.application.dto.response.outbound.OutboundResponse;
 import com.fourguard.wms.application.dto.response.outbound.OutboundSummaryResponse;
+import com.fourguard.wms.application.dto.response.outbound.ScanPalletResponse;
 import com.fourguard.wms.application.dto.response.reception.MovementAuditResponse;
 
 import java.util.List;
@@ -41,13 +43,24 @@ public interface WarehouseOutboundUseCase {
     OutboundResponse cancelOutbound(UUID id, CancelOutboundRequest request);
 
     /**
-     * Returns available inventory batches ordered by FIFO/FEFO for a given client and SKU.
+     * Returns available inventory batches ordered by FIFO/FEFO for a given client and SKU, with optional search.
      */
     List<InventoryBatchResponse> getInventoryBatches(
             UUID organizationId,
             UUID branchId,
             UUID clientId,
-            UUID skuId);
+            UUID skuId,
+            String search);
+
+    /**
+     * Instant RF scanner / barcode lookup for a single pallet by SSCC / UA.
+     */
+    ScanPalletResponse scanPallet(String barcode, UUID organizationId, UUID branchId);
+
+    /**
+     * Validates a batch of scanned barcodes/pallets for rapid mass scanning.
+     */
+    List<ScanPalletResponse> validatePallets(ValidatePalletsRequest request);
 
     /**
      * Returns the chronological audit log for an outbound folio.
