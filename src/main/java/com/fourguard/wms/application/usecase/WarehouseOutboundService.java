@@ -103,13 +103,10 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
             InventoryItemEntity item = inventoryItemRepositoryPort.findById(itemId)
                     .orElseThrow(() -> new EntityNotFoundException("Ítem de inventario no encontrado: " + itemId));
 
-            if (item.getState() != InventoryState.AVAILABLE) {
-                throw new ValidationException("La tarima " + item.getSscc() + " no está disponible para despacho (Estado: " + item.getState() + ")");
+            if (item.getState() != InventoryState.AVAILABLE && item.getState() != InventoryState.EXPIRED) {
+                throw new ValidationException("La tarima " + item.getSscc() + " no está disponible para despacho (Estado actual: " + item.getState() + ")");
             }
 
-            if (!item.getClient().getId().equals(client.getId())) {
-                throw new ValidationException("La tarima " + item.getSscc() + " no pertenece al cliente seleccionado.");
-            }
             itemsToDispatch.add(item);
         }
 
@@ -190,7 +187,7 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
                         .fromLocation(item.getLocation())
                         .user(activeUser)
                         .type(MovementType.EXIT)
-                        .reason("Despacho Outbound Folio: " + folio + " - Remisión: " + request.getRemisionNo())
+                        .reason("Despacho Outbound Folio: " + folio + " - Remisión Salida: " + request.getRemisionNo() + " [Entrada Origen: " + (item.getSapFolio() != null ? item.getSapFolio() : "N/A") + "]")
                         .createdAt(now)
                         .build();
                 inventoryMovementRepositoryPort.save(movement);

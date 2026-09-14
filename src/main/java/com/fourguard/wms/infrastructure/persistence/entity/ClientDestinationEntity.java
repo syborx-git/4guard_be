@@ -14,11 +14,7 @@ import java.util.UUID;
 @Entity
 @Table(
     name = "client_destinations",
-    schema = "wms",
-    uniqueConstraints = @UniqueConstraint(
-        name = "uk_client_destination_code",
-        columnNames = {"client_id", "destination_code"}
-    )
+    schema = "wms"
 )
 @Getter
 @Setter
@@ -31,8 +27,8 @@ public class ClientDestinationEntity extends BaseVersionedEntity {
     @Column(updatable = false, nullable = false, columnDefinition = "UUID")
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "client_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "client_id", nullable = true)
     private ClientEntity client;
 
     @Column(name = "destination_code", nullable = false, length = 50)
