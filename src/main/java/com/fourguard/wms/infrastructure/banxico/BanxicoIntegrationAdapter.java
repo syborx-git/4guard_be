@@ -42,36 +42,55 @@ public class BanxicoIntegrationAdapter implements BanxicoExchangeRatePort {
     @Override
     public Optional<BigDecimal> fetchLatestRate(BanxicoSeries series) {
         if (!banxicoEnabled || banxicoToken == null || banxicoToken.isBlank() || banxicoToken.startsWith("PON_TU_TOKEN")) {
-            log.warn("[BANXICO] Sincronización omitida: Token de Banxico no configurado en el archivo .env");
+            log.warn("[BANXICO] Sincronización omitida: Token de Banxico no configurado o deshabilitado.");
             return Optional.empty();
         }
 
+        String seriesId = series.getSeriesId();
+        // 1. Intentar endpoint oficial oportuno (último dato publicado)
+        try {
+            String oportunoUrl = String.format("%s/%s/datos/oportuno", banxicoUrl.replaceAll("/$", ""), seriesId.trim());
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("Bmx-Token", banxicoToken.trim());
+            headers.set("Accept", "application/json");
+            headers.set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) 4Guard-WMS/1.0");
+
+            HttpEntity<String> entity = new HttpEntity<>(headers);
+            log.info("[BANXICO] Consultando tasa oportuna para serie {} ({})...", seriesId, series.getCurrencyCode());
+
+            ResponseEntity<String> response = restTemplate.exchange(oportunoUrl, HttpMethod.GET, entity, String.class);
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                Optional<BigDecimal> rateOpt = parseLatestRate(response.getBody(), series);
+                if (rateOpt.isPresent()) {
+                    return rateOpt;
+                }
+            }
+        } catch (Exception e) {
+            log.warn("[BANXICO-OPORTUNO] Endpoint oportuno falló para {}: {}. Intentando fallback por rango de fechas...", seriesId, e.getMessage());
+        }
+
+        // 2. Fallback: Rango de últimos 10 días
         try {
             LocalDate endDateObj = LocalDate.now();
-            LocalDate startDateObj = endDateObj.minusDays(5);
+            LocalDate startDateObj = endDateObj.minusDays(10);
             String endDate = endDateObj.format(DateTimeFormatter.ISO_LOCAL_DATE);
             String startDate = startDateObj.format(DateTimeFormatter.ISO_LOCAL_DATE);
 
-            String fullUrl = String.format("%s/%s/datos/%s/%s?token=%s",
-                    banxicoUrl, series.getSeriesId(), startDate, endDate, banxicoToken);
-
+            String rangeUrl = String.format("%s/%s/datos/%s/%s", banxicoUrl.replaceAll("/$", ""), seriesId.trim(), startDate, endDate);
             HttpHeaders headers = new HttpHeaders();
-            headers.set("Bmx-Token", banxicoToken);
+            headers.set("Bmx-Token", banxicoToken.trim());
             headers.set("Accept", "application/json");
+            headers.set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) 4Guard-WMS/1.0");
 
             HttpEntity<String> entity = new HttpEntity<>(headers);
-
-            log.info("[BANXICO] Consultando tipo de cambio para serie {} ({}) con rango 5 días ({} a {})...",
-                    series.getSeriesId(), series.getCurrencyCode(), startDate, endDate);
-
-            ResponseEntity<String> response = restTemplate.exchange(fullUrl, HttpMethod.GET, entity, String.class);
-
+            ResponseEntity<String> response = restTemplate.exchange(rangeUrl, HttpMethod.GET, entity, String.class);
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 return parseLatestRate(response.getBody(), series);
             }
         } catch (Exception e) {
-            log.error("[BANXICO-ERROR] Error al consultar la API de Banxico para serie {}: {}", series.getSeriesId(), e.getMessage());
+            log.error("[BANXICO-ERROR] Error en fallback de rango para serie {}: {}", seriesId, e.getMessage());
         }
+
         return Optional.empty();
     }
 
@@ -87,62 +106,91 @@ public class BanxicoIntegrationAdapter implements BanxicoExchangeRatePort {
     @Override
     public Optional<BanxicoLiveRateResponse> fetchLiveRateBySeriesId(String seriesId) {
         if (!banxicoEnabled || banxicoToken == null || banxicoToken.isBlank() || banxicoToken.startsWith("PON_TU_TOKEN")) {
-            log.warn("[BANXICO] Sincronización omitida: Token de Banxico no configurado en el archivo .env");
+            log.warn("[BANXICO] Consulta Live omitida: Token de Banxico no configurado o deshabilitado.");
             return Optional.empty();
         }
 
+        String cleanSeriesId = (seriesId != null && !seriesId.isBlank()) ? seriesId.trim() : "SF57805";
+
+        // 1. Intentar endpoint oportuno
+        try {
+            String oportunoUrl = String.format("%s/%s/datos/oportuno", banxicoUrl.replaceAll("/$", ""), cleanSeriesId);
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("Bmx-Token", banxicoToken.trim());
+            headers.set("Accept", "application/json");
+            headers.set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) 4Guard-WMS/1.0");
+
+            HttpEntity<String> entity = new HttpEntity<>(headers);
+            log.info("[BANXICO-LIVE] Consultando cotización oportuna en vivo para serieId {}...", cleanSeriesId);
+
+            ResponseEntity<String> response = restTemplate.exchange(oportunoUrl, HttpMethod.GET, entity, String.class);
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                Optional<BanxicoLiveRateResponse> parsed = parseLiveResponse(response.getBody(), cleanSeriesId);
+                if (parsed.isPresent()) {
+                    return parsed;
+                }
+            }
+        } catch (Exception e) {
+            log.warn("[BANXICO-LIVE-OPORTUNO] Consulta oportuna falló para {}: {}. Intentando fallback por rango...", cleanSeriesId, e.getMessage());
+        }
+
+        // 2. Fallback: Rango de últimos 10 días
         try {
             LocalDate endDateObj = LocalDate.now();
-            LocalDate startDateObj = endDateObj.minusDays(5);
+            LocalDate startDateObj = endDateObj.minusDays(10);
             String endDate = endDateObj.format(DateTimeFormatter.ISO_LOCAL_DATE);
             String startDate = startDateObj.format(DateTimeFormatter.ISO_LOCAL_DATE);
 
-            String fullUrl = String.format("%s/%s/datos/%s/%s?token=%s",
-                    banxicoUrl, seriesId.trim(), startDate, endDate, banxicoToken);
-
+            String rangeUrl = String.format("%s/%s/datos/%s/%s", banxicoUrl.replaceAll("/$", ""), cleanSeriesId, startDate, endDate);
             HttpHeaders headers = new HttpHeaders();
-            headers.set("Bmx-Token", banxicoToken);
+            headers.set("Bmx-Token", banxicoToken.trim());
             headers.set("Accept", "application/json");
+            headers.set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) 4Guard-WMS/1.0");
 
             HttpEntity<String> entity = new HttpEntity<>(headers);
-
-            log.info("[BANXICO] Consulta en tiempo real para serieId {} con rango 5 días ({} a {})...",
-                    seriesId, startDate, endDate);
-
-            ResponseEntity<String> response = restTemplate.exchange(fullUrl, HttpMethod.GET, entity, String.class);
-
+            ResponseEntity<String> response = restTemplate.exchange(rangeUrl, HttpMethod.GET, entity, String.class);
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                JsonNode root = objectMapper.readTree(response.getBody());
-                JsonNode seriesNode = root.path("bmx").path("series").path(0);
-                String title = seriesNode.path("titulo").asText("Cotización oficial Banxico");
-                JsonNode datosArray = seriesNode.path("datos");
+                return parseLiveResponse(response.getBody(), cleanSeriesId);
+            }
+        } catch (Exception e) {
+            log.error("[BANXICO-LIVE-ERROR] Error en fallback live para serie {}: {}", cleanSeriesId, e.getMessage());
+        }
 
-                if (datosArray.isArray() && datosArray.size() > 0) {
-                    for (int i = datosArray.size() - 1; i >= 0; i--) {
-                        JsonNode item = datosArray.get(i);
-                        String datoStr = item.path("dato").asText(null);
-                        String fechaStr = item.path("fecha").asText(null);
+        return Optional.empty();
+    }
 
-                        if (datoStr != null && !datoStr.isBlank() && !"N/E".equalsIgnoreCase(datoStr)) {
-                            BigDecimal rate = new BigDecimal(datoStr.trim());
-                            String currencyCode = resolveCurrencyCode(seriesId);
+    private Optional<BanxicoLiveRateResponse> parseLiveResponse(String jsonBody, String cleanSeriesId) {
+        try {
+            JsonNode root = objectMapper.readTree(jsonBody);
+            JsonNode seriesNode = root.path("bmx").path("series").path(0);
+            String title = seriesNode.path("titulo").asText("Cotización oficial Banxico");
+            JsonNode datosArray = seriesNode.path("datos");
 
-                            BanxicoLiveRateResponse liveResponse = BanxicoLiveRateResponse.builder()
-                                    .seriesId(seriesId)
-                                    .currencyCode(currencyCode)
-                                    .seriesTitle(title)
-                                    .rate(rate)
-                                    .publicationDate(fechaStr)
-                                    .sourceType("BANXICO_SIE_REST")
-                                    .build();
+            if (datosArray.isArray() && datosArray.size() > 0) {
+                for (int i = datosArray.size() - 1; i >= 0; i--) {
+                    JsonNode item = datosArray.get(i);
+                    String datoStr = item.path("dato").asText(null);
+                    String fechaStr = item.path("fecha").asText(null);
 
-                            return Optional.of(liveResponse);
-                        }
+                    if (datoStr != null && !datoStr.isBlank() && !"N/E".equalsIgnoreCase(datoStr)) {
+                        BigDecimal rate = new BigDecimal(datoStr.trim());
+                        String currencyCode = resolveCurrencyCode(cleanSeriesId);
+
+                        BanxicoLiveRateResponse liveResponse = BanxicoLiveRateResponse.builder()
+                                .seriesId(cleanSeriesId)
+                                .currencyCode(currencyCode)
+                                .seriesTitle(title)
+                                .rate(rate)
+                                .publicationDate(fechaStr)
+                                .sourceType("BANXICO_SIE_REST")
+                                .build();
+
+                        return Optional.of(liveResponse);
                     }
                 }
             }
         } catch (Exception e) {
-            log.error("[BANXICO-ERROR] Error al consultar en tiempo real serie {}: {}", seriesId, e.getMessage());
+            log.error("[BANXICO-LIVE-PARSER] Error parseando respuesta live de {}: {}", cleanSeriesId, e.getMessage());
         }
         return Optional.empty();
     }
@@ -153,7 +201,9 @@ public class BanxicoIntegrationAdapter implements BanxicoExchangeRatePort {
                 return s.getCurrencyCode();
             }
         }
-        return "UNKNOWN";
+        if ("SF57805".equalsIgnoreCase(seriesId)) return "USD";
+        if ("SF46410".equalsIgnoreCase(seriesId)) return "EUR";
+        return "USD";
     }
 
     private Optional<BigDecimal> parseLatestRate(String jsonBody, BanxicoSeries series) {

@@ -1,5 +1,6 @@
 package com.fourguard.wms.application.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fourguard.wms.domain.enums.UserStatus;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotNull;
@@ -11,6 +12,7 @@ import java.util.UUID;
 
 @Value
 @Builder
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class UserUpdateRequest {
     @NotNull(message = "User ID cannot be null for update")
     UUID id;

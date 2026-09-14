@@ -156,13 +156,14 @@ public class ExchangeRateService implements ExchangeRateUseCase {
                     .build();
         }
 
-        // 1. Check direct rate (from -> to)
-        Optional<ExchangeRate> directRateOpt = exchangeRateRepositoryPort.findLatestRate(
+        // 1. Check direct or inverse rate via pair lookup
+        Optional<ExchangeRate> pairRateOpt = exchangeRateRepositoryPort.findLatestRate(
                 request.getOrganizationId(), fromCurrency.getId(), toCurrency.getId(), queryDate);
 
-        if (directRateOpt.isPresent()) {
-            ExchangeRate rateObj = directRateOpt.get();
-            BigDecimal rateUsed = rateObj.getRate();
+        if (pairRateOpt.isPresent()) {
+            ExchangeRate rateObj = pairRateOpt.get();
+            boolean isDirect = fromCurrency.getId().equals(rateObj.getFromCurrencyId());
+            BigDecimal rateUsed = isDirect ? rateObj.getRate() : rateObj.getInverseRate();
             BigDecimal convertedAmount = amount.multiply(rateUsed).setScale(toCurrency.getDecimalPlaces(), RoundingMode.HALF_UP);
 
             return ConvertCurrencyResponse.builder()
@@ -174,33 +175,13 @@ public class ExchangeRateService implements ExchangeRateUseCase {
                     .convertedAmount(convertedAmount)
                     .rateUsed(rateUsed)
                     .effectiveDate(rateObj.getEffectiveDate())
-                    .conversionPath(String.format("DIRECT (%s -> %s)", fromCurrency.getCode(), toCurrency.getCode()))
+                    .conversionPath(isDirect
+                            ? String.format("DIRECT (%s -> %s)", fromCurrency.getCode(), toCurrency.getCode())
+                            : String.format("INVERSE (%s -> %s)", fromCurrency.getCode(), toCurrency.getCode()))
                     .build();
         }
 
-        // 2. Check inverse rate (to -> from)
-        Optional<ExchangeRate> inverseRateOpt = exchangeRateRepositoryPort.findLatestRate(
-                request.getOrganizationId(), toCurrency.getId(), fromCurrency.getId(), queryDate);
-
-        if (inverseRateOpt.isPresent()) {
-            ExchangeRate rateObj = inverseRateOpt.get();
-            BigDecimal rateUsed = rateObj.getInverseRate();
-            BigDecimal convertedAmount = amount.multiply(rateUsed).setScale(toCurrency.getDecimalPlaces(), RoundingMode.HALF_UP);
-
-            return ConvertCurrencyResponse.builder()
-                    .fromCurrencyId(fromCurrency.getId())
-                    .fromCode(fromCurrency.getCode())
-                    .toCurrencyId(toCurrency.getId())
-                    .toCode(toCurrency.getCode())
-                    .originalAmount(amount)
-                    .convertedAmount(convertedAmount)
-                    .rateUsed(rateUsed)
-                    .effectiveDate(rateObj.getEffectiveDate())
-                    .conversionPath(String.format("INVERSE (%s -> %s)", fromCurrency.getCode(), toCurrency.getCode()))
-                    .build();
-        }
-
-        // 3. Triangulation via base currency
+        // 2. Triangulation via base currency
         Currency baseCurrency = currencyRepositoryPort.findBaseCurrencyByOrganizationId(request.getOrganizationId())
                 .orElseThrow(() -> new ValidationException("No existe una divisa base configurada para triangular la conversión."));
 
@@ -229,12 +210,11 @@ public class ExchangeRateService implements ExchangeRateUseCase {
     }
 
     private BigDecimal resolveRate(UUID orgId, UUID fromId, UUID toId, LocalDate date) {
-        Optional<ExchangeRate> direct = exchangeRateRepositoryPort.findLatestRate(orgId, fromId, toId, date);
-        if (direct.isPresent()) return direct.get().getRate();
-
-        Optional<ExchangeRate> inverse = exchangeRateRepositoryPort.findLatestRate(orgId, toId, fromId, date);
-        if (inverse.isPresent()) return inverse.get().getInverseRate();
-
+        Optional<ExchangeRate> pair = exchangeRateRepositoryPort.findLatestRate(orgId, fromId, toId, date);
+        if (pair.isPresent()) {
+            ExchangeRate r = pair.get();
+            return fromId.equals(r.getFromCurrencyId()) ? r.getRate() : r.getInverseRate();
+        }
         throw new ValidationException("No se encontró tipo de cambio entre las divisas especificadas.");
     }
 
