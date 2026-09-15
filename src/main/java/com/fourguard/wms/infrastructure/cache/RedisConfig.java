@@ -89,7 +89,6 @@ public class RedisConfig {
      * Active only when {@code cache.redis.enabled=true}.
      */
     @Bean
-    @Primary
     @ConditionalOnProperty(name = "cache.redis.enabled", havingValue = "true")
     public CacheManager redisCacheManager(LettuceConnectionFactory connectionFactory) {
         log.info("[Cache] Mode: REDIS (RedisCacheManager).");

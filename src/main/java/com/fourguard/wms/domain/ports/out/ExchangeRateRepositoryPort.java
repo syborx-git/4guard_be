@@ -1,6 +1,5 @@
 package com.fourguard.wms.domain.ports.out;
 
-import com.fourguard.wms.domain.enums.ExchangeRateStatus;
 import com.fourguard.wms.domain.model.ExchangeRate;
 
 import java.time.LocalDate;

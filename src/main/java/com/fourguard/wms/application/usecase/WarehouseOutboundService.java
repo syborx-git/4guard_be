@@ -421,7 +421,7 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
         String locCode = item.getLocation() != null ? item.getLocation().getCode() : "N/A";
         String skuCode = item.getSku() != null ? item.getSku().getCode() : "";
         String skuName = item.getSku() != null ? item.getSku().getName() : "";
-        String category = item.getSku() != null && item.getSku().getCategory() != null ? item.getSku().getCategory().getName() : "GENERAL";
+        String category = item.getSku() != null && item.getSku().getCategory() != null ? item.getSku().getCategory() : "GENERAL";
         String clientName = item.getClient() != null ? item.getClient().getName() : "";
         Double pieces = item.getQuantity() != null ? item.getQuantity().doubleValue() : 0.0;
 

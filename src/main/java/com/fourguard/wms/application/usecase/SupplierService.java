@@ -8,6 +8,7 @@ import com.fourguard.wms.domain.enums.SupplierStatus;
 import com.fourguard.wms.domain.exception.EntityNotFoundException;
 import com.fourguard.wms.domain.exception.ValidationException;
 import com.fourguard.wms.domain.ports.in.SupplierUseCase;
+import com.fourguard.wms.domain.ports.out.AuditLogRepositoryPort;
 import com.fourguard.wms.domain.ports.out.SupplierRepositoryPort;
 import com.fourguard.wms.infrastructure.persistence.entity.*;
 import com.fourguard.wms.infrastructure.persistence.repository.*;
@@ -40,8 +41,8 @@ public class SupplierService implements SupplierUseCase {
     private final SupplierMapper supplierMapper;
     private final SecurityAuditHelper securityAuditHelper;
     private final AuditService auditService;
-    private final com.fourguard.wms.domain.ports.out.AuditLogRepositoryPort auditLogRepositoryPort;
-    private final com.fourguard.wms.infrastructure.persistence.repository.UserJpaRepository userJpaRepository;
+    private final AuditLogRepositoryPort auditLogRepositoryPort;
+    private final UserJpaRepository userJpaRepository;
 
     // =========================================================================
     // CREATE

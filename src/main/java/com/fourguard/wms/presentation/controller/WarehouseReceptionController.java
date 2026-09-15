@@ -5,7 +5,6 @@ import com.fourguard.wms.application.dto.response.reception.*;
 import com.fourguard.wms.domain.ports.in.WarehouseReceptionUseCase;
 import com.fourguard.wms.shared.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
