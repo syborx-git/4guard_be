@@ -33,6 +33,9 @@ public class OutboundResponse {
 
     private UUID carrierId;
     private String carrierName;
+    private UUID rampId;
+    private Integer rampNumber;
+    private String rampCode;
     private UUID forkliftOperatorId;
     private String forkliftOperatorName;
     private String transportType;
@@ -43,6 +46,7 @@ public class OutboundResponse {
     private String boxPlates;
     private String sealNumber;
     private String remisionNo;
+    private String observations;
 
     private Integer totalPallets;
     private Double totalPieces;
@@ -50,6 +54,8 @@ public class OutboundResponse {
 
     private List<OutboundItemResponse> items;
 
+    private OffsetDateTime completedAt;
+    private String leaderAuthorizedBy;
     private OffsetDateTime cancelledAt;
     private String cancellationReason;
     private String cancelledBy;

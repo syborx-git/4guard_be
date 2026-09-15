@@ -2,6 +2,7 @@ package com.fourguard.wms.application.usecase;
 
 import com.fourguard.wms.application.dto.request.outbound.CancelOutboundRequest;
 import com.fourguard.wms.application.dto.request.outbound.CreateOutboundRequest;
+import com.fourguard.wms.application.dto.request.outbound.UpdateOutboundRequest;
 import com.fourguard.wms.application.dto.request.outbound.ValidatePalletsRequest;
 import com.fourguard.wms.application.dto.response.outbound.InventoryBatchResponse;
 import com.fourguard.wms.application.dto.response.outbound.OutboundResponse;
@@ -10,6 +11,7 @@ import com.fourguard.wms.application.dto.response.outbound.ScanPalletResponse;
 import com.fourguard.wms.application.dto.response.reception.MovementAuditResponse;
 import com.fourguard.wms.application.mapper.WarehouseOutboundMapper;
 import com.fourguard.wms.domain.enums.InventoryState;
+import com.fourguard.wms.domain.enums.LocationType;
 import com.fourguard.wms.domain.enums.MovementType;
 import com.fourguard.wms.domain.enums.OutboundStatus;
 import com.fourguard.wms.domain.exception.EntityNotFoundException;
@@ -47,6 +49,7 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
     private final ClientRepositoryPort clientRepositoryPort;
     private final ClientDestinationRepositoryPort clientDestinationRepositoryPort;
     private final CarrierRepositoryPort carrierRepositoryPort;
+    private final LocationRepositoryPort locationRepositoryPort;
     private final ForkliftOperatorRepositoryPort forkliftOperatorRepositoryPort;
     private final InventoryItemRepositoryPort inventoryItemRepositoryPort;
     private final InventoryItemJpaRepository inventoryItemJpaRepository;
@@ -82,6 +85,17 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
             carrier = carrierRepositoryPort.findById(request.getCarrierId()).orElse(null);
         }
 
+        LocationEntity ramp = null;
+        if (request.getRampId() != null) {
+            ramp = locationRepositoryPort.findById(request.getRampId()).orElse(null);
+        }
+        if (ramp == null && request.getRampNumber() != null && branch.getId() != null) {
+            ramp = locationRepositoryPort.findByBranchId(branch.getId()).stream()
+                    .filter(l -> l.getType() == LocationType.RAMP && Objects.equals(l.getRampNumber(), request.getRampNumber()))
+                    .findFirst()
+                    .orElse(null);
+        }
+
         ForkliftOperatorEntity operator = null;
         if (request.getForkliftOperatorId() != null) {
             operator = forkliftOperatorRepositoryPort.findById(request.getForkliftOperatorId()).orElse(null);
@@ -94,24 +108,36 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
                     .orElse(null);
         }
 
+        // Determine target lifecycle status
+        OutboundStatus targetStatus = OutboundStatus.REGISTERED;
+        if (request.getStatus() != null && !request.getStatus().isBlank()) {
+            try {
+                targetStatus = OutboundStatus.valueOf(request.getStatus().toUpperCase().trim());
+            } catch (IllegalArgumentException ignored) {}
+        } else if (request.getSelectedItemIds() != null && !request.getSelectedItemIds().isEmpty()) {
+            targetStatus = OutboundStatus.COMPLETED;
+        }
+
         // Generate consecutive folio: SAL-YYYY-XXXXXX
         long seq = outboundRepositoryPort.nextFolioSequenceValue();
         int year = LocalDate.now().getYear();
         String folio = String.format("SAL-%d-%06d", year, seq);
 
-        // Batch fetch and validate selected items in a single query
-        List<InventoryItemEntity> itemsToDispatch = inventoryItemJpaRepository.findAllByIdInWithDetails(request.getSelectedItemIds());
-        if (itemsToDispatch.size() != request.getSelectedItemIds().size()) {
-            Set<UUID> foundIds = itemsToDispatch.stream().map(InventoryItemEntity::getId).collect(Collectors.toSet());
-            List<UUID> missingIds = request.getSelectedItemIds().stream()
-                    .filter(id -> !foundIds.contains(id))
-                    .collect(Collectors.toList());
-            throw new EntityNotFoundException("Uno o más ítems de inventario no fueron encontrados: " + missingIds);
-        }
+        List<InventoryItemEntity> itemsToDispatch = new ArrayList<>();
+        if (request.getSelectedItemIds() != null && !request.getSelectedItemIds().isEmpty()) {
+            itemsToDispatch = inventoryItemJpaRepository.findAllByIdInWithDetails(request.getSelectedItemIds());
+            if (itemsToDispatch.size() != request.getSelectedItemIds().size()) {
+                Set<UUID> foundIds = itemsToDispatch.stream().map(InventoryItemEntity::getId).collect(Collectors.toSet());
+                List<UUID> missingIds = request.getSelectedItemIds().stream()
+                        .filter(id -> !foundIds.contains(id))
+                        .collect(Collectors.toList());
+                throw new EntityNotFoundException("Uno o más ítems de inventario no fueron encontrados: " + missingIds);
+            }
 
-        for (InventoryItemEntity item : itemsToDispatch) {
-            if (item.getState() != InventoryState.AVAILABLE && item.getState() != InventoryState.EXPIRED) {
-                throw new ValidationException("La tarima " + item.getSscc() + " no está disponible para despacho (Estado actual: " + item.getState() + ")");
+            for (InventoryItemEntity item : itemsToDispatch) {
+                if (item.getState() != InventoryState.AVAILABLE && item.getState() != InventoryState.EXPIRED) {
+                    throw new ValidationException("La tarima " + item.getSscc() + " no está disponible para despacho (Estado actual: " + item.getState() + ")");
+                }
             }
         }
 
@@ -128,16 +154,21 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
             destAddress = destination.getFullAddress() != null ? destination.getFullAddress() : "";
         }
 
+        String remisionNumber = (request.getRemisionNo() != null && !request.getRemisionNo().isBlank())
+                ? request.getRemisionNo().trim()
+                : "REM-" + folio;
+
         WarehouseOutboundEntity outbound = WarehouseOutboundEntity.builder()
                 .organization(organization)
                 .branch(branch)
                 .folio(folio)
-                .status(OutboundStatus.COMPLETED)
+                .status(targetStatus)
                 .client(client)
                 .destination(destination)
                 .destinationName(destName)
                 .destinationAddress(destAddress)
                 .carrier(carrier)
+                .ramp(ramp)
                 .forkliftOperator(operator)
                 .transportType(request.getTransportType() != null ? request.getTransportType().toUpperCase().trim() : "TRAILER")
                 .driverName(request.getDriverName())
@@ -146,7 +177,8 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
                 .tractorPlates(request.getTractorPlates())
                 .boxPlates(request.getBoxPlates())
                 .sealNumber(request.getSealNumber())
-                .remisionNo(request.getRemisionNo())
+                .remisionNo(remisionNumber)
+                .observations(request.getObservations())
                 .totalPallets(itemsToDispatch.size())
                 .totalPieces(BigDecimal.valueOf(totalPieces))
                 .distinctSkus(distinctSkuIds.size())
@@ -166,12 +198,19 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
         outbound.setUpdatedBy(currentUsername);
 
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        if (targetStatus == OutboundStatus.COMPLETED) {
+            outbound.setCompletedAt(now);
+            outbound.setLeaderAuthorizedBy(currentUsername);
+        }
+
         List<WarehouseOutboundItemEntity> outboundItems = new ArrayList<>();
 
         for (InventoryItemEntity item : itemsToDispatch) {
-            // Update state to DISPATCHED
-            item.setState(InventoryState.DISPATCHED);
-            inventoryItemRepositoryPort.save(item);
+            if (targetStatus == OutboundStatus.COMPLETED) {
+                // Update state to DISPATCHED
+                item.setState(InventoryState.DISPATCHED);
+                inventoryItemRepositoryPort.save(item);
+            }
 
             String locCode = item.getLocation() != null ? item.getLocation().getCode() : "N/A";
 
@@ -185,14 +224,14 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
                     .locationCode(locCode)
                     .build());
 
-            // Log Inventory Movement EXIT
-            if (activeUser != null) {
+            // Log Inventory Movement EXIT if completed
+            if (targetStatus == OutboundStatus.COMPLETED && activeUser != null) {
                 InventoryMovementEntity movement = InventoryMovementEntity.builder()
                         .item(item)
                         .fromLocation(item.getLocation())
                         .user(activeUser)
                         .type(MovementType.EXIT)
-                        .reason("Despacho Outbound Folio: " + folio + " - Remisión Salida: " + request.getRemisionNo() + " [Entrada Origen: " + (item.getSapFolio() != null ? item.getSapFolio() : "N/A") + "]")
+                        .reason("Despacho Outbound Folio: " + folio + " - Remisión Salida: " + remisionNumber + " [Entrada Origen: " + (item.getSapFolio() != null ? item.getSapFolio() : "N/A") + "]")
                         .createdAt(now)
                         .build();
                 inventoryMovementRepositoryPort.save(movement);
@@ -205,11 +244,13 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
         logAudit(saved.getId(), "SALIDA_REGISTRADA",
                 Map.of(),
                 Map.of("folio", folio,
+                       "status", targetStatus.name(),
                        "client", client.getName(),
                        "destination", destName != null ? destName : "N/A",
                        "carrier", carrier != null ? carrier.getName() : "N/A",
+                       "ramp", ramp != null ? (ramp.getCode() != null ? ramp.getCode() : "Rampa " + ramp.getRampNumber()) : "N/A",
                        "forkliftOperator", operator != null ? operator.getFullName() : (request.getForkliftOperatorName() != null ? request.getForkliftOperatorName() : "N/A"),
-                       "sealNumber", request.getSealNumber(),
+                       "sealNumber", request.getSealNumber() != null ? request.getSealNumber() : "N/A",
                        "totalPallets", String.valueOf(itemsToDispatch.size()),
                        "totalPieces", String.valueOf(totalPieces)));
 
@@ -238,6 +279,122 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
         List<WarehouseOutboundEntity> list = outboundJpaRepository.findAll(
                 WarehouseOutboundSpecification.withFilters(organizationId, branchId, obStatus, cleanSearch));
         return list.stream().map(outboundMapper::toSummaryResponse).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public OutboundResponse updateOutbound(UUID id, UpdateOutboundRequest request) {
+        WarehouseOutboundEntity outbound = outboundRepositoryPort.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Salida no encontrada: " + id));
+
+        if (outbound.getStatus() == OutboundStatus.CANCELLED) {
+            throw new ValidationException("No se puede modificar una salida cancelada.");
+        }
+
+        Map<String, String> oldValues = new LinkedHashMap<>();
+        Map<String, String> newValues = new LinkedHashMap<>();
+
+        // 1. Status transition
+        if (request.getStatus() != null && !request.getStatus().isBlank()) {
+            try {
+                OutboundStatus newStatus = OutboundStatus.valueOf(request.getStatus().toUpperCase().trim());
+                if (newStatus != outbound.getStatus()) {
+                    oldValues.put("status", outbound.getStatus().name());
+                    newValues.put("status", newStatus.name());
+                    outbound.setStatus(newStatus);
+
+                    if (newStatus == OutboundStatus.COMPLETED) {
+                        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+                        outbound.setCompletedAt(now);
+                        String currentUsername = SecurityAuditHelper.getCurrentUsername();
+                        outbound.setLeaderAuthorizedBy(currentUsername != null ? currentUsername : "Admin");
+
+                        // Update inventory items state to DISPATCHED
+                        if (outbound.getItems() != null) {
+                            for (WarehouseOutboundItemEntity oi : outbound.getItems()) {
+                                if (oi.getItem() != null && oi.getItem().getState() != InventoryState.DISPATCHED) {
+                                    oi.getItem().setState(InventoryState.DISPATCHED);
+                                    inventoryItemRepositoryPort.save(oi.getItem());
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (IllegalArgumentException ignored) {}
+        }
+
+        // 2. Ramp assignment
+        if (request.getRampId() != null || request.getRampNumber() != null) {
+            LocationEntity ramp = null;
+            if (request.getRampId() != null) {
+                ramp = locationRepositoryPort.findById(request.getRampId()).orElse(null);
+            } else if (request.getRampNumber() != null) {
+                ramp = locationRepositoryPort.findByRampNumber(request.getRampNumber(), outbound.getBranch().getId()).orElse(null);
+            }
+            if (ramp != null) {
+                String oldRamp = outbound.getRamp() != null ? String.valueOf(outbound.getRamp().getRampNumber()) : "N/A";
+                outbound.setRamp(ramp);
+                oldValues.put("ramp", oldRamp);
+                newValues.put("ramp", String.valueOf(ramp.getRampNumber()));
+            }
+        }
+
+        // 3. Forklift Operator assignment
+        if (request.getForkliftOperatorId() != null) {
+            ForkliftOperatorEntity operator = forkliftOperatorRepositoryPort.findById(request.getForkliftOperatorId()).orElse(null);
+            if (operator != null) {
+                String oldOp = outbound.getForkliftOperator() != null ? outbound.getForkliftOperator().getFullName() : "N/A";
+                outbound.setForkliftOperator(operator);
+                oldValues.put("forkliftOperator", oldOp);
+                newValues.put("forkliftOperator", operator.getFullName());
+            }
+        }
+
+        // 4. Vehicle & Driver data
+        if (request.getDriverName() != null && !request.getDriverName().isBlank()) {
+            oldValues.put("driverName", outbound.getDriverName());
+            newValues.put("driverName", request.getDriverName());
+            outbound.setDriverName(request.getDriverName());
+        }
+        if (request.getTractorPlates() != null && !request.getTractorPlates().isBlank()) {
+            oldValues.put("tractorPlates", outbound.getTractorPlates());
+            newValues.put("tractorPlates", request.getTractorPlates());
+            outbound.setTractorPlates(request.getTractorPlates());
+        }
+        if (request.getBoxPlates() != null && !request.getBoxPlates().isBlank()) {
+            oldValues.put("boxPlates", outbound.getBoxPlates());
+            newValues.put("boxPlates", request.getBoxPlates());
+            outbound.setBoxPlates(request.getBoxPlates());
+        }
+        if (request.getEconomicNumber() != null) {
+            outbound.setEconomicNumber(request.getEconomicNumber());
+        }
+        if (request.getBoxEconomicNumber() != null) {
+            outbound.setBoxEconomicNumber(request.getBoxEconomicNumber());
+        }
+
+        // 5. Seal number
+        if (request.getSealNumber() != null && !request.getSealNumber().isBlank()) {
+            oldValues.put("sealNumber", outbound.getSealNumber());
+            newValues.put("sealNumber", request.getSealNumber());
+            outbound.setSealNumber(request.getSealNumber());
+        }
+
+        // 6. Observations
+        if (request.getObservations() != null) {
+            outbound.setObservations(request.getObservations());
+        }
+
+        String currentUsername = SecurityAuditHelper.getCurrentUsername();
+        outbound.setUpdatedBy(currentUsername != null ? currentUsername : "Admin");
+
+        WarehouseOutboundEntity saved = outboundRepositoryPort.save(outbound);
+
+        if (!newValues.isEmpty()) {
+            logAudit(saved.getId(), "SALIDA_MODIFICADA", oldValues, newValues);
+        }
+
+        return outboundMapper.toResponse(saved);
     }
 
     @Override
@@ -575,7 +732,11 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
         if (value == null || value.isBlank() || "null".equalsIgnoreCase(value)) return "Sin especificar";
         String val = value.trim();
         return switch (val) {
-            case "COMPLETED", "DISPATCHED" -> "Despachado / Salida Confirmada";
+            case "REGISTERED" -> "1. Caseta / Registrado";
+            case "ASSIGNED" -> "2. Asignado a Andén";
+            case "IN_PROGRESS" -> "3. En Carga";
+            case "LOADED" -> "4. Carga Finalizada";
+            case "COMPLETED", "DISPATCHED" -> "5. Despachado / Salida Confirmada";
             case "CANCELLED" -> "Cancelado";
             case "PENDING" -> "Pendiente de Carga";
             default -> val;

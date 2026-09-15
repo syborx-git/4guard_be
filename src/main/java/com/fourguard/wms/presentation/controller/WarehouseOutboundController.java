@@ -52,6 +52,19 @@ public class WarehouseOutboundController {
         return ResponseEntity.ok(ApiResponse.ok("Salida obtenida con éxito", response));
     }
 
+    // ─── UPDATE OUTBOUND ───────────────────────────────────────────────────────
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('FORKLIFT_OPERATOR')")
+    @Operation(summary = "Actualizar salida de almacén / transicionar fase",
+               description = "Actualiza el estatus del ciclo operativo (REGISTERED -> ASSIGNED -> IN_PROGRESS -> LOADED -> COMPLETED), rampa, montacarguista o datos de caseta.")
+    public ResponseEntity<ApiResponse<OutboundResponse>> updateOutbound(
+            @PathVariable UUID id,
+            @RequestBody com.fourguard.wms.application.dto.request.outbound.UpdateOutboundRequest request) {
+        OutboundResponse response = outboundUseCase.updateOutbound(id, request);
+        return ResponseEntity.ok(ApiResponse.ok("Salida actualizada con éxito", response));
+    }
+
     // ─── GET LIST ──────────────────────────────────────────────────────────────
 
     @GetMapping

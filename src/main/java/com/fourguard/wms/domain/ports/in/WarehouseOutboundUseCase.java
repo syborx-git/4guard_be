@@ -38,6 +38,11 @@ public interface WarehouseOutboundUseCase {
             String search);
 
     /**
+     * Updates an outbound dispatch status, assigned ramp/operator, vehicle details, or seal.
+     */
+    OutboundResponse updateOutbound(UUID id, com.fourguard.wms.application.dto.request.outbound.UpdateOutboundRequest request);
+
+    /**
      * Cancels an outbound dispatch with admin authorization. Reverts inventory state.
      */
     OutboundResponse cancelOutbound(UUID id, CancelOutboundRequest request);

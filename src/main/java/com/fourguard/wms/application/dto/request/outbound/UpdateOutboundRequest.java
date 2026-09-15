@@ -1,27 +1,17 @@
 package com.fourguard.wms.application.dto.request.outbound;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.util.List;
 import java.util.UUID;
 
 /**
- * Request DTO for creating an Outbound dispatch (Salida de Almacén F03).
+ * Request DTO for updating an Outbound dispatch (Lifecycle progression or Caseta modification).
  */
 @Data
-public class CreateOutboundRequest {
+public class UpdateOutboundRequest {
 
-    @NotNull(message = "organizationId es obligatorio")
-    private UUID organizationId;
-
-    @NotNull(message = "branchId es obligatorio")
-    private UUID branchId;
-
-    @NotNull(message = "clientId es obligatorio")
-    private UUID clientId;
-
+    private String status;
     private UUID destinationId;
     private String destinationName;
     private String destinationAddress;
@@ -35,28 +25,16 @@ public class CreateOutboundRequest {
     private UUID forkliftOperatorId;
     private String forkliftOperatorName;
 
-    @NotBlank(message = "transportType es obligatorio (CAMION, TORTON, TRAILER)")
     private String transportType;
-
-    @NotBlank(message = "driverName es obligatorio")
     private String driverName;
-
     private String economicNumber;
     private String boxEconomicNumber;
-
-    @NotBlank(message = "tractorPlates es obligatorio")
     private String tractorPlates;
-
-    @NotBlank(message = "boxPlates es obligatorio")
     private String boxPlates;
 
     private String sealNumber;
-
     private String remisionNo;
-
     private String observations;
-
-    private String status;
 
     private List<UUID> selectedItemIds;
 }

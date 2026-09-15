@@ -181,7 +181,7 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
         WarehouseReceptionEntity entity = receptionRepositoryPort.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Recepción no encontrada: " + id));
 
-        if (entity.getStatus() != ReceptionStatus.REGISTERED) {
+        if (entity.getStatus() != ReceptionStatus.REGISTERED && entity.getStatus() != ReceptionStatus.ASSIGNED) {
             throw new ValidationException("No se pueden editar parámetros de una recepción en estado: " + entity.getStatus());
         }
 
@@ -287,8 +287,8 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
         WarehouseReceptionEntity reception = receptionRepositoryPort.findById(receptionId)
                 .orElseThrow(() -> new EntityNotFoundException("Recepción no encontrada: " + receptionId));
 
-        if (reception.getStatus() != ReceptionStatus.REGISTERED) {
-            throw new ValidationException("Solo se pueden agregar tarimas a recepciones en estado REGISTERED.");
+        if (reception.getStatus() == ReceptionStatus.COMPLETED || reception.getStatus() == ReceptionStatus.CANCELLED) {
+            throw new ValidationException("No se pueden agregar tarimas a una recepción cerrada o cancelada.");
         }
 
         if (reception.getSku() == null) {
@@ -375,8 +375,8 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
         WarehouseReceptionEntity reception = receptionRepositoryPort.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Recepción no encontrada: " + id));
 
-        if (reception.getStatus() != ReceptionStatus.REGISTERED) {
-            throw new ValidationException("La recepción ya no está en estado REGISTERED (Estado actual: " + reception.getStatus() + ")");
+        if (reception.getStatus() == ReceptionStatus.COMPLETED || reception.getStatus() == ReceptionStatus.CANCELLED) {
+            throw new ValidationException("La recepción ya se encuentra cerrada o cancelada (Estado actual: " + reception.getStatus() + ")");
         }
 
         // Validate Leader Credentials against wms.users
