@@ -5,7 +5,6 @@ import com.fourguard.wms.application.dto.request.UpdateCarrierRequest;
 import com.fourguard.wms.application.dto.request.UpdateCarrierStatusRequest;
 import com.fourguard.wms.application.dto.response.CarrierResponse;
 import com.fourguard.wms.application.dto.response.audit.CarrierAuditResponse;
-import com.fourguard.wms.domain.enums.CarrierStatus;
 
 import java.util.List;
 import java.util.UUID;

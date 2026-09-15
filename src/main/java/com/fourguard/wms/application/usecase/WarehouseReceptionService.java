@@ -4,6 +4,8 @@ import com.fourguard.wms.application.dto.request.reception.*;
 import com.fourguard.wms.application.dto.response.reception.*;
 import com.fourguard.wms.application.mapper.WarehouseReceptionMapper;
 import com.fourguard.wms.domain.enums.InventoryState;
+import com.fourguard.wms.domain.enums.LocationStatus;
+import com.fourguard.wms.domain.enums.LocationType;
 import com.fourguard.wms.domain.enums.MovementType;
 import com.fourguard.wms.domain.enums.PalletType;
 import com.fourguard.wms.domain.enums.ReceptionStatus;
@@ -72,9 +74,37 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
             carrier = carrierRepositoryPort.findById(request.getCarrierId()).orElse(null);
         }
 
+        // Resolución robusta de la Rampa seleccionada (por UUID, por número de rampa 1-12, o por código)
         LocationEntity ramp = null;
         if (request.getRampId() != null) {
             ramp = locationRepositoryPort.findById(request.getRampId()).orElse(null);
+        }
+        if (ramp == null && request.getRampNumber() != null) {
+            String formattedCode = String.format("LOC-RAMP-%02d", request.getRampNumber());
+            ramp = locationRepositoryPort.findByBranchIdAndCode(branch.getId(), formattedCode).orElse(null);
+            if (ramp == null) {
+                ramp = locationRepositoryPort.findFirstByCode(formattedCode).orElse(null);
+            }
+        }
+        if (ramp == null && request.getRampCode() != null && !request.getRampCode().isBlank()) {
+            String cleanCode = request.getRampCode().trim();
+            ramp = locationRepositoryPort.findByBranchIdAndCode(branch.getId(), cleanCode).orElse(null);
+            if (ramp == null) {
+                ramp = locationRepositoryPort.findFirstByCode(cleanCode).orElse(null);
+            }
+            if (ramp == null && cleanCode.startsWith("R-")) {
+                String altCode = cleanCode.replace("R-", "LOC-RAMP-");
+                ramp = locationRepositoryPort.findByBranchIdAndCode(branch.getId(), altCode).orElse(null);
+                if (ramp == null) {
+                    ramp = locationRepositoryPort.findFirstByCode(altCode).orElse(null);
+                }
+            }
+        }
+        if (ramp == null) {
+            ramp = locationRepositoryPort.findByBranchId(branch.getId()).stream()
+                    .filter(l -> l.getType() == LocationType.RAMP)
+                    .findFirst()
+                    .orElse(null);
         }
 
         ForkliftOperatorEntity operator = null;
@@ -84,6 +114,11 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
 
         long folioSeq = receptionRepositoryPort.nextFolioSequenceValue();
         String folio = String.valueOf(folioSeq);
+
+        // Asignación inteligente automática de Bahía de Almacenamiento (Putaway Engine)
+        LocationEntity autoStorageLocation = allocateOptimalStorageLocation(branch, null);
+
+        String currentUser = securityAuditHelper.getCurrentUsername();
 
         WarehouseReceptionEntity entity = WarehouseReceptionEntity.builder()
                 .organization(organization)
@@ -100,22 +135,31 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
                 .driverName(request.getDriverName())
                 .tractorPlates(request.getTractorPlates())
                 .boxPlates(request.getBoxPlates())
+                .lotNumber(request.getLotNumber() != null ? request.getLotNumber().trim() : null)
+                .elaborationDate(request.getElaborationDate())
+                .expirationDate(request.getExpirationDate())
+                .storageLocation(autoStorageLocation)
                 .piecesPerPallet(BigDecimal.ZERO)
                 .palletType(null)
+                .createdBy(currentUser)
+                .updatedBy(currentUser)
                 .build();
 
-        if (request.getSealNumbers() != null && !request.getSealNumbers().isEmpty()) {
-            List<WarehouseReceptionSealEntity> seals = new ArrayList<>();
-            for (String sealNum : request.getSealNumbers()) {
-                if (sealNum != null && !sealNum.isBlank()) {
-                    seals.add(WarehouseReceptionSealEntity.builder()
-                            .reception(entity)
-                            .sealNumber(sealNum.trim())
-                            .build());
-                }
-            }
-            entity.setSeals(seals);
+        if (request.getSealNumbers() == null || request.getSealNumbers().isEmpty() ||
+            request.getSealNumbers().stream().allMatch(s -> s == null || s.isBlank())) {
+            throw new IllegalArgumentException("El registro de al menos un sello de seguridad (cincho) es obligatorio para registrar el arribo.");
         }
+
+        List<WarehouseReceptionSealEntity> seals = new ArrayList<>();
+        for (String sealNum : request.getSealNumbers()) {
+            if (sealNum != null && !sealNum.isBlank()) {
+                seals.add(WarehouseReceptionSealEntity.builder()
+                        .reception(entity)
+                        .sealNumber(sealNum.trim().toUpperCase())
+                        .build());
+            }
+        }
+        entity.setSeals(seals);
 
         WarehouseReceptionEntity saved = receptionRepositoryPort.save(entity);
 
@@ -174,11 +218,18 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
             }
         }
 
+        String currentUser = securityAuditHelper.getCurrentUsername();
+        entity.setUpdatedBy(currentUser);
+
         if (request.getStorageLocationId() != null) {
             LocationEntity storageLoc = locationRepositoryPort.findById(request.getStorageLocationId()).orElse(null);
             if (storageLoc != null) {
                 entity.setStorageLocation(storageLoc);
             }
+        }
+        if (entity.getStorageLocation() == null && entity.getBranch() != null) {
+            LocationEntity autoStorage = allocateOptimalStorageLocation(entity.getBranch(), entity.getSku());
+            entity.setStorageLocation(autoStorage);
         }
 
         if (request.getLotNumber() != null) entity.setLotNumber(request.getLotNumber().trim());
@@ -341,11 +392,27 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
         }
 
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        String currentUser = securityAuditHelper.getCurrentUsername();
         reception.setStatus(ReceptionStatus.COMPLETED);
         reception.setCompletedAt(now);
+        reception.setUpdatedBy(currentUser);
         reception.setLeaderAuthorizedBy(leader.getFirstName() + " " + leader.getLastName());
         if (request.getObservations() != null && !request.getObservations().isBlank()) {
             reception.setObservations((reception.getObservations() != null ? reception.getObservations() + " | " : "") + request.getObservations());
+        }
+
+        if (reception.getStorageLocation() == null && reception.getBranch() != null) {
+            LocationEntity autoLoc = allocateOptimalStorageLocation(reception.getBranch(), reception.getSku());
+            reception.setStorageLocation(autoLoc);
+        }
+
+        // Actualizar ocupación de la bahía de almacenamiento asignada
+        if (reception.getStorageLocation() != null) {
+            LocationEntity stLoc = reception.getStorageLocation();
+            int curOcc = stLoc.getCurrentOccupancy() != null ? stLoc.getCurrentOccupancy() : 0;
+            stLoc.setCurrentOccupancy(curOcc + 1);
+            stLoc.setUpdatedBy(currentUser);
+            locationRepositoryPort.save(stLoc);
         }
 
         // Generate Inventory Items and Inventory Movements for each UA
@@ -364,6 +431,8 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
                     .manufacturingDate(reception.getElaborationDate())
                     .expirationDate(reception.getExpirationDate())
                     .sapFolio(reception.getDocNumber())
+                    .createdBy(currentUser)
+                    .updatedBy(currentUser)
                     .build();
 
             InventoryItemEntity savedItem = inventoryItemRepositoryPort.save(inventoryItem);
@@ -409,11 +478,13 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
         UserEntity admin = validateUserCredentials(request.getAdminUsername(), request.getAdminPassword(), "Administrador");
 
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        String currentUser = securityAuditHelper.getCurrentUsername();
         String oldStatus = reception.getStatus().name();
         reception.setStatus(ReceptionStatus.CANCELLED);
         reception.setCancelledAt(now);
         reception.setCancellationReason(request.getReason());
         reception.setCancelledBy(admin.getFirstName() + " " + admin.getLastName());
+        reception.setUpdatedBy(currentUser);
 
         WarehouseReceptionEntity saved = receptionRepositoryPort.save(reception);
 
@@ -442,7 +513,9 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
         UserEntity authorizedUser = validateUserCredentials(request.getAdminUsername(), request.getAdminPassword(), "Supervisor / Administrador");
         String authorizedByName = authorizedUser.getFirstName() + " " + authorizedUser.getLastName() + " (" + authorizedUser.getUsername() + ")";
 
+        String currentUser = securityAuditHelper.getCurrentUsername();
         reception.setDocNumber(newDoc.trim());
+        reception.setUpdatedBy(currentUser);
         WarehouseReceptionEntity saved = receptionRepositoryPort.save(reception);
 
         // Actualizar el sapFolio en los inventory_items asociados a las tarimas de esta recepción
@@ -594,6 +667,73 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
                 .timestamp(formattedTimestamp)
                 .details(details)
                 .build();
+    }
+
+    /**
+     * Algoritmo de Acomodo Inteligente (Slotting & Putaway Optimization).
+     * Selecciona automáticamente la mejor bahía de almacenamiento disponible en la sucursal activa
+     * considerando capacidad, no estar bloqueada y estado activo.
+     */
+    private LocationEntity allocateOptimalStorageLocation(BranchEntity branch, ProductSkuEntity sku) {
+        if (branch == null) return null;
+
+        // 1. Obtener ubicaciones disponibles en la sucursal
+        List<LocationEntity> availableLocs = locationRepositoryPort.findAvailableByBranchId(branch.getId());
+
+        // 2. Filtrar ubicaciones que sean de tipo PALLET, SHELF o BIN (no RAMP) y activas
+        List<LocationEntity> candidates = availableLocs.stream()
+                .filter(l -> l.getType() != LocationType.RAMP)
+                .filter(l -> l.getStatus() == null || l.getStatus() == LocationStatus.ACTIVE)
+                .filter(l -> !Boolean.TRUE.equals(l.getIsBlocked()))
+                .filter(l -> {
+                    int cap = l.getCapacityUnits() != null ? l.getCapacityUnits() : 10;
+                    int occ = l.getCurrentOccupancy() != null ? l.getCurrentOccupancy() : 0;
+                    return occ < cap;
+                })
+                .sorted(Comparator.comparing((LocationEntity l) -> l.getCurrentOccupancy() != null ? l.getCurrentOccupancy() : 0)
+                        .thenComparing(l -> l.getCode() != null ? l.getCode() : ""))
+                .collect(Collectors.toList());
+
+        if (!candidates.isEmpty()) {
+            return candidates.get(0);
+        }
+
+        // 3. Si todas las bahías tienen ocupación, tomar la primera de almacenamiento no bloqueada
+        List<LocationEntity> allStorage = locationRepositoryPort.findByBranchId(branch.getId()).stream()
+                .filter(l -> l.getType() != LocationType.RAMP)
+                .filter(l -> !Boolean.TRUE.equals(l.getIsBlocked()))
+                .collect(Collectors.toList());
+
+        if (!allStorage.isEmpty()) {
+            return allStorage.get(0);
+        }
+
+        // 4. Fallback de alta resiliencia: Si la sucursal no tiene bahías registradas, aprovisionar 'LOC-A-01-N1'
+        String defaultCode = "LOC-A-01-N1";
+        Optional<LocationEntity> existingDefault = locationRepositoryPort.findByBranchIdAndCode(branch.getId(), defaultCode);
+        if (existingDefault.isPresent()) {
+            return existingDefault.get();
+        }
+
+        LocationEntity autoCreated = LocationEntity.builder()
+                .branch(branch)
+                .code(defaultCode)
+                .name("Pasillo A - Rack 01 - Nivel 1")
+                .zone("ZA")
+                .aisle("01")
+                .rack("01")
+                .level(1)
+                .position("P01")
+                .type(LocationType.PALLET)
+                .capacityUnits(10)
+                .currentOccupancy(0)
+                .status(LocationStatus.ACTIVE)
+                .isBlocked(false)
+                .createdBy(securityAuditHelper.getCurrentUsername())
+                .updatedBy(securityAuditHelper.getCurrentUsername())
+                .build();
+
+        return locationRepositoryPort.save(autoCreated);
     }
 
     private String translateFieldName(String field) {

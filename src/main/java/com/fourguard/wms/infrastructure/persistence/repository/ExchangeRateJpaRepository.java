@@ -18,7 +18,7 @@ public interface ExchangeRateJpaRepository extends JpaRepository<ExchangeRateEnt
     @Query("SELECT e FROM ExchangeRateEntity e WHERE (:organizationId IS NULL OR e.organizationId = :organizationId) " +
            "AND ((e.fromCurrencyId = :fromCurrencyId AND e.toCurrencyId = :toCurrencyId) " +
            "     OR (e.fromCurrencyId = :toCurrencyId AND e.toCurrencyId = :fromCurrencyId)) " +
-           "AND e.effectiveDate <= :date AND e.status = 'ACTIVE' " +
+           "AND e.effectiveDate <= :date AND e.status = com.fourguard.wms.domain.enums.ExchangeRateStatus.ACTIVE " +
            "ORDER BY e.effectiveDate DESC, e.createdAt DESC")
     List<ExchangeRateEntity> findTopRates(@Param("organizationId") UUID organizationId,
                                           @Param("fromCurrencyId") UUID fromCurrencyId,

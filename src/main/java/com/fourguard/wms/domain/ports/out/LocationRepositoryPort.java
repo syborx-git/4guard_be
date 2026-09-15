@@ -11,6 +11,8 @@ public interface LocationRepositoryPort {
     Optional<LocationEntity> findById(UUID id);
     List<LocationEntity>     findByBranchId(UUID branchId);
     List<LocationEntity>     findAvailableByBranchId(UUID branchId);
+    Optional<LocationEntity> findByBranchIdAndCode(UUID branchId, String code);
+    Optional<LocationEntity> findFirstByCode(String code);
     LocationEntity           save(LocationEntity location);
     void                     deleteById(UUID id);
     List<LocationEntity>     findAll();
