@@ -102,9 +102,13 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
         }
         if (ramp == null) {
             ramp = locationRepositoryPort.findByBranchId(branch.getId()).stream()
-                    .filter(l -> l.getType() == LocationType.RAMP)
+                    .filter(l -> l.getType() == LocationType.RAMP && !Boolean.TRUE.equals(l.getIsBlocked()))
                     .findFirst()
                     .orElse(null);
+        }
+
+        if (ramp != null && Boolean.TRUE.equals(ramp.getIsBlocked())) {
+            throw new ValidationException("La rampa asignada (" + ramp.getCode() + ") se encuentra bloqueada por mantenimiento o restricción operativa.");
         }
 
         ForkliftOperatorEntity operator = null;

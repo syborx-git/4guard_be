@@ -103,6 +103,10 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
                     .orElse(null);
         }
 
+        if (ramp != null && Boolean.TRUE.equals(ramp.getIsBlocked())) {
+            throw new ValidationException("La rampa seleccionada (" + (ramp.getCode() != null ? ramp.getCode() : "Rampa") + ") se encuentra bloqueada: " + (ramp.getBlockReason() != null ? ramp.getBlockReason() : "Mantenimiento / Bloqueada"));
+        }
+
         ForkliftOperatorEntity operator = null;
         if (request.getForkliftOperatorId() != null) {
             operator = forkliftOperatorRepositoryPort.findById(request.getForkliftOperatorId()).orElse(null);
@@ -144,6 +148,15 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
             for (InventoryItemEntity item : itemsToDispatch) {
                 if (item.getState() != InventoryState.AVAILABLE && item.getState() != InventoryState.EXPIRED) {
                     throw new ValidationException("La tarima " + item.getSscc() + " no está disponible para despacho (Estado actual: " + item.getState() + ")");
+                }
+                if (item.getOrganization() != null && !item.getOrganization().getId().equals(organization.getId())) {
+                    throw new ValidationException("La tarima " + item.getSscc() + " pertenece a otra organización.");
+                }
+                if (item.getBranch() != null && !item.getBranch().getId().equals(branch.getId())) {
+                    throw new ValidationException("La tarima " + item.getSscc() + " pertenece a otra sucursal.");
+                }
+                if (item.getClient() != null && !item.getClient().getId().equals(client.getId())) {
+                    throw new ValidationException("La tarima " + item.getSscc() + " pertenece a otro cliente (" + item.getClient().getName() + ").");
                 }
             }
         }

@@ -111,6 +111,10 @@ public class WarehouseTransferService implements WarehouseTransferUseCase {
             throw new EntityNotFoundException("Ubicación destino no encontrada: " + (request.getDestinationLocationCode() != null ? request.getDestinationLocationCode() : request.getDestinationLocationId()));
         }
 
+        if (Boolean.TRUE.equals(destination.getIsBlocked())) {
+            throw new ValidationException("La ubicación destino (" + (destination.getCode() != null ? destination.getCode() : destination.getId()) + ") se encuentra bloqueada.");
+        }
+
         if (origin.getId().equals(destination.getId())) {
             throw new ValidationException("La ubicación de origen y destino no pueden ser la misma.");
         }
@@ -331,6 +335,17 @@ public class WarehouseTransferService implements WarehouseTransferUseCase {
                             .build();
                     inventoryMovementRepositoryPort.save(comp);
                 }
+            }
+        }
+
+        // Revertir ocupación física de bahías
+        int itemsCount = (transfer.getItems() != null) ? transfer.getItems().size() : 0;
+        if (itemsCount > 0) {
+            if (transfer.getOriginLocation() != null && transfer.getOriginLocation().getId() != null) {
+                locationRepositoryPort.incrementOccupancy(transfer.getOriginLocation().getId(), itemsCount);
+            }
+            if (transfer.getDestinationLocation() != null && transfer.getDestinationLocation().getId() != null) {
+                locationRepositoryPort.decrementOccupancy(transfer.getDestinationLocation().getId(), itemsCount);
             }
         }
 
