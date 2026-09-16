@@ -4,6 +4,7 @@ import com.fourguard.wms.application.dto.response.outbound.OutboundItemResponse;
 import com.fourguard.wms.application.dto.response.outbound.OutboundResponse;
 import com.fourguard.wms.application.dto.response.outbound.OutboundSummaryResponse;
 import com.fourguard.wms.domain.enums.OutboundStatus;
+import com.fourguard.wms.infrastructure.persistence.entity.LocationEntity;
 import com.fourguard.wms.infrastructure.persistence.entity.WarehouseOutboundEntity;
 import com.fourguard.wms.infrastructure.persistence.entity.WarehouseOutboundItemEntity;
 import org.mapstruct.Mapper;
@@ -23,7 +24,7 @@ public interface WarehouseOutboundMapper {
     @Mapping(source = "carrier.id", target = "carrierId")
     @Mapping(source = "carrier.name", target = "carrierName")
     @Mapping(source = "ramp.id", target = "rampId")
-    @Mapping(source = "ramp.rampNumber", target = "rampNumber")
+    @Mapping(source = "ramp", target = "rampNumber", qualifiedByName = "extractRampNumber")
     @Mapping(source = "ramp.code", target = "rampCode")
     @Mapping(source = "forkliftOperator.id", target = "forkliftOperatorId")
     @Mapping(source = "forkliftOperator.fullName", target = "forkliftOperatorName")
@@ -37,7 +38,7 @@ public interface WarehouseOutboundMapper {
     @Mapping(source = "carrier.id", target = "carrierId")
     @Mapping(source = "carrier.name", target = "carrierName")
     @Mapping(source = "ramp.id", target = "rampId")
-    @Mapping(source = "ramp.rampNumber", target = "rampNumber")
+    @Mapping(source = "ramp", target = "rampNumber", qualifiedByName = "extractRampNumber")
     @Mapping(source = "ramp.code", target = "rampCode")
     @Mapping(source = "forkliftOperator.id", target = "forkliftOperatorId")
     @Mapping(source = "forkliftOperator.fullName", target = "forkliftOperatorName")
@@ -56,5 +57,27 @@ public interface WarehouseOutboundMapper {
     @Named("outboundStatusToString")
     default String outboundStatusToString(OutboundStatus status) {
         return status != null ? status.name() : null;
+    }
+
+    @Named("extractRampNumber")
+    default Integer extractRampNumber(LocationEntity ramp) {
+        if (ramp == null) return null;
+        if (ramp.getCode() != null && ramp.getCode().matches(".*\\d+.*")) {
+            try {
+                String numStr = ramp.getCode().replaceAll("\\D+", "");
+                if (!numStr.isBlank()) {
+                    return Integer.parseInt(numStr);
+                }
+            } catch (Exception ignored) {}
+        }
+        if (ramp.getPosition() != null && ramp.getPosition().matches(".*\\d+.*")) {
+            try {
+                String numStr = ramp.getPosition().replaceAll("\\D+", "");
+                if (!numStr.isBlank()) {
+                    return Integer.parseInt(numStr);
+                }
+            } catch (Exception ignored) {}
+        }
+        return null;
     }
 }

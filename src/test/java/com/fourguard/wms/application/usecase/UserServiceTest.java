@@ -6,9 +6,6 @@ import com.fourguard.wms.application.dto.UserUpdateRequest;
 import com.fourguard.wms.application.dto.response.audit.UserAuditResponse;
 import com.fourguard.wms.application.mapper.UserMapper;
 import com.fourguard.wms.domain.enums.UserStatus;
-import com.fourguard.wms.domain.model.Branch;
-import com.fourguard.wms.domain.model.Organization;
-import com.fourguard.wms.domain.model.Role;
 import com.fourguard.wms.domain.model.User;
 import com.fourguard.wms.domain.ports.out.AuditLogRepositoryPort;
 import com.fourguard.wms.domain.ports.out.BranchRepositoryPort;
@@ -33,7 +30,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -154,17 +150,17 @@ class UserServiceTest {
         when(userRepositoryPort.existsByUsername(createRequest.getUsername())).thenReturn(false);
         when(userRepositoryPort.existsByEmail(createRequest.getEmail())).thenReturn(false);
         when(userMapper.toUser(createRequest)).thenReturn(user);
-        
+
         when(organizationRepositoryPort.findById(orgId)).thenReturn(Optional.of(orgEntity));
         when(branchRepositoryPort.findById(branchId)).thenReturn(Optional.of(branchEntity));
         when(roleRepositoryPort.findById(roleId)).thenReturn(Optional.of(roleEntity));
-        
+
         when(passwordEncoder.encode(createRequest.getPassword())).thenReturn("hashedPassword");
         when(userMapper.toUserEntity(any(User.class))).thenReturn(userEntity);
         when(userRepositoryPort.save(any(UserEntity.class))).thenReturn(userEntity);
         when(userMapper.toUser(any(UserEntity.class))).thenReturn(user);
         when(userMapper.toUserResponse(any(User.class))).thenReturn(userResponse);
-        
+
         when(securityAuditHelper.getCurrentUsername()).thenReturn("test-admin");
 
         // Act
@@ -251,23 +247,23 @@ class UserServiceTest {
         when(userRepositoryPort.findById(userId)).thenReturn(Optional.of(userEntity));
         when(userRepositoryPort.existsByUsername(updateRequest.getUsername())).thenReturn(false);
         when(userRepositoryPort.existsByEmail(updateRequest.getEmail())).thenReturn(false);
-        
+
         when(organizationRepositoryPort.findById(orgId)).thenReturn(Optional.of(orgEntity));
         when(branchRepositoryPort.findById(branchId)).thenReturn(Optional.of(branchEntity));
         when(roleRepositoryPort.findById(roleId)).thenReturn(Optional.of(roleEntity));
-        
+
         when(passwordEncoder.encode(updateRequest.getPassword())).thenReturn("newHashedPassword");
         when(userMapper.toUserEntity(any(User.class))).thenReturn(userEntity);
         when(userRepositoryPort.save(any(UserEntity.class))).thenReturn(userEntity);
         when(userMapper.toUser(any(UserEntity.class))).thenReturn(user);
-        
+
         UserResponse updatedResponse = UserResponse.builder()
                 .id(userId)
                 .username("john.updated")
                 .email("john.updated@4guard.com")
                 .build();
         when(userMapper.toUserResponse(any(User.class))).thenReturn(updatedResponse);
-        
+
         when(securityAuditHelper.getCurrentUsername()).thenReturn("test-admin");
 
         // Act
@@ -326,4 +322,4 @@ class UserServiceTest {
         assertEquals("USER_CREATED", logs.get(0).getAction());
         verify(auditLogRepositoryPort, times(1)).findByEntityTypeAndEntityId("USER", userId);
     }
-}
+}

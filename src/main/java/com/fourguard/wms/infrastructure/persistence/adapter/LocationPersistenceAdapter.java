@@ -29,6 +29,16 @@ public class LocationPersistenceAdapter implements LocationRepositoryPort {
     @Override public boolean existsByCodeAndIdNot(String code, UUID excludeId) {
         return repository.existsByCodeAndIdNot(code, excludeId);
     }
+
+    @Override
+    public int decrementOccupancy(UUID locationId, int count) {
+        return repository.decrementOccupancy(locationId, count);
+    }
+
+    @Override
+    public int incrementOccupancy(UUID locationId, int count) {
+        return repository.incrementOccupancy(locationId, count);
+    }
 }
 
 

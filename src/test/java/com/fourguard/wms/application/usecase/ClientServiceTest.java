@@ -1,6 +1,5 @@
 package com.fourguard.wms.application.usecase;
 
-import com.fourguard.wms.application.dto.common.ClientContactDto;
 import com.fourguard.wms.application.dto.common.PhysicalDestinationDto;
 import com.fourguard.wms.application.dto.request.CreateClientRequest;
 import com.fourguard.wms.application.dto.request.UpdateClientRequest;
@@ -15,7 +14,6 @@ import com.fourguard.wms.domain.ports.out.ClientRepositoryPort;
 import com.fourguard.wms.domain.ports.out.OrganizationRepositoryPort;
 import com.fourguard.wms.domain.ports.out.UserRepositoryPort;
 import com.fourguard.wms.infrastructure.persistence.entity.AuditLogEntity;
-import com.fourguard.wms.infrastructure.persistence.entity.ClientContactEntity;
 import com.fourguard.wms.infrastructure.persistence.entity.ClientDestinationEntity;
 import com.fourguard.wms.infrastructure.persistence.entity.ClientEntity;
 import com.fourguard.wms.infrastructure.persistence.entity.OrganizationEntity;
@@ -42,14 +40,22 @@ import static org.mockito.Mockito.*;
 @DisplayName("ClientService — Gestión de Clientes, Contactos y Destinos Físicos")
 class ClientServiceTest {
 
-    @Mock private ClientRepositoryPort            clientRepositoryPort;
-    @Mock private ClientDestinationRepositoryPort destinationRepositoryPort;
-    @Mock private OrganizationRepositoryPort      organizationRepositoryPort;
-    @Mock private UserRepositoryPort              userRepositoryPort;
-    @Mock private AuditLogRepositoryPort          auditLogRepositoryPort;
-    @Mock private ClientMapper                    clientMapper;
-    @Mock private SecurityAuditHelper             securityAuditHelper;
-    @Mock private AuditService                    auditService;
+    @Mock
+    private ClientRepositoryPort clientRepositoryPort;
+    @Mock
+    private ClientDestinationRepositoryPort destinationRepositoryPort;
+    @Mock
+    private OrganizationRepositoryPort organizationRepositoryPort;
+    @Mock
+    private UserRepositoryPort userRepositoryPort;
+    @Mock
+    private AuditLogRepositoryPort auditLogRepositoryPort;
+    @Mock
+    private ClientMapper clientMapper;
+    @Mock
+    private SecurityAuditHelper securityAuditHelper;
+    @Mock
+    private AuditService auditService;
 
     @InjectMocks
     private ClientService clientService;
@@ -59,16 +65,15 @@ class ClientServiceTest {
     private UUID destId;
     private OrganizationEntity orgEntity;
     private ClientEntity clientEntity;
-    private ClientEntity clientEntityWithDestinations;
     private ClientResponse clientResponse;
     private CreateClientRequest createRequest;
     private UpdateClientRequest updateRequest;
 
     @BeforeEach
     void setUp() {
-        orgId    = UUID.randomUUID();
+        orgId = UUID.randomUUID();
         clientId = UUID.randomUUID();
-        destId   = UUID.randomUUID();
+        destId = UUID.randomUUID();
 
         orgEntity = OrganizationEntity.builder()
                 .id(orgId)
@@ -168,7 +173,8 @@ class ClientServiceTest {
                 .build();
 
         when(organizationRepositoryPort.findById(orgId)).thenReturn(Optional.of(orgEntity));
-        // externalId es null → la validación retorna temprano; stub en modo lenient para evitar UnnecessaryStubbing
+        // externalId es null → la validación retorna temprano; stub en modo lenient
+        // para evitar UnnecessaryStubbing
         lenient().when(clientRepositoryPort.existsByOrganizationIdAndExternalId(any(), any())).thenReturn(false);
         when(clientMapper.toEntity(genericRequest)).thenReturn(clientEntity);
         when(securityAuditHelper.getCurrentUsername()).thenReturn("admin.4guard");
@@ -182,14 +188,15 @@ class ClientServiceTest {
         verify(clientRepositoryPort, never()).existsByOrganizationIdAndTaxId(any(), eq("XAXX010101000"));
     }
 
-
     @Test
     @DisplayName("Actualizar cliente con datos válidos → éxito")
     void whenUpdateClient_withValidData_thenSuccess() {
         when(clientRepositoryPort.findById(clientId)).thenReturn(Optional.of(clientEntity));
         when(organizationRepositoryPort.findById(orgId)).thenReturn(Optional.of(orgEntity));
-        when(clientRepositoryPort.existsByOrganizationIdAndExternalIdAndIdNot(orgId, "NME850101K99", clientId)).thenReturn(false);
-        when(clientRepositoryPort.existsByOrganizationIdAndTaxIdAndIdNot(orgId, "NME850101K99", clientId)).thenReturn(false);
+        when(clientRepositoryPort.existsByOrganizationIdAndExternalIdAndIdNot(orgId, "NME850101K99", clientId))
+                .thenReturn(false);
+        when(clientRepositoryPort.existsByOrganizationIdAndTaxIdAndIdNot(orgId, "NME850101K99", clientId))
+                .thenReturn(false);
         when(securityAuditHelper.getCurrentUsername()).thenReturn("admin.4guard");
         when(clientRepositoryPort.save(any(ClientEntity.class))).thenReturn(clientEntity);
         when(clientMapper.toResponse(clientEntity)).thenReturn(clientResponse);

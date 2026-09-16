@@ -90,8 +90,15 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
             ramp = locationRepositoryPort.findById(request.getRampId()).orElse(null);
         }
         if (ramp == null && request.getRampNumber() != null && branch.getId() != null) {
+            String formattedCode = String.format("LOC-RAMP-%02d", request.getRampNumber());
+            ramp = locationRepositoryPort.findByBranchIdAndCode(branch.getId(), formattedCode).orElse(null);
+            if (ramp == null) {
+                ramp = locationRepositoryPort.findFirstByCode(formattedCode).orElse(null);
+            }
+        }
+        if (ramp == null && request.getRampNumber() != null && branch.getId() != null) {
             ramp = locationRepositoryPort.findByBranchId(branch.getId()).stream()
-                    .filter(l -> l.getType() == LocationType.RAMP && Objects.equals(l.getRampNumber(), request.getRampNumber()))
+                    .filter(l -> l.getType() == LocationType.RAMP)
                     .findFirst()
                     .orElse(null);
         }
@@ -127,7 +134,7 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
         if (request.getSelectedItemIds() != null && !request.getSelectedItemIds().isEmpty()) {
             itemsToDispatch = inventoryItemJpaRepository.findAllByIdInWithDetails(request.getSelectedItemIds());
             if (itemsToDispatch.size() != request.getSelectedItemIds().size()) {
-                Set<UUID> foundIds = itemsToDispatch.stream().map(InventoryItemEntity::getId).collect(Collectors.toSet());
+                Set<UUID> foundIds = itemsToDispatch.stream().map(item -> item.getId()).collect(Collectors.toSet());
                 List<UUID> missingIds = request.getSelectedItemIds().stream()
                         .filter(id -> !foundIds.contains(id))
                         .collect(Collectors.toList());
@@ -184,14 +191,18 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
                 .distinctSkus(distinctSkuIds.size())
                 .build();
 
-        String currentUsername = "admin";
+        String loggedUser = securityAuditHelper.getCurrentUsername();
+        String currentUsername = (loggedUser != null && !loggedUser.isBlank()) ? loggedUser : "admin";
         UserEntity activeUser = null;
         try {
-            String loggedUser = securityAuditHelper.getCurrentUsername();
-            if (loggedUser != null && !loggedUser.isBlank()) {
-                currentUsername = loggedUser;
+            activeUser = userRepositoryPort.findByUsernameOrEmail(currentUsername)
+                    .orElse(null);
+            if (activeUser == null) {
+                activeUser = userRepositoryPort.findAll().stream()
+                        .filter(u -> Boolean.TRUE.equals(u.getIsEnabled()))
+                        .findFirst()
+                        .orElse(null);
             }
-            activeUser = userRepositoryPort.findByUsername(currentUsername).orElse(null);
         } catch (Exception ignored) {}
 
         outbound.setCreatedBy(currentUsername);
@@ -210,6 +221,11 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
                 // Update state to DISPATCHED
                 item.setState(InventoryState.DISPATCHED);
                 inventoryItemRepositoryPort.save(item);
+
+                // Decrementar ocupación de la bahía física origen
+                if (item.getLocation() != null && item.getLocation().getId() != null) {
+                    locationRepositoryPort.decrementOccupancy(item.getLocation().getId(), 1);
+                }
             }
 
             String locCode = item.getLocation() != null ? item.getLocation().getCode() : "N/A";
@@ -248,7 +264,7 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
                        "client", client.getName(),
                        "destination", destName != null ? destName : "N/A",
                        "carrier", carrier != null ? carrier.getName() : "N/A",
-                       "ramp", ramp != null ? (ramp.getCode() != null ? ramp.getCode() : "Rampa " + ramp.getRampNumber()) : "N/A",
+                       "ramp", ramp != null ? (ramp.getCode() != null ? ramp.getCode() : (ramp.getName() != null ? ramp.getName() : "Rampa")) : "N/A",
                        "forkliftOperator", operator != null ? operator.getFullName() : (request.getForkliftOperatorName() != null ? request.getForkliftOperatorName() : "N/A"),
                        "sealNumber", request.getSealNumber() != null ? request.getSealNumber() : "N/A",
                        "totalPallets", String.valueOf(itemsToDispatch.size()),
@@ -291,8 +307,8 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
             throw new ValidationException("No se puede modificar una salida cancelada.");
         }
 
-        Map<String, String> oldValues = new LinkedHashMap<>();
-        Map<String, String> newValues = new LinkedHashMap<>();
+        Map<String, Object> oldValues = new LinkedHashMap<>();
+        Map<String, Object> newValues = new LinkedHashMap<>();
 
         // 1. Status transition
         if (request.getStatus() != null && !request.getStatus().isBlank()) {
@@ -306,15 +322,19 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
                     if (newStatus == OutboundStatus.COMPLETED) {
                         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
                         outbound.setCompletedAt(now);
-                        String currentUsername = SecurityAuditHelper.getCurrentUsername();
+                        String currentUsername = securityAuditHelper.getCurrentUsername();
                         outbound.setLeaderAuthorizedBy(currentUsername != null ? currentUsername : "Admin");
 
-                        // Update inventory items state to DISPATCHED
+                        // Update inventory items state to DISPATCHED y decrementar ocupación
                         if (outbound.getItems() != null) {
                             for (WarehouseOutboundItemEntity oi : outbound.getItems()) {
                                 if (oi.getItem() != null && oi.getItem().getState() != InventoryState.DISPATCHED) {
                                     oi.getItem().setState(InventoryState.DISPATCHED);
                                     inventoryItemRepositoryPort.save(oi.getItem());
+
+                                    if (oi.getItem().getLocation() != null && oi.getItem().getLocation().getId() != null) {
+                                        locationRepositoryPort.decrementOccupancy(oi.getItem().getLocation().getId(), 1);
+                                    }
                                 }
                             }
                         }
@@ -328,14 +348,18 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
             LocationEntity ramp = null;
             if (request.getRampId() != null) {
                 ramp = locationRepositoryPort.findById(request.getRampId()).orElse(null);
-            } else if (request.getRampNumber() != null) {
-                ramp = locationRepositoryPort.findByRampNumber(request.getRampNumber(), outbound.getBranch().getId()).orElse(null);
+            } else if (request.getRampNumber() != null && outbound.getBranch() != null) {
+                String formattedCode = String.format("LOC-RAMP-%02d", request.getRampNumber());
+                ramp = locationRepositoryPort.findByBranchIdAndCode(outbound.getBranch().getId(), formattedCode).orElse(null);
+                if (ramp == null) {
+                    ramp = locationRepositoryPort.findFirstByCode(formattedCode).orElse(null);
+                }
             }
             if (ramp != null) {
-                String oldRamp = outbound.getRamp() != null ? String.valueOf(outbound.getRamp().getRampNumber()) : "N/A";
+                String oldRamp = outbound.getRamp() != null ? (outbound.getRamp().getCode() != null ? outbound.getRamp().getCode() : outbound.getRamp().getName()) : "N/A";
                 outbound.setRamp(ramp);
                 oldValues.put("ramp", oldRamp);
-                newValues.put("ramp", String.valueOf(ramp.getRampNumber()));
+                newValues.put("ramp", ramp.getCode() != null ? ramp.getCode() : (ramp.getName() != null ? ramp.getName() : "Rampa"));
             }
         }
 
@@ -385,7 +409,7 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
             outbound.setObservations(request.getObservations());
         }
 
-        String currentUsername = SecurityAuditHelper.getCurrentUsername();
+        String currentUsername = securityAuditHelper.getCurrentUsername();
         outbound.setUpdatedBy(currentUsername != null ? currentUsername : "Admin");
 
         WarehouseOutboundEntity saved = outboundRepositoryPort.save(outbound);
@@ -626,48 +650,53 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
     // ─── PRIVATE HELPERS ─────────────────────────────────────────────────────────
 
     private UserEntity validateUserCredentials(String username, String password) {
-        String identifier = username != null ? username.trim() : "";
-        UserEntity user = null;
-        if (!identifier.isBlank()) {
-            user = userRepositoryPort.findByUsernameOrEmail(identifier)
-                    .or(() -> userRepositoryPort.findByUsername(identifier))
-                    .or(() -> userRepositoryPort.findByEmail(identifier))
-                    .orElse(null);
+        final String searchIdentifier = (username != null && !username.isBlank())
+                ? username.trim()
+                : (securityAuditHelper.getCurrentUsername() != null ? securityAuditHelper.getCurrentUsername().trim() : "");
+
+        if (searchIdentifier.isBlank()) {
+            throw new ValidationException("El nombre de usuario para autorización de despacho es obligatorio.");
         }
 
-        if (user == null) {
-            String currentUsername = securityAuditHelper.getCurrentUsername();
-            if (currentUsername != null && !currentUsername.isBlank()) {
-                user = userRepositoryPort.findByUsernameOrEmail(currentUsername).orElse(null);
-            }
-        }
-
-        if (user == null) {
-            user = userRepositoryPort.findAll().stream()
-                    .filter(u -> Boolean.TRUE.equals(u.getIsEnabled()))
-                    .findFirst()
-                    .orElseThrow(() -> new ValidationException("Credenciales inválidas: usuario '" + identifier + "' no encontrado."));
-        }
+        UserEntity user = userRepositoryPort.findByUsernameOrEmail(searchIdentifier)
+                .or(() -> userRepositoryPort.findByUsername(searchIdentifier))
+                .or(() -> userRepositoryPort.findByEmail(searchIdentifier))
+                .orElseThrow(() -> new ValidationException("Credenciales inválidas: usuario '" + searchIdentifier + "' no encontrado."));
 
         if (Boolean.FALSE.equals(user.getIsEnabled())) {
             throw new ValidationException("El usuario '" + user.getUsername() + "' está inactivo o deshabilitado.");
         }
 
-        if (password != null && !password.isBlank() && user.getPassword() != null) {
-            if (!passwordEncoder.matches(password, user.getPassword()) && !"adminPassword".equals(password) && !"admin".equals(password)) {
-                throw new ValidationException("Contraseña incorrecta para el usuario '" + (user.getEmail() != null ? user.getEmail() : user.getUsername()) + "'.");
-            }
+        if (password == null || password.isBlank()) {
+            throw new ValidationException("La contraseña de autorización para el usuario '" + user.getUsername() + "' es requerida.");
+        }
+
+        if (!passwordEncoder.matches(password, user.getPassword())) {
+            throw new ValidationException("Contraseña incorrecta para el usuario '" + (user.getEmail() != null ? user.getEmail() : user.getUsername()) + "'.");
         }
 
         return user;
     }
 
-    private void logAudit(UUID entityId, String action, Map<String, Object> before, Map<String, Object> after) {
+    private void logAudit(UUID entityId, String action, Map<String, ?> before, Map<String, ?> after) {
         try {
             String username = securityAuditHelper.getCurrentUsername();
-            UserEntity activeUser = userRepositoryPort.findByUsername(username).orElse(null);
+            UserEntity activeUser = null;
+            if (username != null && !username.isBlank()) {
+                activeUser = userRepositoryPort.findByUsername(username)
+                        .or(() -> userRepositoryPort.findByEmail(username))
+                        .orElse(null);
+            }
+            if (activeUser == null) {
+                activeUser = userRepositoryPort.findAll().stream()
+                        .filter(u -> Boolean.TRUE.equals(u.getIsEnabled()))
+                        .findFirst()
+                        .orElse(null);
+            }
             if (activeUser != null) {
-                auditService.log(activeUser, action, "OUTBOUND", entityId, before, after);
+                Map<String, Object> beforeMap = before != null ? new HashMap<>(before) : Collections.emptyMap();
+                Map<String, Object> afterMap = after != null ? new HashMap<>(after) : Collections.emptyMap();
+                auditService.log(activeUser, action, "OUTBOUND", entityId, beforeMap, afterMap);
             }
         } catch (Exception e) {
             log.warn("Could not record relational audit log for outbound {}: {}", entityId, e.getMessage());

@@ -7,7 +7,6 @@ import com.fourguard.wms.application.dto.response.audit.OrganizationAuditRespons
 import com.fourguard.wms.application.mapper.OrganizationMapper;
 import com.fourguard.wms.domain.enums.OrganizationStatus;
 import com.fourguard.wms.domain.enums.OrganizationType;
-import com.fourguard.wms.domain.exception.EntityNotFoundException;
 import com.fourguard.wms.domain.exception.ValidationException;
 import com.fourguard.wms.domain.ports.out.AuditLogRepositoryPort;
 import com.fourguard.wms.domain.ports.out.OrganizationRepositoryPort;

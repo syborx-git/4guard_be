@@ -2,16 +2,15 @@ package com.fourguard.wms.infrastructure.persistence.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-import lombok.experimental.SuperBuilder;
 import org.hibernate.annotations.DynamicUpdate;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.UUID;
 
 /**
  * JPA entity for wms.cat_supplier_types.
- * Catalog table seeded in V9 migration. Not versioned (no optimistic lock needed for catalogs).
+ * Catalog table seeded in V9 migration. Not versioned (no optimistic lock
+ * needed for catalogs).
  */
 @Entity
 @Table(name = "cat_supplier_types", schema = "wms")
@@ -48,6 +47,7 @@ public class CatSupplierTypeEntity {
 
     @PrePersist
     protected void onPrePersist() {
-        if (createdAt == null) createdAt = OffsetDateTime.now(ZoneOffset.UTC);
+        if (createdAt == null)
+            createdAt = OffsetDateTime.now(ZoneOffset.UTC);
     }
 }

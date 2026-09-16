@@ -159,29 +159,9 @@ public class WarehouseTransferService implements WarehouseTransferUseCase {
             });
         }
 
-        // Si no se encontraron items registrados previamente, crearlos en el destino para que el traspaso persista su inventario
+        // Validar que se hayan encontrado ítems de inventario existentes
         if (itemsToMove.isEmpty()) {
-            ProductSkuEntity defaultSku = productSkuRepositoryPort.findAll().stream().findFirst().orElse(null);
-            ClientEntity defaultClient = clientRepositoryPort.findAll().stream().findFirst().orElse(null);
-
-            List<String> codesToCreate = requestedCodes.isEmpty() ? List.of("UA-" + (System.currentTimeMillis() % 100000)) : new ArrayList<>(requestedCodes);
-            for (String code : codesToCreate) {
-                InventoryItemEntity newItem = InventoryItemEntity.builder()
-                        .organization(organization)
-                        .branch(branch)
-                        .client(defaultClient)
-                        .sku(defaultSku)
-                        .sscc(code.trim())
-                        .externalUa(code.trim())
-                        .location(destination)
-                        .state(InventoryState.AVAILABLE)
-                        .quantity(BigDecimal.valueOf(45))
-                        .batchNumber("LOTE-" + year)
-                        .sapFolio("REM-TRF")
-                        .build();
-                InventoryItemEntity savedItem = inventoryItemRepositoryPort.save(newItem);
-                itemsToMove.add(savedItem);
-            }
+            throw new ValidationException("No se encontraron ítems de inventario disponibles asociados a las tarimas o códigos especificados para el traspaso.");
         }
 
         Set<UUID> distinctSkuIds = itemsToMove.stream()
@@ -211,7 +191,7 @@ public class WarehouseTransferService implements WarehouseTransferUseCase {
             creator = securityAuditHelper.getCurrentUsername();
         }
         if (creator == null || creator.isBlank() || creator.startsWith("@")) {
-            creator = "Alex Gabriel Perez";
+            creator = "Sistema / Supervisor";
         }
 
         WarehouseTransferEntity transfer = WarehouseTransferEntity.builder()
@@ -245,7 +225,7 @@ public class WarehouseTransferService implements WarehouseTransferUseCase {
             transferItems.add(WarehouseTransferItemEntity.builder()
                     .transfer(transfer)
                     .item(item)
-                    .pieces(item.getQuantity() != null ? item.getQuantity() : BigDecimal.valueOf(45))
+                    .pieces(item.getQuantity() != null ? item.getQuantity() : BigDecimal.ZERO)
                     .palletCode(itemSscc)
                     .build());
 
@@ -264,6 +244,14 @@ public class WarehouseTransferService implements WarehouseTransferUseCase {
             }
         }
         transfer.setItems(transferItems);
+
+        // Actualizar ocupación física de bahías: decrementar origen e incrementar destino
+        if (origin != null && origin.getId() != null) {
+            locationRepositoryPort.decrementOccupancy(origin.getId(), itemsToMove.size());
+        }
+        if (destination != null && destination.getId() != null) {
+            locationRepositoryPort.incrementOccupancy(destination.getId(), itemsToMove.size());
+        }
 
         WarehouseTransferEntity saved = transferRepositoryPort.save(transfer);
 
@@ -373,37 +361,29 @@ public class WarehouseTransferService implements WarehouseTransferUseCase {
     // ─── PRIVATE HELPERS ─────────────────────────────────────────────────────────
 
     private UserEntity validateUserCredentials(String username, String password) {
-        String identifier = username != null ? username.trim() : "";
-        UserEntity user = null;
-        if (!identifier.isBlank()) {
-            user = userRepositoryPort.findByUsernameOrEmail(identifier)
-                    .or(() -> userRepositoryPort.findByUsername(identifier))
-                    .or(() -> userRepositoryPort.findByEmail(identifier))
-                    .orElse(null);
+        final String searchIdentifier = (username != null && !username.isBlank())
+                ? username.trim()
+                : (securityAuditHelper.getCurrentUsername() != null ? securityAuditHelper.getCurrentUsername().trim() : "");
+
+        if (searchIdentifier.isBlank()) {
+            throw new ValidationException("El nombre de usuario para autorización de traspaso es obligatorio.");
         }
 
-        if (user == null) {
-            String currentUsername = securityAuditHelper.getCurrentUsername();
-            if (currentUsername != null && !currentUsername.isBlank()) {
-                user = userRepositoryPort.findByUsernameOrEmail(currentUsername).orElse(null);
-            }
-        }
-
-        if (user == null) {
-            user = userRepositoryPort.findAll().stream()
-                    .filter(u -> Boolean.TRUE.equals(u.getIsEnabled()))
-                    .findFirst()
-                    .orElseThrow(() -> new ValidationException("Credenciales inválidas: usuario '" + identifier + "' no encontrado."));
-        }
+        UserEntity user = userRepositoryPort.findByUsernameOrEmail(searchIdentifier)
+                .or(() -> userRepositoryPort.findByUsername(searchIdentifier))
+                .or(() -> userRepositoryPort.findByEmail(searchIdentifier))
+                .orElseThrow(() -> new ValidationException("Credenciales inválidas: usuario '" + searchIdentifier + "' no encontrado."));
 
         if (Boolean.FALSE.equals(user.getIsEnabled())) {
             throw new ValidationException("El usuario '" + user.getUsername() + "' está inactivo o deshabilitado.");
         }
 
-        if (password != null && !password.isBlank() && user.getPassword() != null) {
-            if (!passwordEncoder.matches(password, user.getPassword()) && !"adminPassword".equals(password) && !"admin".equals(password)) {
-                throw new ValidationException("Contraseña incorrecta para el usuario '" + (user.getEmail() != null ? user.getEmail() : user.getUsername()) + "'.");
-            }
+        if (password == null || password.isBlank()) {
+            throw new ValidationException("La contraseña de autorización para el usuario '" + user.getUsername() + "' es requerida.");
+        }
+
+        if (!passwordEncoder.matches(password, user.getPassword())) {
+            throw new ValidationException("Contraseña incorrecta para el usuario '" + (user.getEmail() != null ? user.getEmail() : user.getUsername()) + "'.");
         }
 
         return user;

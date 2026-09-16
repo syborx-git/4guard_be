@@ -535,15 +535,9 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
             }
         }
 
-        // Si existen items con el folio de remisión anterior en la misma sucursal, actualizarlos
+        // Si existen items con el folio de remisión anterior en la misma sucursal, actualizarlos mediante query masiva optimizada
         if (oldDoc != null && !oldDoc.isBlank() && reception.getBranch() != null) {
-            List<InventoryItemEntity> branchItems = inventoryItemRepositoryPort.findByBranchId(reception.getBranch().getId());
-            for (InventoryItemEntity item : branchItems) {
-                if (oldDoc.trim().equalsIgnoreCase(item.getSapFolio())) {
-                    item.setSapFolio(newDoc.trim());
-                    inventoryItemRepositoryPort.save(item);
-                }
-            }
+            inventoryItemRepositoryPort.updateSapFolioInBranch(reception.getBranch().getId(), oldDoc.trim(), newDoc.trim());
         }
 
         logAudit(saved.getId(), "REMISION_MODIFICADA", authorizedUser,
@@ -573,35 +567,31 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
     // ─── PRIVATE HELPERS ─────────────────────────────────────────────────────────
 
     private UserEntity validateUserCredentials(String username, String password, String expectedRoleName) {
-        if (username != null && !username.isBlank()) {
-            Optional<UserEntity> userOpt = userRepositoryPort.findByUsername(username.trim());
-            if (userOpt.isPresent()) {
-                UserEntity user = userOpt.get();
-                if (user.getIsEnabled() != null && !user.getIsEnabled()) {
-                    throw new ValidationException("El usuario '" + username + "' está inactivo o deshabilitado.");
-                }
-                if (password != null && !password.isBlank()) {
-                    if (passwordEncoder.matches(password, user.getPassword()) || "adminPassword".equals(password)) {
-                        return user;
-                    }
-                }
-                return user;
-            }
+        final String searchIdentifier = (username != null && !username.isBlank())
+                ? username.trim()
+                : (securityAuditHelper.getCurrentUsername() != null ? securityAuditHelper.getCurrentUsername().trim() : "");
+
+        if (searchIdentifier.isBlank()) {
+            throw new ValidationException("El nombre de usuario para autorización (" + expectedRoleName + ") es obligatorio.");
         }
 
-        String currentUsername = securityAuditHelper.getCurrentUsername();
-        if (currentUsername != null && !currentUsername.isBlank()) {
-            Optional<UserEntity> userOpt = userRepositoryPort.findByUsername(currentUsername.trim());
-            if (userOpt.isPresent()) {
-                return userOpt.get();
-            }
+        UserEntity user = userRepositoryPort.findByUsername(searchIdentifier)
+                .or(() -> userRepositoryPort.findByEmail(searchIdentifier))
+                .orElseThrow(() -> new ValidationException("Usuario de autorización no encontrado: " + searchIdentifier));
+
+        if (user.getIsEnabled() != null && !user.getIsEnabled()) {
+            throw new ValidationException("El usuario '" + user.getUsername() + "' está inactivo o deshabilitado.");
         }
 
-        return userRepositoryPort.findAll().stream()
-                .filter(u -> Boolean.TRUE.equals(u.getIsEnabled()))
-                .findFirst()
-                .orElseGet(() -> userRepositoryPort.findAll().stream().findFirst().orElseThrow(
-                        () -> new EntityNotFoundException("No se encontraron usuarios activos en el sistema para registrar la auditoría.")));
+        if (password == null || password.isBlank()) {
+            throw new ValidationException("La contraseña de autorización para el usuario '" + user.getUsername() + "' es requerida.");
+        }
+
+        if (!passwordEncoder.matches(password, user.getPassword())) {
+            throw new ValidationException("Contraseña de autorización incorrecta para '" + user.getUsername() + "'.");
+        }
+
+        return user;
     }
 
     private void logAudit(UUID entityId, String action, UserEntity actor, Map<String, Object> before, Map<String, Object> after) {

@@ -1,11 +1,9 @@
 package com.fourguard.wms.application.usecase;
 
-import com.fourguard.wms.application.dto.request.CreateRoleRequest;
 import com.fourguard.wms.application.dto.request.UpdateRoleRequest;
 import com.fourguard.wms.application.dto.response.RoleResponse;
 import com.fourguard.wms.application.dto.response.audit.RoleAuditResponse;
 import com.fourguard.wms.application.mapper.RoleMapper;
-import com.fourguard.wms.domain.exception.EntityNotFoundException;
 import com.fourguard.wms.domain.ports.out.AuditLogRepositoryPort;
 import com.fourguard.wms.domain.ports.out.PermissionRepositoryPort;
 import com.fourguard.wms.domain.ports.out.RoleRepositoryPort;

@@ -17,5 +17,13 @@ public interface LocationJpaRepository extends JpaRepository<LocationEntity, UUI
 
     /** Checks whether another location (different ID) already uses the given code. */
     boolean existsByCodeAndIdNot(String code, UUID id);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("UPDATE LocationEntity l SET l.currentOccupancy = GREATEST(0, COALESCE(l.currentOccupancy, 0) - :count) WHERE l.id = :locationId")
+    int decrementOccupancy(UUID locationId, int count);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("UPDATE LocationEntity l SET l.currentOccupancy = COALESCE(l.currentOccupancy, 0) + :count WHERE l.id = :locationId")
+    int incrementOccupancy(UUID locationId, int count);
 }
 

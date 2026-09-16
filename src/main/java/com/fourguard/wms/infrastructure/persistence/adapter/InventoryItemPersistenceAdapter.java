@@ -22,4 +22,5 @@ public class InventoryItemPersistenceAdapter implements InventoryItemRepositoryP
     @Override public List<InventoryItemEntity>     findAvailableBySkuFefo(UUID skuId) { return repository.findAvailableBySkuOrderedByFefo(skuId); }
     @Override public InventoryItemEntity           save(InventoryItemEntity item)     { return repository.save(item); }
     @Override public boolean                       existsBySscc(String sscc)         { return repository.existsBySscc(sscc); }
+    @Override public int                           updateSapFolioInBranch(UUID branchId, String oldDoc, String newDoc) { return repository.updateSapFolioInBranch(branchId, oldDoc, newDoc); }
 }
