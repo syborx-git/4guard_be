@@ -4,6 +4,8 @@ import com.fourguard.wms.shared.audit.BaseVersionedEntity;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -104,13 +106,8 @@ public class SecurityPreCheckinEntity extends BaseVersionedEntity {
     @Column(name = "box_dimensions", length = 50)
     private String boxDimensions;
 
-    @ElementCollection(fetch = FetchType.EAGER)
-    @CollectionTable(
-        name = "security_pre_checkin_seals",
-        schema = "wms",
-        joinColumns = @JoinColumn(name = "pre_checkin_id")
-    )
-    @Column(name = "seal_number", nullable = false, length = 100)
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @Column(name = "seal_numbers", columnDefinition = "TEXT[]")
     @Builder.Default
     private List<String> sealNumbers = new ArrayList<>();
 
@@ -128,7 +125,8 @@ public class SecurityPreCheckinEntity extends BaseVersionedEntity {
     private LocalTime departureTime;
 
     // ── Checklist & Inspection (F01-PO-CP-7.1.3-03) ──
-    @Column(name = "checklist_data", columnDefinition = "TEXT")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "checklist_data", columnDefinition = "JSONB")
     private String checklistData;
 
     @Column(name = "observations", columnDefinition = "TEXT")
@@ -169,6 +167,21 @@ public class SecurityPreCheckinEntity extends BaseVersionedEntity {
 
     @Column(name = "processed_at")
     private OffsetDateTime processedAt;
+
+    // ── Check-Out & Departure (Salida de Planta) ──
+    @Column(name = "exit_observations", columnDefinition = "TEXT")
+    private String exitObservations;
+
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @Column(name = "exit_seal_numbers", columnDefinition = "TEXT[]")
+    @Builder.Default
+    private List<String> exitSealNumbers = new ArrayList<>();
+
+    @Column(name = "exited_by", length = 100)
+    private String exitedBy;
+
+    @Column(name = "exited_at")
+    private OffsetDateTime exitedAt;
 
     @Column(name = "expires_at", nullable = false)
     private OffsetDateTime expiresAt;

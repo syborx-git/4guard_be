@@ -5,11 +5,15 @@ import com.fourguard.wms.application.dto.request.reception.CreateCheckInRequest;
 import com.fourguard.wms.application.dto.request.security.DriverCheckinSubmissionRequest;
 import com.fourguard.wms.application.dto.request.security.GeneratePassRequest;
 import com.fourguard.wms.application.dto.request.security.GuardCheckinCompletionRequest;
+import com.fourguard.wms.application.dto.request.security.GuardCheckOutRequest;
 import com.fourguard.wms.application.dto.response.outbound.OutboundResponse;
 import com.fourguard.wms.application.dto.response.reception.ReceptionResponse;
 import com.fourguard.wms.application.dto.response.security.PassResponse;
+import com.fourguard.wms.application.dto.response.security.SecurityGatePublicCatalogsResponse;
 import com.fourguard.wms.domain.exception.EntityNotFoundException;
 import com.fourguard.wms.domain.exception.ValidationException;
+import com.fourguard.wms.domain.enums.OutboundStatus;
+import com.fourguard.wms.domain.enums.ReceptionStatus;
 import com.fourguard.wms.domain.ports.in.SecurityGateUseCase;
 import com.fourguard.wms.domain.ports.in.WarehouseOutboundUseCase;
 import com.fourguard.wms.domain.ports.in.WarehouseReceptionUseCase;
@@ -40,9 +44,80 @@ public class SecurityGateService implements SecurityGateUseCase {
     private final CarrierRepositoryPort carrierRepositoryPort;
     private final LocationRepositoryPort locationRepositoryPort;
     private final ForkliftOperatorRepositoryPort forkliftOperatorRepositoryPort;
+    private final WarehouseReceptionRepositoryPort warehouseReceptionRepositoryPort;
+    private final WarehouseOutboundRepositoryPort warehouseOutboundRepositoryPort;
     private final WarehouseReceptionUseCase warehouseReceptionUseCase;
     private final WarehouseOutboundUseCase warehouseOutboundUseCase;
     private final SecurityAuditHelper securityAuditHelper;
+
+    @Override
+    @Transactional(readOnly = true)
+    public SecurityGatePublicCatalogsResponse getPublicCatalogs(UUID organizationId) {
+        log.info("Fetching public security gate catalogs for org: {}", organizationId);
+
+        List<ClientEntity> clientEntities = organizationId != null
+                ? clientRepositoryPort.findByOrganizationId(organizationId)
+                : clientRepositoryPort.findAll();
+
+        List<CarrierEntity> carrierEntities = organizationId != null
+                ? carrierRepositoryPort.findByOrganizationId(organizationId)
+                : carrierRepositoryPort.findAll();
+
+        List<SecurityGatePublicCatalogsResponse.CatalogItemDto> clientDtos = (clientEntities != null ? clientEntities : Collections.<ClientEntity>emptyList()).stream()
+                .filter(c -> c.getStatus() == null || "ACTIVE".equalsIgnoreCase(c.getStatus()) || "ACTIVO".equalsIgnoreCase(c.getStatus()))
+                .map(c -> SecurityGatePublicCatalogsResponse.CatalogItemDto.builder()
+                        .id(c.getId().toString())
+                        .code(c.getExternalId() != null && !c.getExternalId().isBlank() ? c.getExternalId() : c.getId().toString())
+                        .name(c.getName())
+                        .tradeName(c.getName())
+                        .build())
+                .sorted(Comparator.comparing(SecurityGatePublicCatalogsResponse.CatalogItemDto::getName))
+                .toList();
+
+        List<SecurityGatePublicCatalogsResponse.CatalogItemDto> carrierDtos = (carrierEntities != null ? carrierEntities : Collections.<CarrierEntity>emptyList()).stream()
+                .filter(c -> c.getStatus() == null || c.getStatus() == com.fourguard.wms.domain.enums.CarrierStatus.ACTIVE)
+                .map(c -> SecurityGatePublicCatalogsResponse.CatalogItemDto.builder()
+                        .id(c.getId().toString())
+                        .code(c.getId().toString())
+                        .name(c.getName())
+                        .tradeName(c.getTradeName() != null && !c.getTradeName().isBlank() ? c.getTradeName() : c.getName())
+                        .build())
+                .sorted(Comparator.comparing(SecurityGatePublicCatalogsResponse.CatalogItemDto::getTradeName))
+                .toList();
+
+        List<String> transportTypes = List.of(
+                "Caja Seca",
+                "Caja Refrigerada / Thermo",
+                "Plataforma / Flatbed",
+                "Camión Tortón (3 Ejes)",
+                "Camión Rabón (2 Ejes)",
+                "Camioneta 3.5 Toneladas",
+                "Contenedor Intermodal (40')",
+                "Contenedor Intermodal (20')",
+                "Tolva / Granel",
+                "Pipa / Tanque Líquidos",
+                "Camioneta Utilitaria (1 Ton)",
+                "Otro (Especificar)"
+        );
+
+        List<String> boxDimensions = List.of(
+                "53 Pies (16.15 m)",
+                "48 Pies (14.63 m)",
+                "40 Pies (12.19 m)",
+                "20 Pies (6.10 m)",
+                "Tortón / Camión Pesado",
+                "Rabón",
+                "3.5 Toneladas",
+                "Otra Medida"
+        );
+
+        return SecurityGatePublicCatalogsResponse.builder()
+                .clients(clientDtos)
+                .carriers(carrierDtos)
+                .transportTypes(transportTypes)
+                .boxDimensions(boxDimensions)
+                .build();
+    }
 
     @Override
     @Transactional
@@ -191,7 +266,37 @@ public class SecurityGateService implements SecurityGateUseCase {
         List<SecurityPreCheckinEntity> list = preCheckinJpaRepository.findActivePasses(
                 organizationId, branchId, OffsetDateTime.now()
         );
-        return list.stream().map(this::mapToResponse).toList();
+        return list.stream().map(this::mapToResponseWithWarehouseStatus).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PassResponse> getInYardPasses(UUID organizationId, UUID branchId) {
+        List<SecurityPreCheckinEntity> list = preCheckinJpaRepository.findInYardPasses(
+                organizationId, branchId
+        );
+        return list.stream().map(this::mapToResponseWithWarehouseStatus).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PassResponse> getHistoryPasses(UUID organizationId, UUID branchId, String search) {
+        List<SecurityPreCheckinEntity> list = preCheckinJpaRepository.findHistoryPasses(
+                organizationId, branchId
+        );
+        if (search != null && !search.isBlank()) {
+            String q = search.trim().toLowerCase();
+            list = list.stream().filter(p ->
+                    (p.getToken() != null && p.getToken().toLowerCase().contains(q)) ||
+                    (p.getGeneratedFolio() != null && p.getGeneratedFolio().toLowerCase().contains(q)) ||
+                    (p.getDriverName() != null && p.getDriverName().toLowerCase().contains(q)) ||
+                    (p.getTractorPlates() != null && p.getTractorPlates().toLowerCase().contains(q)) ||
+                    (p.getBoxPlates() != null && p.getBoxPlates().toLowerCase().contains(q)) ||
+                    (p.getClientName() != null && p.getClientName().toLowerCase().contains(q)) ||
+                    (p.getCarrierLine() != null && p.getCarrierLine().toLowerCase().contains(q))
+            ).toList();
+        }
+        return list.stream().map(this::mapToResponseWithWarehouseStatus).toList();
     }
 
     @Override
@@ -202,7 +307,7 @@ public class SecurityGateService implements SecurityGateUseCase {
         SecurityPreCheckinEntity entity = preCheckinJpaRepository.findByToken(token.trim().toUpperCase())
                 .orElseThrow(() -> new EntityNotFoundException("Pase de acceso no encontrado: " + token));
 
-        if ("COMPLETED".equalsIgnoreCase(entity.getStatus())) {
+        if ("COMPLETED".equalsIgnoreCase(entity.getStatus()) || "COMPLETED_EXIT".equalsIgnoreCase(entity.getStatus())) {
             throw new ValidationException("Este pase ya fue completado con el folio: " + entity.getGeneratedFolio());
         }
 
@@ -304,10 +409,72 @@ public class SecurityGateService implements SecurityGateUseCase {
         entity.setProcessedBy(securityAuditHelper.getCurrentUsername() != null ? securityAuditHelper.getCurrentUsername() : "guardia");
 
         SecurityPreCheckinEntity saved = preCheckinJpaRepository.save(entity);
-        return mapToResponse(saved);
+        return mapToResponseWithWarehouseStatus(saved);
+    }
+
+    @Override
+    @Transactional
+    public PassResponse checkOut(String tokenOrFolio, GuardCheckOutRequest request) {
+        log.info("Guard executing check-out for pass / folio: {}", tokenOrFolio);
+        if (tokenOrFolio == null || tokenOrFolio.isBlank()) {
+            throw new ValidationException("El token o folio es obligatorio para el check-out de caseta.");
+        }
+
+        String search = tokenOrFolio.trim().toUpperCase();
+        SecurityPreCheckinEntity entity = preCheckinJpaRepository.findByToken(search)
+                .or(() -> preCheckinJpaRepository.findByGeneratedFolio(tokenOrFolio.trim()))
+                .orElseThrow(() -> new EntityNotFoundException("No se encontró el pase o folio de caseta: " + tokenOrFolio));
+
+        LocalTime exitTime = request.getDepartureTime() != null ? request.getDepartureTime() : LocalTime.now();
+        entity.setDepartureTime(exitTime);
+        if (request.getExitObservations() != null) {
+            entity.setExitObservations(request.getExitObservations());
+        }
+        if (request.getExitSealNumbers() != null && !request.getExitSealNumbers().isEmpty()) {
+            entity.setExitSealNumbers(request.getExitSealNumbers());
+        }
+        if (request.getGuardNotes() != null && !request.getGuardNotes().isBlank()) {
+            entity.setGuardNotes((entity.getGuardNotes() != null ? entity.getGuardNotes() + " | " : "") + request.getGuardNotes());
+        }
+
+        String currentUser = securityAuditHelper.getCurrentUsername() != null ? securityAuditHelper.getCurrentUsername() : "guardia";
+        entity.setExitedBy(currentUser);
+        entity.setExitedAt(OffsetDateTime.now());
+        entity.setStatus("COMPLETED_EXIT");
+
+        SecurityPreCheckinEntity saved = preCheckinJpaRepository.save(entity);
+        return mapToResponseWithWarehouseStatus(saved);
     }
 
     private PassResponse mapToResponse(SecurityPreCheckinEntity entity) {
+        return mapToResponseWithWarehouseStatus(entity);
+    }
+
+    private PassResponse mapToResponseWithWarehouseStatus(SecurityPreCheckinEntity entity) {
+        String whStatus = "REGISTRADO";
+        boolean readyForExit = false;
+
+        if (entity.getGeneratedFolio() != null && !entity.getGeneratedFolio().isBlank()) {
+            String folio = entity.getGeneratedFolio().trim();
+            if ("CARGA".equalsIgnoreCase(entity.getOperationType())) {
+                Optional<WarehouseOutboundEntity> outbound = warehouseOutboundRepositoryPort.findByFolio(folio);
+                if (outbound.isPresent()) {
+                    WarehouseOutboundEntity out = outbound.get();
+                    whStatus = out.getStatus() != null ? out.getStatus().name() : "REGISTERED";
+                    readyForExit = (out.getStatus() == OutboundStatus.COMPLETED ||
+                                    out.getStatus() == OutboundStatus.LOADED);
+                }
+            } else {
+                Optional<WarehouseReceptionEntity> reception = warehouseReceptionRepositoryPort.findByFolio(folio);
+                if (reception.isPresent()) {
+                    WarehouseReceptionEntity rec = reception.get();
+                    whStatus = rec.getStatus() != null ? rec.getStatus().name() : "REGISTERED";
+                    readyForExit = (rec.getStatus() == ReceptionStatus.COMPLETED ||
+                                    rec.getStatus() == ReceptionStatus.DISCHARGED);
+                }
+            }
+        }
+
         return PassResponse.builder()
                 .id(entity.getId())
                 .token(entity.getToken())
@@ -333,6 +500,7 @@ public class SecurityGateService implements SecurityGateUseCase {
                 .docNumber(entity.getDocNumber())
                 .docDate(entity.getDocDate())
                 .receptionTime(entity.getReceptionTime())
+                .departureTime(entity.getDepartureTime())
                 .checklistData(entity.getChecklistData())
                 .observations(entity.getObservations())
                 .driverSignature(entity.getDriverSignature())
@@ -343,6 +511,12 @@ public class SecurityGateService implements SecurityGateUseCase {
                 .generatedFolio(entity.getGeneratedFolio())
                 .processedBy(entity.getProcessedBy())
                 .processedAt(entity.getProcessedAt())
+                .exitObservations(entity.getExitObservations())
+                .exitSealNumbers(entity.getExitSealNumbers())
+                .exitedBy(entity.getExitedBy())
+                .exitedAt(entity.getExitedAt())
+                .warehouseStatus(whStatus)
+                .isReadyForExit(readyForExit)
                 .expiresAt(entity.getExpiresAt())
                 .createdAt(entity.getCreatedAt())
                 .build();

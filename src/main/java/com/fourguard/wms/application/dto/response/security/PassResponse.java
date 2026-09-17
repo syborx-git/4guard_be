@@ -42,6 +42,7 @@ public class PassResponse {
     private String docNumber;
     private LocalDate docDate;
     private LocalTime receptionTime;
+    private LocalTime departureTime;
 
     private String checklistData;
     private String observations;
@@ -55,6 +56,14 @@ public class PassResponse {
     private String generatedFolio;
     private String processedBy;
     private OffsetDateTime processedAt;
+
+    // Check-Out & Exit
+    private String exitObservations;
+    private List<String> exitSealNumbers;
+    private String exitedBy;
+    private OffsetDateTime exitedAt;
+    private String warehouseStatus;
+    private Boolean isReadyForExit;
 
     private OffsetDateTime expiresAt;
     private OffsetDateTime createdAt;

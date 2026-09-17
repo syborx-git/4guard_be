@@ -16,6 +16,8 @@ public interface SecurityPreCheckinJpaRepository extends JpaRepository<SecurityP
 
     Optional<SecurityPreCheckinEntity> findByToken(String token);
 
+    Optional<SecurityPreCheckinEntity> findByGeneratedFolio(String generatedFolio);
+
     @Query("SELECT p FROM SecurityPreCheckinEntity p " +
            "WHERE p.organization.id = :orgId " +
            "AND (:branchId IS NULL OR p.branch.id = :branchId) " +
@@ -26,5 +28,24 @@ public interface SecurityPreCheckinJpaRepository extends JpaRepository<SecurityP
             @Param("orgId") UUID orgId,
             @Param("branchId") UUID branchId,
             @Param("now") OffsetDateTime now
+    );
+
+    @Query("SELECT p FROM SecurityPreCheckinEntity p " +
+           "WHERE p.organization.id = :orgId " +
+           "AND (:branchId IS NULL OR p.branch.id = :branchId) " +
+           "AND p.status = 'COMPLETED' " +
+           "ORDER BY p.processedAt DESC")
+    List<SecurityPreCheckinEntity> findInYardPasses(
+            @Param("orgId") UUID orgId,
+            @Param("branchId") UUID branchId
+    );
+
+    @Query("SELECT p FROM SecurityPreCheckinEntity p " +
+           "WHERE p.organization.id = :orgId " +
+           "AND (:branchId IS NULL OR p.branch.id = :branchId) " +
+           "ORDER BY p.createdAt DESC")
+    List<SecurityPreCheckinEntity> findHistoryPasses(
+            @Param("orgId") UUID orgId,
+            @Param("branchId") UUID branchId
     );
 }

@@ -3,7 +3,9 @@ package com.fourguard.wms.presentation.controller;
 import com.fourguard.wms.application.dto.request.security.DriverCheckinSubmissionRequest;
 import com.fourguard.wms.application.dto.request.security.GeneratePassRequest;
 import com.fourguard.wms.application.dto.request.security.GuardCheckinCompletionRequest;
+import com.fourguard.wms.application.dto.request.security.GuardCheckOutRequest;
 import com.fourguard.wms.application.dto.response.security.PassResponse;
+import com.fourguard.wms.application.dto.response.security.SecurityGatePublicCatalogsResponse;
 import com.fourguard.wms.domain.ports.in.SecurityGateUseCase;
 import com.fourguard.wms.shared.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -27,6 +29,15 @@ public class SecurityGateController {
     private final SecurityGateUseCase securityGateUseCase;
 
     // ─── PUBLIC DRIVER PORTAL ENDPOINTS ───────────────────────────────────────
+
+    @GetMapping("/public/catalogs")
+    @Operation(summary = "Obtener catálogos dinámicos públicos para transportistas (Clientes, Líneas, Tipos de Transporte)",
+               description = "Retorna la lista de clientes activos, líneas transportistas y tipos de transporte permitidos.")
+    public ResponseEntity<ApiResponse<SecurityGatePublicCatalogsResponse>> getPublicCatalogs(
+            @RequestParam(required = false) UUID organizationId) {
+        SecurityGatePublicCatalogsResponse response = securityGateUseCase.getPublicCatalogs(organizationId);
+        return ResponseEntity.ok(ApiResponse.ok("Catálogos de caseta obtenidos con éxito", response));
+    }
 
     @GetMapping("/public/passes/{token}")
     @Operation(summary = "Consultar pase QR por Token (Acceso Público Móvil Chofer)",
@@ -69,6 +80,29 @@ public class SecurityGateController {
         return ResponseEntity.ok(ApiResponse.ok("Pases activos obtenidos con éxito", list));
     }
 
+    @GetMapping("/passes/in-yard")
+    @PreAuthorize("hasAuthority('SECURITY_GATE_READ') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR')")
+    @Operation(summary = "Listar unidades en planta (patio / andenes)",
+               description = "Retorna los vehículos que han ingresado y están actualmente en descarga, carga o listos para salida.")
+    public ResponseEntity<ApiResponse<List<PassResponse>>> getInYardPasses(
+            @RequestParam UUID organizationId,
+            @RequestParam(required = false) UUID branchId) {
+        List<PassResponse> list = securityGateUseCase.getInYardPasses(organizationId, branchId);
+        return ResponseEntity.ok(ApiResponse.ok("Unidades en planta obtenidas con éxito", list));
+    }
+
+    @GetMapping("/passes/history")
+    @PreAuthorize("hasAuthority('SECURITY_GATE_READ') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR')")
+    @Operation(summary = "Historial y Auditoría de Caseta de Seguridad",
+               description = "Retorna el histórico completo de pases y movimientos con búsqueda para reimpresión de boleta F01.")
+    public ResponseEntity<ApiResponse<List<PassResponse>>> getHistoryPasses(
+            @RequestParam UUID organizationId,
+            @RequestParam(required = false) UUID branchId,
+            @RequestParam(required = false) String search) {
+        List<PassResponse> list = securityGateUseCase.getHistoryPasses(organizationId, branchId, search);
+        return ResponseEntity.ok(ApiResponse.ok("Historial de caseta obtenido con éxito", list));
+    }
+
     @PostMapping("/passes/{token}/complete")
     @PreAuthorize("hasAuthority('SECURITY_GATE_UPDATE') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR')")
     @Operation(summary = "Validar y autorizar entrada a planta (Check-In Oficial WMS)",
@@ -78,5 +112,17 @@ public class SecurityGateController {
             @Valid @RequestBody GuardCheckinCompletionRequest request) {
         PassResponse response = securityGateUseCase.completeCheckin(token, request);
         return ResponseEntity.ok(ApiResponse.ok("Check-in autorizado y registrado exitosamente en el WMS", response));
+    }
+
+    @PostMapping("/passes/{token}/check-out")
+    @PreAuthorize("hasAuthority('SECURITY_GATE_UPDATE') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR')")
+    @Operation(summary = "Registrar Salida de Planta (Check-Out Oficial y Cierre de Pase F01)",
+               description = "El guardia registra la hora de salida de la unidad, observaciones finales y sella la salida para imprimir o descargar el formato F01.")
+    public ResponseEntity<ApiResponse<PassResponse>> checkOut(
+            @PathVariable String token,
+            @RequestBody(required = false) GuardCheckOutRequest request) {
+        GuardCheckOutRequest req = request != null ? request : new GuardCheckOutRequest();
+        PassResponse response = securityGateUseCase.checkOut(token, req);
+        return ResponseEntity.ok(ApiResponse.ok("Salida registrada exitosamente. Unidad lista para retiro y generación de boleta F01.", response));
     }
 }
