@@ -54,7 +54,7 @@ public class SecurityConfig {
                                 SecurityConstants.AUTH_PATTERN,
                                 SecurityConstants.RESET_PASSWORD_TEMP_PATTERN,
                                 SecurityConstants.ACTUATOR_HEALTH,
-                                "/api/v1/security-gate/public/**",
+                                SecurityConstants.SECURITY_GATE_PUBLIC_PATTERN,
                                 "/swagger-ui.html",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",

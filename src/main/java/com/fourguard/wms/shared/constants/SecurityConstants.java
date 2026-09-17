@@ -21,6 +21,9 @@ public final class SecurityConstants {
     /** Password reset (temporary) — public, called before login. */
     public static final String RESET_PASSWORD_TEMP_PATTERN = "/users/reset-password-temp";
 
+    /** Public Security Gate endpoints for drivers — no JWT required. */
+    public static final String SECURITY_GATE_PUBLIC_PATTERN = "/security-gate/public/**";
+
     /** Swagger UI assets — public in dev, consider restricting in prod. */
     public static final String SWAGGER_UI_PATTERN   = "/swagger-ui/**";
     public static final String SWAGGER_DOCS_PATTERN = "/v3/api-docs/**";
