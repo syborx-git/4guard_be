@@ -72,17 +72,74 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
         BranchEntity branch = branchRepositoryPort.findById(request.getBranchId())
                 .orElseThrow(() -> new EntityNotFoundException("Sucursal no encontrada: " + request.getBranchId()));
 
-        ClientEntity client = clientRepositoryPort.findById(request.getClientId())
-                .orElseThrow(() -> new EntityNotFoundException("Cliente no encontrado: " + request.getClientId()));
+        // Resolución flexible de Cliente
+        ClientEntity client = null;
+        if (request.getClientId() != null) {
+            client = clientRepositoryPort.findById(request.getClientId()).orElse(null);
+        }
+        if (client == null) {
+            List<ClientEntity> orgClients = clientRepositoryPort.findByOrganizationId(organization.getId());
+            if (request.getClientCode() != null && !request.getClientCode().isBlank()) {
+                String searchCode = request.getClientCode().trim();
+                client = orgClients.stream()
+                        .filter(c -> (c.getExternalId() != null && c.getExternalId().equalsIgnoreCase(searchCode)) ||
+                                     (c.getTaxId() != null && c.getTaxId().equalsIgnoreCase(searchCode)) ||
+                                     (c.getName() != null && c.getName().equalsIgnoreCase(searchCode)))
+                        .findFirst()
+                        .orElse(null);
+            }
+            if (client == null && request.getClientName() != null && !request.getClientName().isBlank()) {
+                String searchName = request.getClientName().trim();
+                client = orgClients.stream()
+                        .filter(c -> c.getName() != null && c.getName().equalsIgnoreCase(searchName))
+                        .findFirst()
+                        .orElse(null);
+            }
+            if (client == null && !orgClients.isEmpty()) {
+                client = orgClients.get(0);
+            }
+        }
+        if (client == null) {
+            throw new ValidationException("No se encontró un cliente válido registrado para la organización.");
+        }
 
         ClientDestinationEntity destination = null;
         if (request.getDestinationId() != null) {
             destination = clientDestinationRepositoryPort.findById(request.getDestinationId()).orElse(null);
         }
 
+        // Resolución flexible de Línea Transportista
         CarrierEntity carrier = null;
         if (request.getCarrierId() != null) {
             carrier = carrierRepositoryPort.findById(request.getCarrierId()).orElse(null);
+        }
+        if (carrier == null) {
+            List<CarrierEntity> orgCarriers = carrierRepositoryPort.findByOrganizationId(organization.getId());
+            if (request.getCarrierLineCode() != null && !request.getCarrierLineCode().isBlank()) {
+                String searchCode = request.getCarrierLineCode().trim();
+                carrier = orgCarriers.stream()
+                        .filter(c -> (c.getTaxId() != null && c.getTaxId().equalsIgnoreCase(searchCode)) ||
+                                     (c.getName() != null && c.getName().equalsIgnoreCase(searchCode)) ||
+                                     (c.getTradeName() != null && c.getTradeName().equalsIgnoreCase(searchCode)))
+                        .findFirst()
+                        .orElse(null);
+            }
+            if (carrier == null && request.getCarrierLine() != null && !request.getCarrierLine().isBlank()) {
+                String searchLine = request.getCarrierLine().trim();
+                carrier = orgCarriers.stream()
+                        .filter(c -> (c.getName() != null && c.getName().equalsIgnoreCase(searchLine)) ||
+                                     (c.getTradeName() != null && c.getTradeName().equalsIgnoreCase(searchLine)))
+                        .findFirst()
+                        .orElse(null);
+            }
+            if (carrier == null && request.getCarrierName() != null && !request.getCarrierName().isBlank()) {
+                String searchName = request.getCarrierName().trim();
+                carrier = orgCarriers.stream()
+                        .filter(c -> (c.getName() != null && c.getName().equalsIgnoreCase(searchName)) ||
+                                     (c.getTradeName() != null && c.getTradeName().equalsIgnoreCase(searchName)))
+                        .findFirst()
+                        .orElse(null);
+            }
         }
 
         LocationEntity ramp = null;
@@ -94,6 +151,13 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
             ramp = locationRepositoryPort.findByBranchIdAndCode(branch.getId(), formattedCode).orElse(null);
             if (ramp == null) {
                 ramp = locationRepositoryPort.findFirstByCode(formattedCode).orElse(null);
+            }
+        }
+        if (ramp == null && request.getRampCode() != null && !request.getRampCode().isBlank()) {
+            String cleanCode = request.getRampCode().trim();
+            ramp = locationRepositoryPort.findByBranchIdAndCode(branch.getId(), cleanCode).orElse(null);
+            if (ramp == null) {
+                ramp = locationRepositoryPort.findFirstByCode(cleanCode).orElse(null);
             }
         }
         if (ramp == null && request.getRampNumber() != null && branch.getId() != null) {

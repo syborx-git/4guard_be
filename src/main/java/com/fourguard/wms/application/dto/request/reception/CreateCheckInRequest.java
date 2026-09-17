@@ -25,8 +25,16 @@ public class CreateCheckInRequest {
     /** Optional: Carrier UUID from catalog */
     private UUID carrierId;
 
-    @NotNull(message = "clientId es obligatorio")
+    /** Optional: Carrier line code or name */
+    private String carrierLineCode;
+    private String carrierLine;
+
+    /** Client UUID from catalog (or resolved via clientCode/clientName) */
     private UUID clientId;
+
+    /** Optional: Client code or trade name */
+    private String clientCode;
+    private String clientName;
 
     /** Optional: Ramp/andén location UUID */
     private UUID rampId;
@@ -71,4 +79,10 @@ public class CreateCheckInRequest {
     @NotNull(message = "El registro de sellos de seguridad es obligatorio")
     @NotEmpty(message = "Debe registrar al menos un sello de seguridad (cincho)")
     private List<@NotBlank(message = "El número de sello no puede estar vacío") String> sealNumbers;
+
+    /** Optional: Additional metadata from Caseta Check List (F01-PO-CP-7.1.3-03) */
+    private String observations;
+    private String transportType;
+    private String noEcoTractor;
+    private String noCartaPorte;
 }

@@ -19,8 +19,10 @@ public class CreateOutboundRequest {
     @NotNull(message = "branchId es obligatorio")
     private UUID branchId;
 
-    @NotNull(message = "clientId es obligatorio")
+    /** Client UUID from catalog (or resolved via clientCode/clientName) */
     private UUID clientId;
+    private String clientCode;
+    private String clientName;
 
     private UUID destinationId;
     private String destinationName;
@@ -28,9 +30,12 @@ public class CreateOutboundRequest {
 
     private UUID carrierId;
     private String carrierName;
+    private String carrierLineCode;
+    private String carrierLine;
 
     private UUID rampId;
     private Integer rampNumber;
+    private String rampCode;
 
     private UUID forkliftOperatorId;
     private String forkliftOperatorName;

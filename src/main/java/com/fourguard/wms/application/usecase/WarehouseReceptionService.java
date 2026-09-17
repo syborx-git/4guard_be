@@ -66,12 +66,61 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
         BranchEntity branch = branchRepositoryPort.findById(request.getBranchId())
                 .orElseThrow(() -> new EntityNotFoundException("Sucursal no encontrada: " + request.getBranchId()));
 
-        ClientEntity client = clientRepositoryPort.findById(request.getClientId())
-                .orElseThrow(() -> new EntityNotFoundException("Cliente no encontrado: " + request.getClientId()));
+        // Resolución flexible de Cliente (por UUID, código de cliente o nombre)
+        ClientEntity client = null;
+        if (request.getClientId() != null) {
+            client = clientRepositoryPort.findById(request.getClientId()).orElse(null);
+        }
+        if (client == null) {
+            List<ClientEntity> orgClients = clientRepositoryPort.findByOrganizationId(organization.getId());
+            if (request.getClientCode() != null && !request.getClientCode().isBlank()) {
+                String searchCode = request.getClientCode().trim();
+                client = orgClients.stream()
+                        .filter(c -> (c.getExternalId() != null && c.getExternalId().equalsIgnoreCase(searchCode)) ||
+                                     (c.getTaxId() != null && c.getTaxId().equalsIgnoreCase(searchCode)) ||
+                                     (c.getName() != null && c.getName().equalsIgnoreCase(searchCode)))
+                        .findFirst()
+                        .orElse(null);
+            }
+            if (client == null && request.getClientName() != null && !request.getClientName().isBlank()) {
+                String searchName = request.getClientName().trim();
+                client = orgClients.stream()
+                        .filter(c -> c.getName() != null && c.getName().equalsIgnoreCase(searchName))
+                        .findFirst()
+                        .orElse(null);
+            }
+            if (client == null && !orgClients.isEmpty()) {
+                client = orgClients.get(0);
+            }
+        }
+        if (client == null) {
+            throw new ValidationException("No se encontró un cliente válido registrado para la organización.");
+        }
 
+        // Resolución flexible de Línea Transportista
         CarrierEntity carrier = null;
         if (request.getCarrierId() != null) {
             carrier = carrierRepositoryPort.findById(request.getCarrierId()).orElse(null);
+        }
+        if (carrier == null) {
+            List<CarrierEntity> orgCarriers = carrierRepositoryPort.findByOrganizationId(organization.getId());
+            if (request.getCarrierLineCode() != null && !request.getCarrierLineCode().isBlank()) {
+                String searchCode = request.getCarrierLineCode().trim();
+                carrier = orgCarriers.stream()
+                        .filter(c -> (c.getTaxId() != null && c.getTaxId().equalsIgnoreCase(searchCode)) ||
+                                     (c.getName() != null && c.getName().equalsIgnoreCase(searchCode)) ||
+                                     (c.getTradeName() != null && c.getTradeName().equalsIgnoreCase(searchCode)))
+                        .findFirst()
+                        .orElse(null);
+            }
+            if (carrier == null && request.getCarrierLine() != null && !request.getCarrierLine().isBlank()) {
+                String searchLine = request.getCarrierLine().trim();
+                carrier = orgCarriers.stream()
+                        .filter(c -> (c.getName() != null && c.getName().equalsIgnoreCase(searchLine)) ||
+                                     (c.getTradeName() != null && c.getTradeName().equalsIgnoreCase(searchLine)))
+                        .findFirst()
+                        .orElse(null);
+            }
         }
 
         // Resolución robusta de la Rampa seleccionada (por UUID, por número de rampa 1-12, o por código)
@@ -145,6 +194,7 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
                 .storageLocation(autoStorageLocation)
                 .piecesPerPallet(BigDecimal.ZERO)
                 .palletType(null)
+                .observations(request.getObservations())
                 .createdBy(currentUser)
                 .updatedBy(currentUser)
                 .build();
@@ -174,7 +224,8 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
                        "docNumber", request.getDocNumber(),
                        "client", client.getName(),
                        "driver", request.getDriverName(),
-                       "plates", request.getTractorPlates() + " / " + request.getBoxPlates()));
+                       "plates", request.getTractorPlates() + " / " + request.getBoxPlates(),
+                       "ramp", ramp != null ? ramp.getCode() : "Sin rampa"));
 
         return receptionMapper.toResponse(saved);
     }
