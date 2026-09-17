@@ -20,4 +20,10 @@ public interface WarehouseReceptionPalletJpaRepository extends JpaRepository<War
     boolean existsByReceptionIdAndPalletCode(UUID receptionId, String palletCode);
 
     int countByReceptionId(UUID receptionId);
+
+    @org.springframework.data.jpa.repository.Query("SELECT COALESCE(MAX(p.palletNumber), 0) FROM WarehouseReceptionPalletEntity p")
+    int findMaxPalletNumber();
+
+    @org.springframework.data.jpa.repository.Query("SELECT COALESCE(MAX(p.palletNumber), 0) FROM WarehouseReceptionPalletEntity p WHERE p.reception.organization.id = :orgId AND p.reception.branch.id = :branchId")
+    int findMaxPalletNumberByOrgAndBranch(@org.springframework.data.repository.query.Param("orgId") UUID orgId, @org.springframework.data.repository.query.Param("branchId") UUID branchId);
 }

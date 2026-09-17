@@ -24,8 +24,19 @@ public class UpdateReceptionParametersRequest {
     /** Must match PalletType enum values */
     private String palletType;
 
-    /** FK to wms.locations for the storage bahía */
     private UUID storageLocationId;
+
+    /** Optional: Assigned forklift operator */
+    private UUID forkliftOperatorId;
+    private String forkliftOperatorName;
+
+    /** Optional: Assigned ramp */
+    private UUID rampId;
+    private Integer rampNumber;
+    private String rampCode;
+
+    /** Optional: Target lifecycle status (ASSIGNED, IN_PROGRESS, DISCHARGED) */
+    private String status;
 
     private String observations;
 }

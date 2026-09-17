@@ -445,8 +445,7 @@ public class WarehouseTransferService implements WarehouseTransferUseCase {
                     .orElse("Usuario " + log.getUserId());
         }
 
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
-        String formattedTimestamp = log.getCreatedAt() != null ? log.getCreatedAt().format(formatter) : "";
+        String formattedTimestamp = log.getCreatedAt() != null ? log.getCreatedAt().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME) : "";
 
         return MovementAuditResponse.builder()
                 .id(log.getLogId() != null ? log.getLogId().toString() : UUID.randomUUID().toString())

@@ -185,7 +185,10 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
         WarehouseReceptionEntity entity = receptionRepositoryPort.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Recepción no encontrada: " + id));
 
-        if (entity.getStatus() != ReceptionStatus.REGISTERED && entity.getStatus() != ReceptionStatus.ASSIGNED) {
+        if (entity.getStatus() != ReceptionStatus.REGISTERED &&
+            entity.getStatus() != ReceptionStatus.ASSIGNED &&
+            entity.getStatus() != ReceptionStatus.IN_PROGRESS &&
+            entity.getStatus() != ReceptionStatus.DISCHARGED) {
             throw new ValidationException("No se pueden editar parámetros de una recepción en estado: " + entity.getStatus());
         }
 
@@ -222,6 +225,44 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
             }
         }
 
+        // Forklift operator update
+        if (request.getForkliftOperatorId() != null) {
+            forkliftOperatorRepositoryPort.findById(request.getForkliftOperatorId()).ifPresent(entity::setForkliftOperator);
+        } else if (request.getForkliftOperatorName() != null && !request.getForkliftOperatorName().isBlank()) {
+            String opName = request.getForkliftOperatorName().trim().toLowerCase();
+            forkliftOperatorRepositoryPort.findAll().stream()
+                    .filter(o -> (o.getFullName() != null && o.getFullName().toLowerCase().contains(opName)) ||
+                                 (o.getCode() != null && o.getCode().equalsIgnoreCase(opName)))
+                    .findFirst()
+                    .ifPresent(entity::setForkliftOperator);
+        }
+
+        // Ramp update
+        if (request.getRampId() != null) {
+            locationRepositoryPort.findById(request.getRampId()).ifPresent(ramp -> {
+                if (Boolean.TRUE.equals(ramp.getIsBlocked())) {
+                    throw new ValidationException("La rampa asignada (" + ramp.getCode() + ") se encuentra bloqueada.");
+                }
+                entity.setRamp(ramp);
+            });
+        } else if (request.getRampNumber() != null && entity.getBranch() != null) {
+            String formattedCode = String.format("LOC-RAMP-%02d", request.getRampNumber());
+            locationRepositoryPort.findByBranchIdAndCode(entity.getBranch().getId(), formattedCode)
+                    .ifPresent(entity::setRamp);
+        } else if (request.getRampCode() != null && !request.getRampCode().isBlank() && entity.getBranch() != null) {
+            String cleanCode = request.getRampCode().trim();
+            locationRepositoryPort.findByBranchIdAndCode(entity.getBranch().getId(), cleanCode)
+                    .ifPresent(entity::setRamp);
+        }
+
+        // Lifecycle Status transition
+        if (request.getStatus() != null && !request.getStatus().isBlank()) {
+            try {
+                ReceptionStatus targetStatus = ReceptionStatus.valueOf(request.getStatus().trim().toUpperCase());
+                entity.setStatus(targetStatus);
+            } catch (IllegalArgumentException ignored) {}
+        }
+
         String currentUser = securityAuditHelper.getCurrentUsername();
         entity.setUpdatedBy(currentUser);
 
@@ -252,11 +293,24 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
 
         WarehouseReceptionEntity saved = receptionRepositoryPort.save(entity);
 
-        Map<String, Object> after = Map.of(
-                "lotNumber", saved.getLotNumber() != null ? saved.getLotNumber() : "",
-                "piecesPerPallet", saved.getPiecesPerPallet() != null ? saved.getPiecesPerPallet().toString() : "0"
-        );
-        logAudit(saved.getId(), "RECEPCION_ACTUALIZADA", before, after);
+        Map<String, Object> after = new HashMap<>();
+        if (saved.getLotNumber() != null) after.put("lotNumber", saved.getLotNumber());
+        if (saved.getPiecesPerPallet() != null) after.put("piecesPerPallet", saved.getPiecesPerPallet().toString());
+        if (saved.getForkliftOperator() != null) after.put("forkliftOperator", saved.getForkliftOperator().getFullName());
+        if (saved.getRamp() != null) after.put("ramp", saved.getRamp().getCode() != null ? saved.getRamp().getCode() : saved.getRamp().getName());
+        if (saved.getStatus() != null) after.put("status", saved.getStatus().name());
+
+        String auditAction;
+        if (saved.getStatus() == ReceptionStatus.ASSIGNED) {
+            auditAction = "RECEPCION_ASIGNADA";
+        } else if (saved.getStatus() == ReceptionStatus.IN_PROGRESS) {
+            auditAction = "DESCARGA_INICIADA";
+        } else if (saved.getStatus() == ReceptionStatus.DISCHARGED) {
+            auditAction = "DESCARGA_FINALIZADA";
+        } else {
+            auditAction = "RECEPCION_ACTUALIZADA";
+        }
+        logAudit(saved.getId(), auditAction, before, after);
 
         return receptionMapper.toResponse(saved);
     }
@@ -299,7 +353,14 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
             throw new ValidationException("Debes asignar un SKU/Producto a la recepción antes de capturar tarimas.");
         }
 
-        int currentCount = palletRepositoryPort.countByReceptionId(receptionId);
+        int currentMax = 0;
+        if (reception.getOrganization() != null && reception.getBranch() != null) {
+            currentMax = palletRepositoryPort.findMaxPalletNumber(reception.getOrganization().getId(), reception.getBranch().getId());
+        }
+        if (currentMax == 0) {
+            currentMax = palletRepositoryPort.findMaxPalletNumber();
+        }
+
         List<WarehouseReceptionPalletEntity> newPallets = new ArrayList<>();
 
         for (AddReceptionPalletsRequest.PalletItemRequest item : request.getPallets()) {
@@ -314,6 +375,9 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
             Optional<WarehouseReceptionPalletEntity> existing = palletRepositoryPort.findByReceptionIdAndPalletCode(receptionId, code);
             if (existing.isPresent()) {
                 WarehouseReceptionPalletEntity p = existing.get();
+                if (p.getPalletNumber() == null || p.getPalletNumber() <= 0) {
+                    p.setPalletNumber(item.getPalletNumber() != null && item.getPalletNumber() > 0 ? item.getPalletNumber() : ++currentMax);
+                }
                 p.setPieces(BigDecimal.valueOf(item.getPieces()));
                 p.setPalletType(pType);
                 p.setObservations(item.getObservations());
@@ -323,10 +387,17 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
                 continue;
             }
 
-            currentCount++;
+            int pNum = (item.getPalletNumber() != null && item.getPalletNumber() > 0)
+                    ? item.getPalletNumber()
+                    : ++currentMax;
+
+            if (pNum > currentMax) {
+                currentMax = pNum;
+            }
+
             WarehouseReceptionPalletEntity palletEntity = WarehouseReceptionPalletEntity.builder()
                     .reception(reception)
-                    .palletNumber(currentCount)
+                    .palletNumber(pNum)
                     .palletCode(code)
                     .sku(reception.getSku())
                     .supplier(reception.getSupplier())
@@ -635,6 +706,9 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
 
         String actionLabel = switch (log.getAction()) {
             case "RECEPCION_CREADA" -> "Pre-Recepción Registrada en Caseta";
+            case "RECEPCION_ASIGNADA" -> "Andén y Montacarguista Asignados";
+            case "DESCARGA_INICIADA" -> "Descarga Iniciada en Terminal de Montacargas";
+            case "DESCARGA_FINALIZADA" -> "Descarga Física Concluida (Notificado a Mesa Administrativa)";
             case "RECEPCION_ACTUALIZADA" -> "Actualización de Parámetros de Recepción";
             case "TARIMA_EDITADA" -> "Ajuste de Tarima Individual";
             case "RECEPCION_COMPLETADA" -> "Descarga Finalizada y Cierre F01";
@@ -650,8 +724,7 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
                     .orElse("Usuario " + log.getUserId());
         }
 
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
-        String formattedTimestamp = log.getCreatedAt() != null ? log.getCreatedAt().format(formatter) : "";
+        String formattedTimestamp = log.getCreatedAt() != null ? log.getCreatedAt().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME) : "";
 
         return MovementAuditResponse.builder()
                 .id(log.getLogId() != null ? log.getLogId().toString() : UUID.randomUUID().toString())
@@ -751,6 +824,8 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
             case "leader", "leaderAuthorizedBy" -> "Líder de Turno Responsable";
             case "sku", "skuId", "skuCode" -> "Código SKU / Producto";
             case "palletType", "pallet_type" -> "Tipo de Tarima";
+            case "forkliftOperator", "forklift_operator", "operator" -> "Montacarguista";
+            case "ramp", "rampId", "rampCode", "rampNumber" -> "Rampa Asignada";
             case "observations" -> "Observaciones";
             case "folio" -> "Folio de Operación";
             case "elaborationDate" -> "Fecha de Elaboración";
@@ -763,17 +838,35 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
         if (value == null || value.isBlank() || "null".equalsIgnoreCase(value)) return "Sin especificar";
         String val = value.trim();
         return switch (val) {
-            case "REGISTERED" -> "En Proceso / Registrado en Caseta";
+            case "REGISTERED" -> "Pre-registro Caseta";
+            case "ASSIGNED" -> "Andén y Montacarguista Asignados";
+            case "IN_PROGRESS" -> "En Descarga Física";
+            case "DISCHARGED" -> "Descarga Concluida / Por Auditar";
             case "COMPLETED" -> "Descarga Finalizada / En Stock";
             case "CANCELLED" -> "Cancelado";
             case "DRAFT" -> "Borrador";
             case "PENDING" -> "Pendiente";
-            case "IN_PROGRESS" -> "En Tránsito / En Curso";
             case "MADERA_ESTANDAR" -> "Madera Estándar (40x48)";
             case "PLASTICO" -> "Plástico Higiénico";
             case "CHEP" -> "Tarima CHEP Azul";
             case "EURO" -> "Euro-Tarima";
             default -> val;
         };
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<String, Integer> getNextPalletNumber(UUID organizationId, UUID branchId) {
+        int maxNumber = 0;
+        if (organizationId != null && branchId != null) {
+            maxNumber = palletRepositoryPort.findMaxPalletNumber(organizationId, branchId);
+        }
+        if (maxNumber == 0) {
+            maxNumber = palletRepositoryPort.findMaxPalletNumber();
+        }
+        return Map.of(
+                "lastPalletNumber", maxNumber,
+                "nextPalletNumber", maxNumber + 1
+        );
     }
 }

@@ -33,6 +33,10 @@ public class ReceptionSummaryResponse {
     private String carrierName;
     private UUID rampId;
     private String rampName;
+    private String rampCode;
+    private UUID forkliftOperatorId;
+    private String forkliftOperatorName;
+    private String forkliftOperatorCode;
     private String driverName;
     private String tractorPlates;
     private String boxPlates;
@@ -41,11 +45,14 @@ public class ReceptionSummaryResponse {
     private UUID skuId;
     private String skuCode;
     private String productName;
+    private UUID supplierId;
+    private String supplierName;
     private String lotNumber;
     private UUID storageLocationId;
     private String storageLocationCode;
     private Integer totalPallets;
     private Double totalPieces;
+    private String observations;
 
     // Audit timestamps
     private OffsetDateTime createdAt;
