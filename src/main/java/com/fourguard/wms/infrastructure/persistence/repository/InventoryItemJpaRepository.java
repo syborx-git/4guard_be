@@ -108,4 +108,11 @@ public interface InventoryItemJpaRepository extends JpaRepository<InventoryItemE
             UUID branchId);
 
     boolean existsBySscc(String sscc);
+
+    /**
+     * Bulk update sapFolio (remisionNo) in branch without loading all entities into memory.
+     */
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("UPDATE InventoryItemEntity i SET i.sapFolio = :newDoc WHERE i.branch.id = :branchId AND LOWER(i.sapFolio) = LOWER(:oldDoc)")
+    int updateSapFolioInBranch(UUID branchId, String oldDoc, String newDoc);
 }

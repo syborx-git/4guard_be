@@ -4,7 +4,6 @@ import com.fourguard.wms.application.dto.request.CreatePermissionRequest;
 import com.fourguard.wms.application.dto.response.PermissionResponse;
 import com.fourguard.wms.application.dto.response.audit.PermissionAuditResponse;
 import com.fourguard.wms.application.mapper.PermissionMapper;
-import com.fourguard.wms.domain.exception.EntityNotFoundException;
 import com.fourguard.wms.domain.ports.out.AuditLogRepositoryPort;
 import com.fourguard.wms.domain.ports.out.PermissionRepositoryPort;
 import com.fourguard.wms.domain.ports.out.UserRepositoryPort;

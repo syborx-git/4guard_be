@@ -1,7 +1,6 @@
 package com.fourguard.wms.application.dto.request.outbound;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
@@ -20,8 +19,10 @@ public class CreateOutboundRequest {
     @NotNull(message = "branchId es obligatorio")
     private UUID branchId;
 
-    @NotNull(message = "clientId es obligatorio")
+    /** Client UUID from catalog (or resolved via clientCode/clientName) */
     private UUID clientId;
+    private String clientCode;
+    private String clientName;
 
     private UUID destinationId;
     private String destinationName;
@@ -29,6 +30,12 @@ public class CreateOutboundRequest {
 
     private UUID carrierId;
     private String carrierName;
+    private String carrierLineCode;
+    private String carrierLine;
+
+    private UUID rampId;
+    private Integer rampNumber;
+    private String rampCode;
 
     private UUID forkliftOperatorId;
     private String forkliftOperatorName;
@@ -48,12 +55,13 @@ public class CreateOutboundRequest {
     @NotBlank(message = "boxPlates es obligatorio")
     private String boxPlates;
 
-    @NotBlank(message = "sealNumber es obligatorio")
     private String sealNumber;
 
-    @NotBlank(message = "remisionNo es obligatorio")
     private String remisionNo;
 
-    @NotEmpty(message = "Se requiere al menos una tarima / item para despachar")
+    private String observations;
+
+    private String status;
+
     private List<UUID> selectedItemIds;
 }

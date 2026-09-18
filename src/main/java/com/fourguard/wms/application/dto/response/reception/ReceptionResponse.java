@@ -34,8 +34,10 @@ public class ReceptionResponse {
     private String clientName;
     private UUID rampId;
     private String rampName;
+    private String rampCode;
     private UUID forkliftOperatorId;
     private String forkliftOperatorName;
+    private String forkliftOperatorCode;
     private String docNumber;
     private LocalDate docDate;
     private LocalTime receptionTime;

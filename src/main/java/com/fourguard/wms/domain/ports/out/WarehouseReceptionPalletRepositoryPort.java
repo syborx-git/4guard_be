@@ -27,4 +27,8 @@ public interface WarehouseReceptionPalletRepositoryPort {
     void deleteById(UUID id);
 
     int countByReceptionId(UUID receptionId);
+
+    int findMaxPalletNumber();
+
+    int findMaxPalletNumber(UUID orgId, UUID branchId);
 }

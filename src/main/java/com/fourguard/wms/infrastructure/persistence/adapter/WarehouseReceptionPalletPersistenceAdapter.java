@@ -55,4 +55,14 @@ public class WarehouseReceptionPalletPersistenceAdapter implements WarehouseRece
     public int countByReceptionId(UUID receptionId) {
         return repository.countByReceptionId(receptionId);
     }
+
+    @Override
+    public int findMaxPalletNumber() {
+        return repository.findMaxPalletNumber();
+    }
+
+    @Override
+    public int findMaxPalletNumber(UUID orgId, UUID branchId) {
+        return repository.findMaxPalletNumberByOrgAndBranch(orgId, branchId);
+    }
 }

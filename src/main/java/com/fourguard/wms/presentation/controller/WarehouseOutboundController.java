@@ -3,6 +3,7 @@ package com.fourguard.wms.presentation.controller;
 import com.fourguard.wms.application.dto.request.outbound.CancelOutboundRequest;
 import com.fourguard.wms.application.dto.request.outbound.CreateOutboundRequest;
 import com.fourguard.wms.application.dto.request.outbound.ValidatePalletsRequest;
+import com.fourguard.wms.application.dto.request.reception.ChangeRemisionRequest;
 import com.fourguard.wms.application.dto.response.outbound.InventoryBatchResponse;
 import com.fourguard.wms.application.dto.response.outbound.OutboundResponse;
 import com.fourguard.wms.application.dto.response.outbound.OutboundSummaryResponse;
@@ -52,6 +53,19 @@ public class WarehouseOutboundController {
         return ResponseEntity.ok(ApiResponse.ok("Salida obtenida con éxito", response));
     }
 
+    // ─── UPDATE OUTBOUND ───────────────────────────────────────────────────────
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('FORKLIFT_OPERATOR')")
+    @Operation(summary = "Actualizar salida de almacén / transicionar fase",
+               description = "Actualiza el estatus del ciclo operativo (REGISTERED -> ASSIGNED -> IN_PROGRESS -> LOADED -> COMPLETED), rampa, montacarguista o datos de caseta.")
+    public ResponseEntity<ApiResponse<OutboundResponse>> updateOutbound(
+            @PathVariable UUID id,
+            @RequestBody com.fourguard.wms.application.dto.request.outbound.UpdateOutboundRequest request) {
+        OutboundResponse response = outboundUseCase.updateOutbound(id, request);
+        return ResponseEntity.ok(ApiResponse.ok("Salida actualizada con éxito", response));
+    }
+
     // ─── GET LIST ──────────────────────────────────────────────────────────────
 
     @GetMapping
@@ -78,6 +92,19 @@ public class WarehouseOutboundController {
             @Valid @RequestBody CancelOutboundRequest request) {
         OutboundResponse response = outboundUseCase.cancelOutbound(id, request);
         return ResponseEntity.ok(ApiResponse.ok("Salida cancelada con éxito", response));
+    }
+
+    // ─── CHANGE REMISIÓN / CARTA PORTE ─────────────────────────────────────────
+
+    @PutMapping("/{id}/change-remision")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER')")
+    @Operation(summary = "Modificar número de remisión / carta porte de salida",
+               description = "Actualiza el número de remisión / carta porte de la salida con justificación y registro en auditoría.")
+    public ResponseEntity<ApiResponse<OutboundResponse>> changeRemision(
+            @PathVariable UUID id,
+            @Valid @RequestBody ChangeRemisionRequest request) {
+        OutboundResponse response = outboundUseCase.changeRemision(id, request);
+        return ResponseEntity.ok(ApiResponse.ok("Número de remisión / carta porte modificado con éxito", response));
     }
 
     // ─── INVENTORY BATCHES (FIFO / FEFO) ───────────────────────────────────────

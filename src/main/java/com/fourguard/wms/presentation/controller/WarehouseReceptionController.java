@@ -13,6 +13,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -46,6 +47,19 @@ public class WarehouseReceptionController {
             @Valid @RequestBody UpdateReceptionParametersRequest request) {
         ReceptionResponse response = receptionUseCase.updateParameters(id, request);
         return ResponseEntity.ok(ApiResponse.ok("Parámetros de recepción actualizados con éxito", response));
+    }
+
+    // ─── GET NEXT PALLET NUMBER (CONSECUTIVO GLOBAL) ───────────────────────────
+
+    @GetMapping("/next-pallet-number")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SECURITY_GUARD') or hasRole('FORKLIFT_OPERATOR')")
+    @Operation(summary = "Obtener siguiente consecutivo de tarima global",
+               description = "Retorna el último y siguiente número consecutivo de tarima registrado en el sistema/sucursal.")
+    public ResponseEntity<ApiResponse<Map<String, Integer>>> getNextPalletNumber(
+            @RequestParam(required = false) UUID organizationId,
+            @RequestParam(required = false) UUID branchId) {
+        Map<String, Integer> result = receptionUseCase.getNextPalletNumber(organizationId, branchId);
+        return ResponseEntity.ok(ApiResponse.ok("Consecutivo de tarima obtenido con éxito", result));
     }
 
     // ─── GET BY ID ─────────────────────────────────────────────────────────────

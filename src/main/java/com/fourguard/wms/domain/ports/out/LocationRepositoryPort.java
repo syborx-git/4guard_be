@@ -25,6 +25,10 @@ public interface LocationRepositoryPort {
      * different from {@code excludeId}. Used to detect duplicate codes on update.
      */
     boolean existsByCodeAndIdNot(String code, UUID excludeId);
+
+    int decrementOccupancy(UUID locationId, int count);
+
+    int incrementOccupancy(UUID locationId, int count);
 }
 
 

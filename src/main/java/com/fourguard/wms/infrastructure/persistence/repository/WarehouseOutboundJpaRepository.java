@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
@@ -18,6 +19,8 @@ public interface WarehouseOutboundJpaRepository extends
     List<WarehouseOutboundEntity> findByOrganizationIdOrderByCreatedAtDesc(UUID organizationId);
 
     List<WarehouseOutboundEntity> findByOrganizationIdAndStatusOrderByCreatedAtDesc(UUID organizationId, OutboundStatus status);
+
+    Optional<WarehouseOutboundEntity> findByFolio(String folio);
 
     @Query(value = "SELECT nextval('wms.seq_outbound_folio')", nativeQuery = true)
     long getNextFolioSequenceValue();

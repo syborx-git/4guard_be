@@ -9,32 +9,35 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 @Repository
 public interface ExchangeRateJpaRepository extends JpaRepository<ExchangeRateEntity, UUID> {
 
-    @Query("SELECT e FROM ExchangeRateEntity e WHERE (:organizationId IS NULL OR e.organizationId = :organizationId) " +
-           "AND ((e.fromCurrencyId = :fromCurrencyId AND e.toCurrencyId = :toCurrencyId) " +
-           "     OR (e.fromCurrencyId = :toCurrencyId AND e.toCurrencyId = :fromCurrencyId)) " +
-           "AND e.effectiveDate <= :date AND e.status = com.fourguard.wms.domain.enums.ExchangeRateStatus.ACTIVE " +
-           "ORDER BY e.effectiveDate DESC, e.createdAt DESC")
-    List<ExchangeRateEntity> findTopRates(@Param("organizationId") UUID organizationId,
-                                          @Param("fromCurrencyId") UUID fromCurrencyId,
-                                          @Param("toCurrencyId") UUID toCurrencyId,
-                                          @Param("date") LocalDate date);
+       @Query("SELECT e FROM ExchangeRateEntity e WHERE (:organizationId IS NULL OR e.organizationId = :organizationId) "
+                     +
+                     "AND ((e.fromCurrencyId = :fromCurrencyId AND e.toCurrencyId = :toCurrencyId) " +
+                     "     OR (e.fromCurrencyId = :toCurrencyId AND e.toCurrencyId = :fromCurrencyId)) " +
+                     "AND e.effectiveDate <= :date AND e.status = com.fourguard.wms.domain.enums.ExchangeRateStatus.ACTIVE "
+                     +
+                     "ORDER BY e.effectiveDate DESC, e.createdAt DESC")
+       List<ExchangeRateEntity> findTopRates(@Param("organizationId") UUID organizationId,
+                     @Param("fromCurrencyId") UUID fromCurrencyId,
+                     @Param("toCurrencyId") UUID toCurrencyId,
+                     @Param("date") LocalDate date);
 
-    @Query("SELECT e FROM ExchangeRateEntity e WHERE (:organizationId IS NULL OR e.organizationId = :organizationId) " +
-           "AND (:fromCurrencyId IS NULL OR e.fromCurrencyId = :fromCurrencyId) " +
-           "AND (:toCurrencyId IS NULL OR e.toCurrencyId = :toCurrencyId) " +
-           "AND (:date IS NULL OR e.effectiveDate = :date) " +
-           "ORDER BY e.effectiveDate DESC, e.createdAt DESC")
-    List<ExchangeRateEntity> findWithFilters(@Param("organizationId") UUID organizationId,
-                                             @Param("fromCurrencyId") UUID fromCurrencyId,
-                                             @Param("toCurrencyId") UUID toCurrencyId,
-                                             @Param("date") LocalDate date);
+       @Query("SELECT e FROM ExchangeRateEntity e WHERE (:organizationId IS NULL OR e.organizationId = :organizationId) "
+                     +
+                     "AND (:fromCurrencyId IS NULL OR e.fromCurrencyId = :fromCurrencyId) " +
+                     "AND (:toCurrencyId IS NULL OR e.toCurrencyId = :toCurrencyId) " +
+                     "AND (:date IS NULL OR e.effectiveDate = :date) " +
+                     "ORDER BY e.effectiveDate DESC, e.createdAt DESC")
+       List<ExchangeRateEntity> findWithFilters(@Param("organizationId") UUID organizationId,
+                     @Param("fromCurrencyId") UUID fromCurrencyId,
+                     @Param("toCurrencyId") UUID toCurrencyId,
+                     @Param("date") LocalDate date);
 
-    List<ExchangeRateEntity> findAllByOrganizationIdAndStatus(UUID organizationId, ExchangeRateStatus status);
-    List<ExchangeRateEntity> findAllByStatus(ExchangeRateStatus status);
+       List<ExchangeRateEntity> findAllByOrganizationIdAndStatus(UUID organizationId, ExchangeRateStatus status);
+
+       List<ExchangeRateEntity> findAllByStatus(ExchangeRateStatus status);
 }

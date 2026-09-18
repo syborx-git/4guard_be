@@ -18,6 +18,8 @@ public interface WarehouseOutboundRepositoryPort {
 
     List<WarehouseOutboundEntity> findByOrganizationIdAndStatus(UUID organizationId, String status);
 
+    Optional<WarehouseOutboundEntity> findByFolio(String folio);
+
     WarehouseOutboundEntity save(WarehouseOutboundEntity entity);
 
     long nextFolioSequenceValue();

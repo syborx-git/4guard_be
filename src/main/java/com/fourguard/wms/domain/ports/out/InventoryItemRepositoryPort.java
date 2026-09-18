@@ -14,4 +14,5 @@ public interface InventoryItemRepositoryPort {
     List<InventoryItemEntity>     findAvailableBySkuFefo(UUID skuId);
     InventoryItemEntity           save(InventoryItemEntity item);
     boolean                       existsBySscc(String sscc);
+    int                           updateSapFolioInBranch(UUID branchId, String oldDoc, String newDoc);
 }

@@ -16,7 +16,6 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -61,7 +60,7 @@ class ChangeTemporaryPasswordUseCaseImplTest {
         // Assert
         ArgumentCaptor<UserEntity> captor = ArgumentCaptor.forClass(UserEntity.class);
         verify(userRepositoryPort, times(1)).save(captor.capture());
-        
+
         UserEntity savedUser = captor.getValue();
         assertEquals("newHashedPassword", savedUser.getPassword());
         assertFalse(savedUser.getChangePasswordRequired());
@@ -74,9 +73,9 @@ class ChangeTemporaryPasswordUseCaseImplTest {
         when(userRepositoryPort.findByUsername(username)).thenReturn(Optional.empty());
 
         // Act & Assert
-        assertThrows(EntityNotFoundException.class, () ->
-                changeTemporaryPasswordUseCase.changePassword(username, "newPermanentPassword"));
-        
+        assertThrows(EntityNotFoundException.class,
+                () -> changeTemporaryPasswordUseCase.changePassword(username, "newPermanentPassword"));
+
         verify(userRepositoryPort, never()).save(any());
     }
 }
