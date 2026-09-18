@@ -1,13 +1,14 @@
 package com.fourguard.wms.application.dto.request.reception;
 
-import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.List;
 import java.util.UUID;
 
 /**
- * Request DTO for updating andén parameters of a REGISTERED reception.
+ * Request DTO for updating andén parameters and caseta data of a reception.
  */
 @Data
 public class UpdateReceptionParametersRequest {
@@ -18,7 +19,6 @@ public class UpdateReceptionParametersRequest {
     private LocalDate elaborationDate;
     private LocalDate expirationDate;
 
-    @NotNull(message = "piecesPerPallet es obligatorio")
     private Double piecesPerPallet;
 
     /** Must match PalletType enum values */
@@ -39,4 +39,23 @@ public class UpdateReceptionParametersRequest {
     private String status;
 
     private String observations;
+
+    // ── Caseta / Transport Data Updates ──
+    private String tractorPlates;
+    private String boxPlates;
+    private String driverName;
+    private String docNumber;
+    private LocalDate docDate;
+    private LocalTime receptionTime;
+
+    private UUID carrierId;
+    private String carrierLineCode;
+    private String carrierLine;
+
+    private UUID clientId;
+    private String clientCode;
+    private String clientName;
+
+    private List<String> sealNumbers;
 }
+

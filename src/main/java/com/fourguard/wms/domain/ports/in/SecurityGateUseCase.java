@@ -31,4 +31,6 @@ public interface SecurityGateUseCase {
     PassResponse completeCheckin(String token, GuardCheckinCompletionRequest request);
 
     PassResponse checkOut(String tokenOrFolio, GuardCheckOutRequest request);
+
+    void cancelPass(UUID passId);
 }

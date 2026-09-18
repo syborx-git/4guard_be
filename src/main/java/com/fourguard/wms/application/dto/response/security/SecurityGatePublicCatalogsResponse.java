@@ -21,6 +21,11 @@ public class SecurityGatePublicCatalogsResponse {
     @Schema(description = "Lista de Líneas Transportistas / Fleteras activas")
     private List<CatalogItemDto> carriers;
 
+    @Schema(description = "Alias para Lista de Líneas Transportistas")
+    public List<CatalogItemDto> getCarrierLines() {
+        return carriers;
+    }
+
     @Schema(description = "Lista de Tipos de Transporte permitidos en planta")
     private List<String> transportTypes;
 

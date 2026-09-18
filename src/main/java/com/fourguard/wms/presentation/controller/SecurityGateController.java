@@ -20,7 +20,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/v1/security-gate")
+@RequestMapping("/security-gate")
 @RequiredArgsConstructor
 @Tag(name = "Caseta de Seguridad (Gate Check-In & QR Passes)",
      description = "Endpoints para la gestión de pases de acceso QR y auto-registro de transportistas (F01-PO-CP-7.1.3-03)")
@@ -124,5 +124,14 @@ public class SecurityGateController {
         GuardCheckOutRequest req = request != null ? request : new GuardCheckOutRequest();
         PassResponse response = securityGateUseCase.checkOut(token, req);
         return ResponseEntity.ok(ApiResponse.ok("Salida registrada exitosamente. Unidad lista para retiro y generación de boleta F01.", response));
+    }
+
+    @DeleteMapping("/passes/{id}")
+    @PreAuthorize("hasAuthority('SECURITY_GATE_DELETE') or hasAuthority('SECURITY_GATE_UPDATE') or hasAuthority('SECURITY_GATE_CREATE') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR')")
+    @Operation(summary = "Cancelar / Descartar Pase Digital QR",
+               description = "Elimina un pase de acceso generado o pendiente que no fue utilizado.")
+    public ResponseEntity<ApiResponse<Void>> deletePass(@PathVariable UUID id) {
+        securityGateUseCase.cancelPass(id);
+        return ResponseEntity.ok(ApiResponse.ok("Pase descartado exitosamente"));
     }
 }

@@ -43,7 +43,8 @@ public interface SecurityPreCheckinJpaRepository extends JpaRepository<SecurityP
     @Query("SELECT p FROM SecurityPreCheckinEntity p " +
            "WHERE p.organization.id = :orgId " +
            "AND (:branchId IS NULL OR p.branch.id = :branchId) " +
-           "ORDER BY p.createdAt DESC")
+           "AND p.status = 'COMPLETED_EXIT' " +
+           "ORDER BY p.exitedAt DESC, p.createdAt DESC")
     List<SecurityPreCheckinEntity> findHistoryPasses(
             @Param("orgId") UUID orgId,
             @Param("branchId") UUID branchId
