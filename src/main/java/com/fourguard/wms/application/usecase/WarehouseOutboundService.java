@@ -4,6 +4,7 @@ import com.fourguard.wms.application.dto.request.outbound.CancelOutboundRequest;
 import com.fourguard.wms.application.dto.request.outbound.CreateOutboundRequest;
 import com.fourguard.wms.application.dto.request.outbound.UpdateOutboundRequest;
 import com.fourguard.wms.application.dto.request.outbound.ValidatePalletsRequest;
+import com.fourguard.wms.application.dto.request.reception.ChangeRemisionRequest;
 import com.fourguard.wms.application.dto.response.outbound.InventoryBatchResponse;
 import com.fourguard.wms.application.dto.response.outbound.OutboundResponse;
 import com.fourguard.wms.application.dto.response.outbound.OutboundSummaryResponse;
@@ -542,6 +543,36 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
         logAudit(saved.getId(), "SALIDA_CANCELADA",
                 Map.of("status", "COMPLETED"),
                 Map.of("status", "CANCELLED", "cancelledBy", saved.getCancelledBy(), "reason", request.getReason()));
+
+        return outboundMapper.toResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public OutboundResponse changeRemision(UUID id, ChangeRemisionRequest request) {
+        WarehouseOutboundEntity outbound = outboundRepositoryPort.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Salida no encontrada: " + id));
+
+        String oldDoc = outbound.getRemisionNo();
+        String newDoc = request.getNewDocNumber();
+        if (newDoc == null || newDoc.isBlank()) {
+            throw new ValidationException("El nuevo número de remisión / carta porte es obligatorio.");
+        }
+
+        // Validate Supervisor / Admin Credentials
+        UserEntity authorizedUser = validateUserCredentials(request.getAdminUsername(), request.getAdminPassword());
+        String authorizedByName = authorizedUser.getFirstName() + " " + authorizedUser.getLastName() + " (" + authorizedUser.getUsername() + ")";
+
+        String currentUser = securityAuditHelper.getCurrentUsername();
+        outbound.setRemisionNo(newDoc.trim());
+        outbound.setUpdatedBy(currentUser != null ? currentUser : authorizedByName);
+        WarehouseOutboundEntity saved = outboundRepositoryPort.save(outbound);
+
+        logAudit(saved.getId(), "REMISION_MODIFICADA",
+                Map.of("remisionNo", oldDoc != null ? oldDoc : "N/A"),
+                Map.of("remisionNo", newDoc.trim(),
+                       "reason", request.getReason(),
+                       "authorizedBy", authorizedByName));
 
         return outboundMapper.toResponse(saved);
     }

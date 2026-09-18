@@ -3,6 +3,7 @@ package com.fourguard.wms.domain.ports.in;
 import com.fourguard.wms.application.dto.request.outbound.CancelOutboundRequest;
 import com.fourguard.wms.application.dto.request.outbound.CreateOutboundRequest;
 import com.fourguard.wms.application.dto.request.outbound.ValidatePalletsRequest;
+import com.fourguard.wms.application.dto.request.reception.ChangeRemisionRequest;
 import com.fourguard.wms.application.dto.response.outbound.InventoryBatchResponse;
 import com.fourguard.wms.application.dto.response.outbound.OutboundResponse;
 import com.fourguard.wms.application.dto.response.outbound.OutboundSummaryResponse;
@@ -46,6 +47,11 @@ public interface WarehouseOutboundUseCase {
      * Cancels an outbound dispatch with admin authorization. Reverts inventory state.
      */
     OutboundResponse cancelOutbound(UUID id, CancelOutboundRequest request);
+
+    /**
+     * Modifies the remision / carta porte of an outbound dispatch with supervisor authorization.
+     */
+    OutboundResponse changeRemision(UUID id, ChangeRemisionRequest request);
 
     /**
      * Returns available inventory batches ordered by FIFO/FEFO for a given client and SKU, with optional search.

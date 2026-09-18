@@ -521,8 +521,7 @@ public class SecurityGateService implements SecurityGateUseCase {
                 if (outbound.isPresent()) {
                     WarehouseOutboundEntity out = outbound.get();
                     whStatus = out.getStatus() != null ? out.getStatus().name() : "REGISTERED";
-                    readyForExit = (out.getStatus() == OutboundStatus.COMPLETED ||
-                                    out.getStatus() == OutboundStatus.LOADED);
+                    readyForExit = (out.getStatus() == OutboundStatus.COMPLETED);
                 }
             } else {
                 Optional<WarehouseReceptionEntity> reception = warehouseReceptionRepositoryPort.findByFolio(folio);
