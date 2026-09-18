@@ -451,8 +451,7 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
         logAudit(saved.getId(), auditAction, before, after);
 
         List<WarehouseReceptionPalletEntity> pallets = palletRepositoryPort.findByReceptionId(saved.getId());
-        saved.setPallets(pallets);
-        return receptionMapper.toResponse(saved);
+        return buildReceptionResponse(saved, pallets);
     }
 
     @Override
@@ -461,8 +460,7 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
         WarehouseReceptionEntity entity = receptionRepositoryPort.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Recepción no encontrada: " + id));
         List<WarehouseReceptionPalletEntity> pallets = palletRepositoryPort.findByReceptionId(id);
-        entity.setPallets(pallets);
-        return receptionMapper.toResponse(entity);
+        return buildReceptionResponse(entity, pallets);
     }
 
     @Override
@@ -480,8 +478,7 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
                 WarehouseReceptionSpecification.withFilters(organizationId, branchId, recStatus, cleanSearch));
         return entities.stream().map(e -> {
             List<WarehouseReceptionPalletEntity> pallets = palletRepositoryPort.findByReceptionId(e.getId());
-            e.setPallets(pallets);
-            return receptionMapper.toSummaryResponse(e);
+            return buildReceptionSummaryResponse(e, pallets);
         }).collect(Collectors.toList());
     }
 
@@ -682,7 +679,7 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
                        "totalPallets", String.valueOf(pallets.size()),
                        "totalPieces", String.valueOf(totalPieces)));
 
-        return receptionMapper.toResponse(saved);
+        return buildReceptionResponse(saved, pallets);
     }
 
     @Override
@@ -715,7 +712,8 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
                        "cancelledBy", reception.getCancelledBy(),
                        "reason", request.getReason()));
 
-        return receptionMapper.toResponse(saved);
+        List<WarehouseReceptionPalletEntity> pallets = palletRepositoryPort.findByReceptionId(saved.getId());
+        return buildReceptionResponse(saved, pallets);
     }
 
     @Override
@@ -767,7 +765,7 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
                        "reason", request.getReason(),
                        "authorizedBy", authorizedByName));
 
-        return receptionMapper.toResponse(saved);
+        return buildReceptionResponse(saved, pallets);
     }
 
     @Override
@@ -861,6 +859,25 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
 
     private void logAudit(UUID entityId, String action, Map<String, Object> before, Map<String, Object> after) {
         logAudit(entityId, action, null, before, after);
+    }
+
+    private ReceptionResponse buildReceptionResponse(WarehouseReceptionEntity entity, List<WarehouseReceptionPalletEntity> pallets) {
+        ReceptionResponse response = receptionMapper.toResponse(entity);
+        if (pallets != null) {
+            response.setPallets(receptionMapper.toPalletResponseList(pallets));
+            response.setTotalPallets(pallets.size());
+            response.setTotalPieces(pallets.stream().mapToDouble(p -> p.getPieces() != null ? p.getPieces().doubleValue() : 0.0).sum());
+        }
+        return response;
+    }
+
+    private ReceptionSummaryResponse buildReceptionSummaryResponse(WarehouseReceptionEntity entity, List<WarehouseReceptionPalletEntity> pallets) {
+        ReceptionSummaryResponse summary = receptionMapper.toSummaryResponse(entity);
+        if (pallets != null) {
+            summary.setTotalPallets(pallets.size());
+            summary.setTotalPieces(pallets.stream().mapToDouble(p -> p.getPieces() != null ? p.getPieces().doubleValue() : 0.0).sum());
+        }
+        return summary;
     }
 
     private MovementAuditResponse mapToAuditResponse(AuditLogEntity log) {
