@@ -9,8 +9,27 @@
 
 SET search_path TO wms, public;
 
--- 1. Desactivar temporalmente verificación de FKs durante la reestructuración
-SET session_replication_role = 'replica';
+-- 1. Eliminar temporalmente las constraints de Foreign Key que apuntan a client_destinations
+--    (Permite actualizar IDs sin requerir privilegios de SUPERUSER como session_replication_role)
+DO $$
+DECLARE
+    fk RECORD;
+BEGIN
+    FOR fk IN
+        SELECT 
+            c.conname AS constraint_name,
+            format('%I.%I', n_rel.nspname, rel.relname) AS table_name
+        FROM pg_constraint c
+        JOIN pg_namespace n ON n.oid = c.connamespace
+        JOIN pg_class rel ON rel.oid = c.conrelid
+        JOIN pg_namespace n_rel ON n_rel.oid = rel.relnamespace
+        WHERE n.nspname = 'wms' 
+          AND c.contype = 'f'
+          AND c.confrelid = 'wms.client_destinations'::regclass
+    LOOP
+        EXECUTE format('ALTER TABLE %s DROP CONSTRAINT IF EXISTS %I', fk.table_name, fk.constraint_name);
+    END LOOP;
+END $$;
 
 -- 2. Permitir que client_id sea opcional (NULL) para destinos compartidos / centros de negocio
 ALTER TABLE wms.client_destinations
@@ -67,5 +86,19 @@ ON CONFLICT (destination_code) DO UPDATE SET
     status = EXCLUDED.status,
     updated_at = NOW();
 
--- 7. Restaurar modo de integridad referencial
-SET session_replication_role = 'origin';
+-- 7. Restaurar integridad referencial hacia client_destinations
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint c
+        JOIN pg_namespace n ON n.oid = c.connamespace
+        WHERE n.nspname = 'wms' 
+          AND c.contype = 'f'
+          AND c.conrelid = 'wms.warehouse_outbounds'::regclass
+          AND c.confrelid = 'wms.client_destinations'::regclass
+    ) THEN
+        ALTER TABLE wms.warehouse_outbounds
+            ADD CONSTRAINT fk_warehouse_outbounds_destination
+            FOREIGN KEY (destination_id) REFERENCES wms.client_destinations(id);
+    END IF;
+END $$;

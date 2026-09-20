@@ -30,13 +30,30 @@ $$ LANGUAGE plpgsql IMMUTABLE;
 -- 2. Bloque PL/pgSQL para migración atómica y universal en todas las tablas del esquema 'wms'
 DO $$
 DECLARE
+    fk RECORD;
     tbl RECORD;
     col RECORD;
     sql_stmt TEXT;
 BEGIN
-    -- Desactivar temporalmente constraints de FK y triggers durante la actualización atómica
-    SET session_replication_role = 'replica';
+    -- 2.1. Respaldar y eliminar temporalmente todas las constraints de Foreign Key del esquema 'wms'
+    --      (Evita requerir privilegios de SUPERUSER necesarios para session_replication_role)
+    DROP TABLE IF EXISTS temp_wms_foreign_keys;
+    CREATE TEMP TABLE temp_wms_foreign_keys AS
+    SELECT 
+        c.conname AS constraint_name,
+        format('%I.%I', n_rel.nspname, rel.relname) AS table_name,
+        pg_get_constraintdef(c.oid) AS constraint_definition
+    FROM pg_constraint c
+    JOIN pg_namespace n ON n.oid = c.connamespace
+    JOIN pg_class rel ON rel.oid = c.conrelid
+    JOIN pg_namespace n_rel ON n_rel.oid = rel.relnamespace
+    WHERE n.nspname = 'wms' AND c.contype = 'f';
 
+    FOR fk IN SELECT table_name, constraint_name FROM temp_wms_foreign_keys LOOP
+        EXECUTE format('ALTER TABLE %s DROP CONSTRAINT IF EXISTS %I', fk.table_name, fk.constraint_name);
+    END LOOP;
+
+    -- 2.2. Actualizar los UUIDs deterministas en todas las tablas y columnas UUID
     FOR tbl IN 
         SELECT table_name 
         FROM information_schema.tables 
@@ -60,6 +77,10 @@ BEGIN
         END LOOP;
     END LOOP;
 
-    -- Restaurar modo de replicación normal
-    SET session_replication_role = 'origin';
+    -- 2.3. Restaurar todas las constraints de Foreign Key
+    FOR fk IN SELECT table_name, constraint_name, constraint_definition FROM temp_wms_foreign_keys LOOP
+        EXECUTE format('ALTER TABLE %s ADD CONSTRAINT %I %s', fk.table_name, fk.constraint_name, fk.constraint_definition);
+    END LOOP;
+
+    DROP TABLE IF EXISTS temp_wms_foreign_keys;
 END $$;
