@@ -27,7 +27,10 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
--- 2. Bloque PL/pgSQL para migración atómica y universal en todas las tablas del esquema 'wms'
+-- 2. Desactivar temporalmente el trigger de inmutabilidad (WORM) en audit_logs para permitir la sincronización
+DROP TRIGGER IF EXISTS trg_audit_logs_worm ON wms.audit_logs;
+
+-- 3. Bloque PL/pgSQL para migración atómica y universal en todas las tablas del esquema 'wms'
 DO $$
 DECLARE
     fk RECORD;
@@ -35,7 +38,7 @@ DECLARE
     col RECORD;
     sql_stmt TEXT;
 BEGIN
-    -- 2.1. Respaldar y eliminar temporalmente todas las constraints de Foreign Key del esquema 'wms'
+    -- 3.1. Respaldar y eliminar temporalmente todas las constraints de Foreign Key del esquema 'wms'
     --      (Evita requerir privilegios de SUPERUSER necesarios para session_replication_role)
     DROP TABLE IF EXISTS temp_wms_foreign_keys;
     CREATE TEMP TABLE temp_wms_foreign_keys AS
@@ -53,12 +56,13 @@ BEGIN
         EXECUTE format('ALTER TABLE %s DROP CONSTRAINT IF EXISTS %I', fk.table_name, fk.constraint_name);
     END LOOP;
 
-    -- 2.2. Actualizar los UUIDs deterministas en todas las tablas y columnas UUID
+    -- 3.2. Actualizar los UUIDs deterministas en todas las tablas y columnas UUID
     FOR tbl IN 
         SELECT table_name 
         FROM information_schema.tables 
         WHERE table_schema = 'wms' 
           AND table_type = 'BASE TABLE'
+          AND table_name != 'flyway_schema_history'
         ORDER BY table_name
     LOOP
         FOR col IN 
@@ -77,10 +81,15 @@ BEGIN
         END LOOP;
     END LOOP;
 
-    -- 2.3. Restaurar todas las constraints de Foreign Key
+    -- 3.3. Restaurar todas las constraints de Foreign Key
     FOR fk IN SELECT table_name, constraint_name, constraint_definition FROM temp_wms_foreign_keys LOOP
         EXECUTE format('ALTER TABLE %s ADD CONSTRAINT %I %s', fk.table_name, fk.constraint_name, fk.constraint_definition);
     END LOOP;
 
     DROP TABLE IF EXISTS temp_wms_foreign_keys;
 END $$;
+
+-- 4. Restaurar trigger de inmutabilidad (WORM) en audit_logs
+CREATE TRIGGER trg_audit_logs_worm
+    BEFORE UPDATE OR DELETE ON wms.audit_logs
+    FOR EACH ROW EXECUTE FUNCTION wms.protect_audit_logs();
