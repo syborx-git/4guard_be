@@ -18,6 +18,8 @@ public class LocationPersistenceAdapter implements LocationRepositoryPort {
     @Override public Optional<LocationEntity> findById(UUID id)                { return repository.findById(id); }
     @Override public List<LocationEntity>     findByBranchId(UUID bid)         { return repository.findByBranchId(bid); }
     @Override public List<LocationEntity>     findAvailableByBranchId(UUID bid){ return repository.findByBranchIdAndIsBlockedFalse(bid); }
+    @Override public Optional<LocationEntity> findByBranchIdAndCode(UUID bid, String code) { return repository.findByBranchIdAndCode(bid, code); }
+    @Override public Optional<LocationEntity> findFirstByCode(String code)     { return repository.findFirstByCode(code); }
     @Override public LocationEntity           save(LocationEntity l)           { return repository.save(l); }
     @Override public void                     deleteById(UUID id)              { repository.deleteById(id); }
     @Override public List<LocationEntity>     findAll()                        { return repository.findAll(); }
@@ -26,6 +28,16 @@ public class LocationPersistenceAdapter implements LocationRepositoryPort {
 
     @Override public boolean existsByCodeAndIdNot(String code, UUID excludeId) {
         return repository.existsByCodeAndIdNot(code, excludeId);
+    }
+
+    @Override
+    public int decrementOccupancy(UUID locationId, int count) {
+        return repository.decrementOccupancy(locationId, count);
+    }
+
+    @Override
+    public int incrementOccupancy(UUID locationId, int count) {
+        return repository.incrementOccupancy(locationId, count);
     }
 }
 

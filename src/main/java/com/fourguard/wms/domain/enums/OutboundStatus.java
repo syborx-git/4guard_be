@@ -6,7 +6,10 @@ package com.fourguard.wms.domain.enums;
  */
 public enum OutboundStatus {
     DRAFT,
-    CONFIRMED,
+    REGISTERED,
+    ASSIGNED,
+    IN_PROGRESS,
+    LOADED,
     COMPLETED,
     CANCELLED
 }

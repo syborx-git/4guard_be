@@ -4,9 +4,6 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.DynamicUpdate;
 
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
-
 /**
  * JPA entity for wms.cat_currencies.
  * ISO 4217 currency catalog seeded in V9 migration.

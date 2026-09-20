@@ -28,6 +28,9 @@ public class OutboundSummaryResponse {
 
     private UUID carrierId;
     private String carrierName;
+    private UUID rampId;
+    private Integer rampNumber;
+    private String rampCode;
     private UUID forkliftOperatorId;
     private String forkliftOperatorName;
     private String transportType;
@@ -38,11 +41,13 @@ public class OutboundSummaryResponse {
     private String sealNumber;
     private String remisionNo;
     private String destinationAddress;
+    private String observations;
 
     private Integer totalPallets;
     private Double totalPieces;
     private Integer distinctSkus;
 
+    private OffsetDateTime completedAt;
     private OffsetDateTime createdAt;
     private String createdBy;
 }

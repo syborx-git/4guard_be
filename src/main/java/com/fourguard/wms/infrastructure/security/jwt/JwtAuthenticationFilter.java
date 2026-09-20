@@ -1,6 +1,11 @@
 package com.fourguard.wms.infrastructure.security.jwt;
 
+import com.fourguard.wms.domain.ports.out.TokenBlacklistPort;
 import com.fourguard.wms.shared.constants.SecurityConstants;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.MalformedJwtException;
+import io.jsonwebtoken.UnsupportedJwtException;
+import io.jsonwebtoken.security.SignatureException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -14,14 +19,14 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
-import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.util.AntPathMatcher;
+import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
-
-import com.fourguard.wms.domain.ports.out.TokenBlacklistPort;
+import java.util.UUID;
 
 /**
  * Filter that intercepts HTTP requests, extracts Bearer JWT from headers,
@@ -41,6 +46,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final List<String> EXCLUDED_PATHS = Arrays.asList(
             SecurityConstants.AUTH_PATTERN,              // /auth/**
             SecurityConstants.RESET_PASSWORD_TEMP_PATTERN, // /users/reset-password-temp (public)
+            SecurityConstants.SECURITY_GATE_PUBLIC_PATTERN, // /security-gate/public/**
             SecurityConstants.ACTUATOR_HEALTH,           // /actuator/health
             "/swagger-ui.html",
             "/swagger-ui/**",
@@ -78,8 +84,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             jwt = authHeader.substring(SecurityConstants.BEARER_PREFIX.length());
             username = jwtService.extractUsername(jwt);
-            java.util.UUID userId = jwtService.extractUserId(jwt);
-            java.util.Date issuedAt = jwtService.extractIssuedAt(jwt);
+            UUID userId = jwtService.extractUserId(jwt);
+            Date issuedAt = jwtService.extractIssuedAt(jwt);
 
             if (userId != null && tokenBlacklistPort.isUserRevoked(userId, issuedAt)) {
                 log.warn("[Security] Request rejected for revoked user session: {}", username);
@@ -101,11 +107,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     SecurityContextHolder.getContext().setAuthentication(authToken);
                 }
             }
-        } catch (io.jsonwebtoken.ExpiredJwtException e) {
+        } catch (ExpiredJwtException e) {
             log.warn("JWT token has expired: {}", e.getMessage());
             // No seteamos el contexto de seguridad. La cadena continuará y Spring Security
             // bloqueará los endpoints protegidos retornando un 401 Unauthorized limpio en vez de un 500.
-        } catch (io.jsonwebtoken.security.SignatureException | io.jsonwebtoken.MalformedJwtException | io.jsonwebtoken.UnsupportedJwtException | IllegalArgumentException e) {
+        } catch (SignatureException | MalformedJwtException | UnsupportedJwtException | IllegalArgumentException e) {
             log.warn("Invalid JWT token: {}", e.getMessage());
         }
 

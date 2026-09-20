@@ -34,6 +34,11 @@ public class WarehouseOutboundPersistenceAdapter implements WarehouseOutboundRep
     }
 
     @Override
+    public Optional<WarehouseOutboundEntity> findByFolio(String folio) {
+        return repository.findByFolio(folio);
+    }
+
+    @Override
     public WarehouseOutboundEntity save(WarehouseOutboundEntity entity) {
         return repository.save(entity);
     }

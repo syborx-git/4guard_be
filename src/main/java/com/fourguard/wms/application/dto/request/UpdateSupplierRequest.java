@@ -7,9 +7,10 @@ import jakarta.validation.constraints.Size;
 import lombok.Builder;
 import lombok.Value;
 
-import java.util.UUID;
-
-/** Request DTO for updating an existing Supplier. Same structure as create, plus id validation. */
+/**
+ * Request DTO for updating an existing Supplier. Same structure as create, plus
+ * id validation.
+ */
 @Value
 @Builder
 public class UpdateSupplierRequest {

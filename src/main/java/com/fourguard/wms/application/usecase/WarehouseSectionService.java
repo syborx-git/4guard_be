@@ -2,6 +2,7 @@ package com.fourguard.wms.application.usecase;
 
 import com.fourguard.wms.application.dto.request.CreateWarehouseSectionRequest;
 import com.fourguard.wms.application.dto.request.UpdateWarehouseSectionRequest;
+import com.fourguard.wms.application.dto.request.UpdateWarehouseSectionStatusRequest;
 import com.fourguard.wms.application.dto.response.WarehouseSectionResponse;
 import com.fourguard.wms.application.dto.response.audit.WarehouseSectionAuditResponse;
 import com.fourguard.wms.application.mapper.WarehouseSectionMapper;
@@ -109,7 +110,7 @@ public class WarehouseSectionService implements WarehouseSectionUseCase {
 
     @Override
     @Transactional
-    public WarehouseSectionResponse updateWarehouseSectionStatus(UUID id, com.fourguard.wms.application.dto.request.UpdateWarehouseSectionStatusRequest request) {
+    public WarehouseSectionResponse updateWarehouseSectionStatus(UUID id, UpdateWarehouseSectionStatusRequest request) {
         log.info("Updating status for warehouse section ID={} to {}", id, request.getStatus());
         WarehouseSectionEntity existing = sectionRepositoryPort.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Sección no encontrada con ID: " + id));

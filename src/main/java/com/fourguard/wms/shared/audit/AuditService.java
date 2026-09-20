@@ -67,18 +67,41 @@ public class AuditService {
             Object oldVal = before != null ? before.get(key) : null;
             Object newVal = after != null ? after.get(key) : null;
 
-            String oldStr = oldVal != null ? String.valueOf(oldVal) : null;
-            String newStr = newVal != null ? String.valueOf(newVal) : null;
+            String oldStr = oldVal != null ? String.valueOf(oldVal).trim() : null;
+            String newStr = newVal != null ? String.valueOf(newVal).trim() : null;
 
-            if (!Objects.equals(oldStr, newStr)) {
-                details.add(AuditLogDetailEntity.builder()
-                        .log(logEntry)
-                        .fieldName(key)
-                        .oldValue(oldStr)
-                        .newValue(newStr)
-                        .build());
+            if (isEqual(oldStr, newStr)) {
+                continue;
             }
+
+            details.add(AuditLogDetailEntity.builder()
+                    .log(logEntry)
+                    .fieldName(key)
+                    .oldValue(oldStr)
+                    .newValue(newStr)
+                    .build());
         }
         return details;
+    }
+
+    private boolean isEqual(String oldStr, String newStr) {
+        if (Objects.equals(oldStr, newStr)) return true;
+        if ((oldStr == null || oldStr.isBlank() || "null".equalsIgnoreCase(oldStr)) &&
+            (newStr == null || newStr.isBlank() || "null".equalsIgnoreCase(newStr))) {
+            return true;
+        }
+
+        // Numeric equivalence comparison (e.g., "45.00" == "45.0" == "45")
+        if (oldStr != null && newStr != null) {
+            try {
+                double d1 = Double.parseDouble(oldStr);
+                double d2 = Double.parseDouble(newStr);
+                if (Math.abs(d1 - d2) < 0.0001) {
+                    return true;
+                }
+            } catch (NumberFormatException ignored) {}
+        }
+
+        return false;
     }
 }

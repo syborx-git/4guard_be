@@ -20,6 +20,8 @@ public class AddReceptionPalletsRequest {
     @Data
     public static class PalletItemRequest {
 
+        private Integer palletNumber;
+
         @NotNull(message = "palletCode (UA / SSCC) es obligatorio")
         private String palletCode;
 

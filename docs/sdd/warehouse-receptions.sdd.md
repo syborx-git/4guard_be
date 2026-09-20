@@ -11,13 +11,14 @@
 
 ## 1. Descripción del Módulo
 
-El submódulo **Recepción de Mercancía (F01)** controla el flujo transaccional de ingreso de mercancías al almacén:
-1. **Caseta de Seguridad (Check-In):** Registro inicial del arribo de transporte, operador, placas, remisión, rampa y sellos de seguridad. Genera el folio consecutivo con estatus `REGISTERED`.
-2. **Andén de Descarga:** Captura de parámetros de lote (lote, elaboración, caducidad, SKU, proveedor, piezas por tarima, tipo de tarima y ubicación sugerida).
-3. **Escáner de UAs:** Registro unitario o por lote de códigos de tarima (SSCC/UA) con validación de unicidad.
-4. **Cierre y Autorización con Doble Factor:** Autorización de Líder/Supervisor de Almacén (`/complete`) que impacta `wms.inventory_items` (estado DISPONIBLE) y genera movimientos `ENTRY` en `wms.inventory_movements`.
-5. **Cancelación Extraordinaria:** Cancelación por Administrador con motivo obligatorio y credenciales de seguridad.
-6. **Auditoría Integral:** Trazabilidad de cada cambio (`RECEPCION_CREADA`, `RECEPCION_ACTUALIZADA`, `TARIMA_EDITADA`, `RECEPCION_COMPLETADA`, `RECEPCION_CANCELADA`, `REMISION_MODIFICADA`).
+El submódulo **Recepción de Mercancía (F01)** controla el flujo transaccional desacoplado de ingreso de mercancías al almacén (Ver ADR-017):
+1. **Caseta de Seguridad (Vigilancia - Check-In):** Registro perimetral del transporte, operador, placas, remisión y sellos de seguridad. Genera el folio consecutivo con estatus `REGISTERED`.
+2. **Mesa Administrativa (Asignación Operativa):** Captura de parámetros (lote, elaboración, caducidad, SKU, proveedor, piezas por tarima, tipo de tarima y bahía WMS). Asigna rampa y montacarguista, **bloquea la rampa** y despacha la tarea a terminal RF con estatus `ASSIGNED`.
+3. **Andén / Terminal Montacarguista (Descarga Activa):** El montacarguista valida físicamente el arribo, inicia descarga (`IN_PROGRESS`) y escanea los códigos de tarima (SSCC/UA).
+4. **Finalización de Maniobra Física:** El montacarguista notifica fin de descarga en su terminal (`DISCHARGED`). La información consolidada de tarimas y piezas descargadas regresa a la mesa administrativa para auditoría.
+5. **Auditoría y Cierre Formal (Doble Factor):** El administrativo/supervisor audita el manifiesto descargado y aprueba el cierre formal (`COMPLETED`). Impacta `wms.inventory_items` (estado DISPONIBLE), genera movimientos `ENTRY` en `wms.inventory_movements`, **libera la rampa** y habilita la emisión oficial de Pauta / PDF F01.
+6. **Cancelación Extraordinaria:** Cancelación por Administrador con motivo obligatorio y credenciales de seguridad (`CANCELLED`). Libera la rampa.
+7. **Auditoría Integral:** Trazabilidad de cada cambio (`RECEPCION_CREADA`, `RECEPCION_ASIGNADA`, `DESCARGA_INICIADA`, `DESCARGA_FINALIZADA`, `RECEPCION_COMPLETADA`, `RECEPCION_CANCELADA`, `EDICION_CASETA`, `REMISION_MODIFICADA`).
 
 ---
 
@@ -31,7 +32,7 @@ El submódulo **Recepción de Mercancía (F01)** controla el flujo transaccional
 | `organization_id` | UUID | FK `wms.organizations.id`, NOT NULL | Organización |
 | `branch_id` | UUID | FK `wms.branches.id`, NOT NULL | Sucursal |
 | `folio` | VARCHAR(30) | NOT NULL, UNIQUE | Consecutivo numérico (ej. 26510) |
-| `status` | VARCHAR(20) | NOT NULL, DEFAULT `REGISTERED` | `REGISTERED`, `COMPLETED`, `CANCELLED` |
+| `status` | VARCHAR(20) | NOT NULL, DEFAULT `REGISTERED` | `REGISTERED`, `ASSIGNED`, `IN_PROGRESS`, `DISCHARGED`, `COMPLETED`, `CANCELLED` (ADR-017) |
 | `carrier_id` | UUID | FK `wms.carriers.id`, NULLABLE | Transportista |
 | `client_id` | UUID | FK `wms.clients.id`, NOT NULL | Cliente |
 | `ramp_id` | UUID | FK `wms.locations.id`, NULLABLE | Rampa asignada |

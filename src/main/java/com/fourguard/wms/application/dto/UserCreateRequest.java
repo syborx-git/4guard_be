@@ -1,5 +1,6 @@
 package com.fourguard.wms.application.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fourguard.wms.domain.enums.UserStatus;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -12,6 +13,7 @@ import java.util.UUID;
 
 @Value
 @Builder
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class UserCreateRequest {
     @NotBlank(message = "Username cannot be blank")
     @Size(min = 3, max = 50, message = "Username must be between 3 and 50 characters")

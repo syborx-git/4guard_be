@@ -6,7 +6,6 @@ import com.fourguard.wms.application.mapper.WmsLicenseMapper;
 import com.fourguard.wms.domain.enums.LicenseAdminStatus;
 import com.fourguard.wms.domain.enums.LicenseHistoryAction;
 import com.fourguard.wms.domain.enums.LicensePlan;
-import com.fourguard.wms.domain.exception.EntityNotFoundException;
 import com.fourguard.wms.domain.exception.ValidationException;
 import com.fourguard.wms.domain.model.LicenseUsage;
 import com.fourguard.wms.domain.model.WmsLicense;
@@ -275,7 +274,8 @@ class WmsLicenseServiceTest {
                 .performedAt(OffsetDateTime.now())
                 .build();
 
-        when(wmsLicenseHistoryRepositoryPort.findByLicenseIdOrderByPerformedAtDesc(licenseId)).thenReturn(List.of(history));
+        when(wmsLicenseHistoryRepositoryPort.findByLicenseIdOrderByPerformedAtDesc(licenseId))
+                .thenReturn(List.of(history));
 
         List<WmsLicenseHistoryResponse> historyResponses = wmsLicenseService.getLicenseHistory(licenseId);
 

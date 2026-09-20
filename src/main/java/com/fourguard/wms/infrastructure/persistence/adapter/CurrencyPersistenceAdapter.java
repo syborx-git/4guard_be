@@ -37,20 +37,26 @@ public class CurrencyPersistenceAdapter implements CurrencyRepositoryPort {
 
     @Override
     public Optional<Currency> findBaseCurrencyByOrganizationId(UUID organizationId) {
-        return repository.findByOrganizationIdAndIsBaseTrue(organizationId).map(this::toDomain);
+        if (organizationId != null) {
+            return repository.findByOrganizationIdAndIsBaseTrue(organizationId).map(this::toDomain);
+        }
+        return repository.findAll().stream().filter(c -> Boolean.TRUE.equals(c.getIsBase())).findFirst().map(this::toDomain);
     }
 
     @Override
     public List<Currency> findAllByOrganizationId(UUID organizationId) {
-        return repository.findAllByOrganizationId(organizationId)
-                .stream()
-                .map(this::toDomain)
-                .collect(Collectors.toList());
+        List<CurrencyEntity> entities = (organizationId != null)
+                ? repository.findAllByOrganizationId(organizationId)
+                : repository.findAll();
+        return entities.stream().map(this::toDomain).collect(Collectors.toList());
     }
 
     @Override
     public boolean existsByOrganizationIdAndCode(UUID organizationId, String code) {
-        return repository.existsByOrganizationIdAndCode(organizationId, code);
+        if (organizationId != null) {
+            return repository.existsByOrganizationIdAndCode(organizationId, code);
+        }
+        return repository.findAll().stream().anyMatch(c -> c.getCode().equalsIgnoreCase(code));
     }
 
     private CurrencyEntity toEntity(Currency domain) {

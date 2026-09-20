@@ -90,4 +90,9 @@ public interface WarehouseReceptionUseCase {
      * Returns the chronological audit log for a reception folio.
      */
     List<MovementAuditResponse> getAuditLogs(UUID id);
+
+    /**
+     * Returns the current and next consecutive pallet number across the system/branch.
+     */
+    java.util.Map<String, Integer> getNextPalletNumber(UUID organizationId, UUID branchId);
 }

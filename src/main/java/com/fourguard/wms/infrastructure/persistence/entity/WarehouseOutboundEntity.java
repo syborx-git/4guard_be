@@ -48,7 +48,7 @@ public class WarehouseOutboundEntity extends BaseVersionedEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     @Builder.Default
-    private OutboundStatus status = OutboundStatus.COMPLETED;
+    private OutboundStatus status = OutboundStatus.REGISTERED;
 
     // ── Cliente y Destino ───────────────────────────────────────────────────
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -66,6 +66,10 @@ public class WarehouseOutboundEntity extends BaseVersionedEntity {
     private String destinationAddress;
 
     // ── Transporte y Chofer ─────────────────────────────────────────────────
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "ramp_id")
+    private LocationEntity ramp;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "forklift_operator_id")
     private ForkliftOperatorEntity forkliftOperator;
@@ -93,11 +97,14 @@ public class WarehouseOutboundEntity extends BaseVersionedEntity {
     @Column(name = "box_plates", nullable = false, length = 20)
     private String boxPlates;
 
-    @Column(name = "seal_number", nullable = false, length = 50)
+    @Column(name = "seal_number", length = 50)
     private String sealNumber;
 
     @Column(name = "remision_no", nullable = false, length = 60)
     private String remisionNo;
+
+    @Column(columnDefinition = "TEXT")
+    private String observations;
 
     // ── Totales Desnormalizados ─────────────────────────────────────────────
     @Column(name = "total_pallets", nullable = false)
@@ -112,7 +119,13 @@ public class WarehouseOutboundEntity extends BaseVersionedEntity {
     @Builder.Default
     private Integer distinctSkus = 0;
 
-    // ── Cancelación ─────────────────────────────────────────────────────────
+    // ── Cierre y Cancelación ────────────────────────────────────────────────
+    @Column(name = "completed_at")
+    private OffsetDateTime completedAt;
+
+    @Column(name = "leader_authorized_by", length = 100)
+    private String leaderAuthorizedBy;
+
     @Column(name = "cancelled_at")
     private OffsetDateTime cancelledAt;
 

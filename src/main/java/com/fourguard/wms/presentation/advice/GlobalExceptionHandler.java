@@ -1,5 +1,6 @@
 package com.fourguard.wms.presentation.advice;
 
+import com.fourguard.wms.domain.exception.*;
 import com.fourguard.wms.shared.response.ApiResponse;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
@@ -37,13 +38,61 @@ import java.util.stream.Collectors;
  *   <li>Internal error details are logged server-side only</li>
  *   <li>Authentication errors return 401, authorization errors return 403</li>
  * </ul>
- *
- * <p>Domain-specific exceptions ({@code EntityNotFoundException},
- * {@code InvalidCredentialsException}, etc.) will be added in Phase 3.
  */
 @RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
+
+    // ── Domain Exceptions ─────────────────────────────────────────────────────
+
+    @ExceptionHandler({EntityNotFoundException.class, CurrencyNotFoundException.class, ExchangeRateNotFoundException.class})
+    public ResponseEntity<ApiResponse<Void>> handleNotFound(RuntimeException ex) {
+        log.warn("[NOT_FOUND] {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.error(ex.getMessage()));
+    }
+
+    @ExceptionHandler(ConflictException.class)
+    public ResponseEntity<ApiResponse<Void>> handleConflict(ConflictException ex) {
+        log.warn("[CONFLICT] {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.error(ex.getMessage()));
+    }
+
+    @ExceptionHandler(ValidationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDomainValidation(ValidationException ex) {
+        log.warn("[VALIDATION] {}", ex.getMessage());
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.error(ex.getMessage()));
+    }
+
+    @ExceptionHandler(InvalidCredentialsException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidCredentials(InvalidCredentialsException ex) {
+        log.warn("[AUTH] Invalid credentials: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ApiResponse.error(ex.getMessage()));
+    }
+
+    @ExceptionHandler(TokenExpiredException.class)
+    public ResponseEntity<ApiResponse<Void>> handleTokenExpired(TokenExpiredException ex) {
+        log.warn("[AUTH] Token expired: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ApiResponse.error(ex.getMessage()));
+    }
+
+    @ExceptionHandler({AccountTemporarilyLockedException.class, AccountPermanentlyLockedException.class})
+    public ResponseEntity<ApiResponse<Void>> handleAccountLocked(RuntimeException ex) {
+        log.warn("[AUTH] Account locked: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.LOCKED)
+                .body(ApiResponse.error(ex.getMessage()));
+    }
+
+    @ExceptionHandler(InvalidFsmTransitionException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidFsmTransition(InvalidFsmTransitionException ex) {
+        log.warn("[FSM] Invalid state transition: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
+                .body(ApiResponse.error(ex.getMessage()));
+    }
 
     // ── Validation ────────────────────────────────────────────────────────────
 
