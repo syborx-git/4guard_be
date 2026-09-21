@@ -21,7 +21,6 @@ import com.fourguard.wms.domain.ports.in.WarehouseOutboundUseCase;
 import com.fourguard.wms.domain.ports.out.*;
 import com.fourguard.wms.infrastructure.persistence.entity.*;
 import com.fourguard.wms.infrastructure.persistence.repository.InventoryItemJpaRepository;
-import com.fourguard.wms.infrastructure.persistence.repository.WarehouseOutboundJpaRepository;
 import com.fourguard.wms.shared.audit.AuditService;
 import com.fourguard.wms.shared.audit.SecurityAuditHelper;
 import lombok.RequiredArgsConstructor;
@@ -44,7 +43,6 @@ import java.util.stream.Collectors;
 public class WarehouseOutboundService implements WarehouseOutboundUseCase {
 
     private final WarehouseOutboundRepositoryPort outboundRepositoryPort;
-    private final WarehouseOutboundJpaRepository outboundJpaRepository;
     private final OrganizationRepositoryPort organizationRepositoryPort;
     private final BranchRepositoryPort branchRepositoryPort;
     private final ClientRepositoryPort clientRepositoryPort;
@@ -370,7 +368,7 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
         }
         String cleanSearch = (search != null && !search.isBlank()) ? search.trim() : null;
 
-        List<WarehouseOutboundEntity> list = outboundJpaRepository.findAll(
+        List<WarehouseOutboundEntity> list = outboundRepositoryPort.findAll(
                 WarehouseOutboundSpecification.withFilters(organizationId, branchId, obStatus, cleanSearch));
         return list.stream().map(outboundMapper::toSummaryResponse).collect(Collectors.toList());
     }

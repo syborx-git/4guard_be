@@ -14,7 +14,6 @@ import com.fourguard.wms.domain.exception.ValidationException;
 import com.fourguard.wms.domain.ports.in.WarehouseReceptionUseCase;
 import com.fourguard.wms.domain.ports.out.*;
 import com.fourguard.wms.infrastructure.persistence.entity.*;
-import com.fourguard.wms.infrastructure.persistence.repository.WarehouseReceptionJpaRepository;
 import com.fourguard.wms.shared.audit.AuditService;
 import com.fourguard.wms.shared.audit.SecurityAuditHelper;
 import lombok.RequiredArgsConstructor;
@@ -37,7 +36,6 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
 
     private final WarehouseReceptionRepositoryPort receptionRepositoryPort;
     private final WarehouseReceptionPalletRepositoryPort palletRepositoryPort;
-    private final WarehouseReceptionJpaRepository receptionJpaRepository;
     private final OrganizationRepositoryPort organizationRepositoryPort;
     private final BranchRepositoryPort branchRepositoryPort;
     private final CarrierRepositoryPort carrierRepositoryPort;
@@ -474,7 +472,7 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
         }
         String cleanSearch = (search != null && !search.isBlank()) ? search.trim() : null;
 
-        List<WarehouseReceptionEntity> entities = receptionJpaRepository.findAll(
+        List<WarehouseReceptionEntity> entities = receptionRepositoryPort.findAll(
                 WarehouseReceptionSpecification.withFilters(organizationId, branchId, recStatus, cleanSearch));
         return entities.stream().map(e -> {
             List<WarehouseReceptionPalletEntity> pallets = palletRepositoryPort.findByReceptionId(e.getId());

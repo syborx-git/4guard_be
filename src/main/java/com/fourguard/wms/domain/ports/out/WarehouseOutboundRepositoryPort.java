@@ -22,5 +22,7 @@ public interface WarehouseOutboundRepositoryPort {
 
     WarehouseOutboundEntity save(WarehouseOutboundEntity entity);
 
+    List<WarehouseOutboundEntity> findAll(org.springframework.data.jpa.domain.Specification<WarehouseOutboundEntity> spec);
+
     long nextFolioSequenceValue();
 }
