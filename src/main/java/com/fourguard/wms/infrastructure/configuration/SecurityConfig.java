@@ -3,6 +3,7 @@ package com.fourguard.wms.infrastructure.configuration;
 import com.fourguard.wms.infrastructure.security.jwt.JwtAuthenticationFilter;
 import com.fourguard.wms.shared.constants.SecurityConstants;
 import lombok.RequiredArgsConstructor;
+import java.util.List;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -86,17 +87,41 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
 
-        if (!corsProperties.getAllowedOrigins().isEmpty()) {
-            config.setAllowedOrigins(corsProperties.getAllowedOrigins());
+        List<String> origins = corsProperties.getAllowedOrigins();
+        if (origins != null && !origins.isEmpty()) {
+            config.setAllowedOrigins(origins);
+        } else {
+            config.setAllowedOrigins(List.of(
+                "http://localhost:4200",
+                "http://localhost:4201",
+                "http://localhost:8080",
+                "http://127.0.0.1:4200",
+                "http://127.0.0.1:4201"
+            ));
         }
 
-        if (!corsProperties.getAllowedOriginPatterns().isEmpty()) {
-            config.setAllowedOriginPatterns(corsProperties.getAllowedOriginPatterns());
+        List<String> patterns = corsProperties.getAllowedOriginPatterns();
+        if (patterns != null && !patterns.isEmpty()) {
+            config.setAllowedOriginPatterns(patterns);
+        } else {
+            config.setAllowedOriginPatterns(List.of(
+                "http://localhost:*",
+                "http://127.0.0.1:*",
+                "https://*.ngrok-free.dev",
+                "https://*.onrender.com"
+            ));
         }
 
-        config.setAllowedMethods(corsProperties.getAllowedMethods());
-        config.setAllowedHeaders(corsProperties.getAllowedHeaders());
+        config.setAllowedMethods(corsProperties.getAllowedMethods() != null && !corsProperties.getAllowedMethods().isEmpty()
+                ? corsProperties.getAllowedMethods()
+                : List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+
+        config.setAllowedHeaders(corsProperties.getAllowedHeaders() != null && !corsProperties.getAllowedHeaders().isEmpty()
+                ? corsProperties.getAllowedHeaders()
+                : List.of("*"));
+
         config.setAllowCredentials(corsProperties.isAllowCredentials());
+        config.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
