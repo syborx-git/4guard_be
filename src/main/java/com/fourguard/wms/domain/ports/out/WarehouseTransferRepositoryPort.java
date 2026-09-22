@@ -20,5 +20,7 @@ public interface WarehouseTransferRepositoryPort {
 
     WarehouseTransferEntity save(WarehouseTransferEntity entity);
 
+    List<WarehouseTransferEntity> findAll(org.springframework.data.jpa.domain.Specification<WarehouseTransferEntity> spec);
+
     long nextFolioSequenceValue();
 }

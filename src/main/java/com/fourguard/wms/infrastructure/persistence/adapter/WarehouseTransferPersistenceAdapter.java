@@ -39,6 +39,11 @@ public class WarehouseTransferPersistenceAdapter implements WarehouseTransferRep
     }
 
     @Override
+    public List<WarehouseTransferEntity> findAll(org.springframework.data.jpa.domain.Specification<WarehouseTransferEntity> spec) {
+        return repository.findAll(spec);
+    }
+
+    @Override
     public long nextFolioSequenceValue() {
         return repository.getNextFolioSequenceValue();
     }

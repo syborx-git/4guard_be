@@ -6,7 +6,7 @@ import com.fourguard.wms.application.dto.response.WarehouseSectionResponse;
 import com.fourguard.wms.infrastructure.persistence.entity.WarehouseSectionEntity;
 import org.mapstruct.*;
 
-@Mapper(componentModel = "spring")
+@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface WarehouseSectionMapper {
 
     @Mapping(target = "id", ignore = true)

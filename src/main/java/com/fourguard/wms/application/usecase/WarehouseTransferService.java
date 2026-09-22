@@ -15,7 +15,6 @@ import com.fourguard.wms.domain.exception.ValidationException;
 import com.fourguard.wms.domain.ports.in.WarehouseTransferUseCase;
 import com.fourguard.wms.domain.ports.out.*;
 import com.fourguard.wms.infrastructure.persistence.entity.*;
-import com.fourguard.wms.infrastructure.persistence.repository.WarehouseTransferJpaRepository;
 import com.fourguard.wms.shared.audit.AuditService;
 import com.fourguard.wms.shared.audit.SecurityAuditHelper;
 import lombok.RequiredArgsConstructor;
@@ -38,7 +37,6 @@ import java.util.stream.Collectors;
 public class WarehouseTransferService implements WarehouseTransferUseCase {
 
     private final WarehouseTransferRepositoryPort transferRepositoryPort;
-    private final WarehouseTransferJpaRepository transferJpaRepository;
     private final OrganizationRepositoryPort organizationRepositoryPort;
     private final BranchRepositoryPort branchRepositoryPort;
     private final LocationRepositoryPort locationRepositoryPort;
@@ -280,7 +278,7 @@ public class WarehouseTransferService implements WarehouseTransferUseCase {
         }
         String cleanSearch = (search != null && !search.isBlank()) ? search.trim() : null;
 
-        List<WarehouseTransferEntity> list = transferJpaRepository.findAll(
+        List<WarehouseTransferEntity> list = transferRepositoryPort.findAll(
                 WarehouseTransferSpecification.withFilters(organizationId, branchId, trStatus, cleanSearch));
         return list.stream().map(transferMapper::toSummaryResponse).collect(Collectors.toList());
     }
