@@ -15,9 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Stream;
 
 @Service
@@ -28,10 +26,28 @@ public class WarehouseMapService implements WarehouseMapUseCase {
     private final WarehouseMapLocationJpaRepository locationRepository;
     private final CatBlockReasonJpaRepository blockReasonRepository;
 
+    private Map<String, List<String>> loadMaterialsMap() {
+        Map<String, List<String>> materialsBySection = new HashMap<>();
+        try {
+            List<Object[]> rows = locationRepository.findAllSectionMaterials();
+            for (Object[] row : rows) {
+                if (row != null && row.length >= 2 && row[0] != null && row[1] != null) {
+                    String secId = row[0].toString();
+                    String mat = row[1].toString();
+                    materialsBySection.computeIfAbsent(secId, k -> new ArrayList<>()).add(mat);
+                }
+            }
+        } catch (Exception e) {
+            // Fallback gracefully si la tabla no tuviera datos
+        }
+        return materialsBySection;
+    }
+
     @Override
     @Transactional(readOnly = true)
     public WarehouseTopologyResponse getTopology(UUID branchId) {
         List<WarehouseSectionEntity> sections = sectionRepository.findSectionsWithLocationsByBranchId(branchId);
+        Map<String, List<String>> materialsMap = loadMaterialsMap();
 
         int totalPositions = 0;
         int totalCapacity = 0;
@@ -54,6 +70,9 @@ public class WarehouseMapService implements WarehouseMapUseCase {
 
             int pct = posCount > 0 ? (int) Math.round(((double) occupied / posCount) * 100) : 0;
 
+            String secIdStr = sec.getId() != null ? sec.getId().toString() : "";
+            List<String> secMaterials = materialsMap.getOrDefault(secIdStr, Collections.emptyList());
+
             sectionResponses.add(WarehouseSectionMapResponse.builder()
                 .id(sec.getId())
                 .code(sec.getCode())
@@ -62,7 +81,7 @@ public class WarehouseMapService implements WarehouseMapUseCase {
                 .posFijas(sec.getPosFijas() != null ? sec.getPosFijas() : 0)
                 .capacidadTarimas(sec.getCapacidadTarimas() != null ? sec.getCapacidadTarimas() : 0)
                 .factorEstiba(sec.getFactorEstiba() != null ? sec.getFactorEstiba() : "22 tarimas/pos")
-                .materials(new ArrayList<>())
+                .materials(secMaterials)
                 .notes(sec.getNotes() != null ? sec.getNotes() : "")
                 .status(sec.getPosFijas() != null && sec.getPosFijas() > 0 ? "LOADED" : "PENDING")
                 .polygonPoints(sec.getPolygonPoints())
@@ -100,26 +119,8 @@ public class WarehouseMapService implements WarehouseMapUseCase {
     @Transactional(readOnly = true)
     public List<PositionMapDetailResponse> getPositionsBySection(UUID sectionId, String status, String search) {
         List<LocationEntity> locations = locationRepository.findBySectionIdOrderByCodeAsc(sectionId);
-        Stream<PositionMapDetailResponse> stream = locations.stream().map(this::mapLocationToPositionDetail);
-
-        if (status != null && !status.isBlank() && !status.equalsIgnoreCase("ALL")) {
-            stream = stream.filter(p -> p.getStatus().equalsIgnoreCase(status));
-        }
-
-        if (search != null && !search.isBlank()) {
-            String query = search.trim().toLowerCase();
-            stream = stream.filter(p -> (p.getCode() != null && p.getCode().toLowerCase().contains(query))
-                                     || (p.getSectionName() != null && p.getSectionName().toLowerCase().contains(query)));
-        }
-
-        return stream.toList();
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<PositionMapDetailResponse> getAllPositions(UUID branchId, UUID sectionId, String status, String search) {
-        List<LocationEntity> locations = locationRepository.findByBranchIdAndOptionalSectionId(branchId, sectionId);
-        Stream<PositionMapDetailResponse> stream = locations.stream().map(this::mapLocationToPositionDetail);
+        Map<String, List<String>> materialsMap = loadMaterialsMap();
+        Stream<PositionMapDetailResponse> stream = locations.stream().map(l -> mapLocationToPositionDetail(l, materialsMap));
 
         if (status != null && !status.isBlank() && !status.equalsIgnoreCase("ALL")) {
             stream = stream.filter(p -> p.getStatus().equalsIgnoreCase(status));
@@ -129,6 +130,29 @@ public class WarehouseMapService implements WarehouseMapUseCase {
             String query = search.trim().toLowerCase();
             stream = stream.filter(p -> (p.getCode() != null && p.getCode().toLowerCase().contains(query))
                                      || (p.getSectionName() != null && p.getSectionName().toLowerCase().contains(query))
+                                     || (p.getSkuCode() != null && p.getSkuCode().toLowerCase().contains(query))
+                                     || (p.getSkuDescription() != null && p.getSkuDescription().toLowerCase().contains(query)));
+        }
+
+        return stream.toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PositionMapDetailResponse> getAllPositions(UUID branchId, UUID sectionId, String status, String search) {
+        List<LocationEntity> locations = locationRepository.findByBranchIdAndOptionalSectionId(branchId, sectionId);
+        Map<String, List<String>> materialsMap = loadMaterialsMap();
+        Stream<PositionMapDetailResponse> stream = locations.stream().map(l -> mapLocationToPositionDetail(l, materialsMap));
+
+        if (status != null && !status.isBlank() && !status.equalsIgnoreCase("ALL")) {
+            stream = stream.filter(p -> p.getStatus().equalsIgnoreCase(status));
+        }
+
+        if (search != null && !search.isBlank()) {
+            String query = search.trim().toLowerCase();
+            stream = stream.filter(p -> (p.getCode() != null && p.getCode().toLowerCase().contains(query))
+                                     || (p.getSectionName() != null && p.getSectionName().toLowerCase().contains(query))
+                                     || (p.getSkuCode() != null && p.getSkuCode().toLowerCase().contains(query))
                                      || (p.getSkuDescription() != null && p.getSkuDescription().toLowerCase().contains(query))
                                      || (p.getBatchNumber() != null && p.getBatchNumber().toLowerCase().contains(query)));
         }
@@ -143,24 +167,25 @@ public class WarehouseMapService implements WarehouseMapUseCase {
         LocationEntity loc = locationRepository.findById(positionId)
             .orElseThrow(() -> new EntityNotFoundException("Ubicación no encontrada con ID: " + positionId));
 
-        String sanitizedUser = username != null ? username.substring(0, Math.min(36, username.length())) : "SYSTEM";
+        String sanitizedUser = (username != null && !username.isBlank()) ? username : "OPERATIONS_DESK";
 
         switch (request.getTargetAction().toUpperCase()) {
             case "BLOCK" -> {
-                String fullReason = (request.getReasonCode() != null ? request.getReasonCode() : "") + 
-                    (request.getComment() != null && !request.getComment().isBlank() 
-                    ? " — " + request.getComment().trim() : "");
                 loc.setStatus(LocationStatus.BLOCKED);
                 loc.setIsBlocked(true);
-                loc.setStatusReason(fullReason);
-                loc.setBlockReason(fullReason);
+                String reason = request.getReasonCode() != null ? request.getReasonCode() : "BLOQUEO_ADMINISTRATIVO";
+                if (request.getComment() != null && !request.getComment().isBlank()) {
+                    reason += " - " + request.getComment().trim();
+                }
+                loc.setBlockReason(reason);
+                loc.setStatusReason(reason);
                 loc.setUpdatedBy(sanitizedUser);
             }
             case "RELEASE" -> {
                 loc.setStatus(LocationStatus.ACTIVE);
                 loc.setIsBlocked(false);
-                loc.setStatusReason(null);
                 loc.setBlockReason(null);
+                loc.setStatusReason(null);
                 loc.setCurrentOccupancy(0);
                 loc.setUpdatedBy(sanitizedUser);
             }
@@ -175,7 +200,8 @@ public class WarehouseMapService implements WarehouseMapUseCase {
         }
 
         LocationEntity saved = locationRepository.save(loc);
-        return mapLocationToPositionDetail(saved);
+        Map<String, List<String>> materialsMap = loadMaterialsMap();
+        return mapLocationToPositionDetail(saved, materialsMap);
     }
 
     @Override
@@ -186,7 +212,7 @@ public class WarehouseMapService implements WarehouseMapUseCase {
             .toList();
     }
 
-    private PositionMapDetailResponse mapLocationToPositionDetail(LocationEntity l) {
+    private PositionMapDetailResponse mapLocationToPositionDetail(LocationEntity l, Map<String, List<String>> materialsMap) {
         String visualStatus = "AVAILABLE";
         if (l.getStatus() == LocationStatus.BLOCKED || Boolean.TRUE.equals(l.getIsBlocked())) {
             visualStatus = "BLOCKED";
@@ -201,14 +227,33 @@ public class WarehouseMapService implements WarehouseMapUseCase {
             if (l.getPosition() != null) posNum = Integer.parseInt(l.getPosition());
         } catch (NumberFormatException ignored) {}
 
+        String skuCode = null;
+        String skuDescription = "Sin Material Asignado";
+
+        if (l.getSection() != null && l.getSection().getId() != null) {
+            String secIdKey = l.getSection().getId().toString();
+            List<String> mats = materialsMap.get(secIdKey);
+            if (mats != null && !mats.isEmpty()) {
+                int idx = Math.abs(posNum - 1) % mats.size();
+                String chosenMat = mats.get(idx);
+                int firstSpace = chosenMat.indexOf(' ');
+                if (firstSpace > 0) {
+                    skuCode = chosenMat.substring(0, firstSpace);
+                    skuDescription = chosenMat.substring(firstSpace + 1);
+                } else {
+                    skuDescription = chosenMat;
+                }
+            }
+        }
+
         return PositionMapDetailResponse.builder()
             .id(l.getId())
             .positionNumber(posNum)
             .code(l.getCode())
             .sectionId(l.getSection() != null ? l.getSection().getId() : null)
             .sectionName(l.getSection() != null ? l.getSection().getName() : "")
-            .skuCode(null)
-            .skuDescription("Sin Material Asignado")
+            .skuCode(skuCode)
+            .skuDescription(skuDescription)
             .status(visualStatus)
             .capacityTarimas(l.getCapacityUnits() != null ? l.getCapacityUnits() : 22)
             .currentTarimas(l.getCurrentOccupancy() != null ? l.getCurrentOccupancy() : 0)

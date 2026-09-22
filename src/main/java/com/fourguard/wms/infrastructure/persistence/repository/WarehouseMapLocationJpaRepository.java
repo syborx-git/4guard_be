@@ -51,5 +51,22 @@ public interface WarehouseMapLocationJpaRepository extends JpaRepository<Locatio
         @Param("branchId") UUID branchId,
         @Param("sectionId") UUID sectionId
     );
+
+    @Query(value = """
+        SELECT CONCAT(p.code, ' ', p.name)
+        FROM wms.warehouse_section_skus wss
+        JOIN wms.products_sku p ON p.id = wss.sku_id
+        WHERE wss.section_id = :sectionId
+        ORDER BY wss.is_primary DESC, p.code ASC
+    """, nativeQuery = true)
+    List<String> findMaterialsBySectionId(@Param("sectionId") UUID sectionId);
+
+    @Query(value = """
+        SELECT CAST(wss.section_id AS text) AS section_id, CONCAT(p.code, ' ', p.name) AS material
+        FROM wms.warehouse_section_skus wss
+        JOIN wms.products_sku p ON p.id = wss.sku_id
+        ORDER BY wss.is_primary DESC, p.code ASC
+    """, nativeQuery = true)
+    List<Object[]> findAllSectionMaterials();
 }
 
