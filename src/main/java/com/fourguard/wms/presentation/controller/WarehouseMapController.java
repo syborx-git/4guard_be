@@ -46,6 +46,19 @@ public class WarehouseMapController {
         return ResponseEntity.ok(ApiResponse.ok("Posiciones recuperadas con éxito", response));
     }
 
+    @GetMapping("/positions")
+    @PreAuthorize("hasAuthority('INVENTORY_READ') or hasRole('OPERATIONS_MANAGER')")
+    @Operation(summary = "Consultar todas las posiciones/bahías", description = "Retorna la cuadrícula completa de posiciones de la sucursal o filtrada por sección para la tabla de Consulta de Bahías.")
+    public ResponseEntity<ApiResponse<List<PositionMapDetailResponse>>> getAllPositions(
+            @RequestParam UUID branchId,
+            @RequestParam(required = false) UUID sectionId,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String search) {
+        List<PositionMapDetailResponse> response = mapUseCase.getAllPositions(branchId, sectionId, status, search);
+        return ResponseEntity.ok(ApiResponse.ok("Posiciones recuperadas con éxito", response));
+    }
+
+
     @PatchMapping("/positions/{positionId}/status")
     @PreAuthorize("hasAuthority('LOCATIONS_UPDATE') or hasRole('OPERATIONS_MANAGER')")
     @Operation(summary = "Actualizar estado operativo de posición", description = "Ejecuta transiciones FSM: BLOCK (bloqueo QM), RELEASE (liberación) u OCCUPY.")

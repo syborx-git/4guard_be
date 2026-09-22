@@ -116,6 +116,28 @@ public class WarehouseMapService implements WarehouseMapUseCase {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public List<PositionMapDetailResponse> getAllPositions(UUID branchId, UUID sectionId, String status, String search) {
+        List<LocationEntity> locations = locationRepository.findByBranchIdAndOptionalSectionId(branchId, sectionId);
+        Stream<PositionMapDetailResponse> stream = locations.stream().map(this::mapLocationToPositionDetail);
+
+        if (status != null && !status.isBlank() && !status.equalsIgnoreCase("ALL")) {
+            stream = stream.filter(p -> p.getStatus().equalsIgnoreCase(status));
+        }
+
+        if (search != null && !search.isBlank()) {
+            String query = search.trim().toLowerCase();
+            stream = stream.filter(p -> (p.getCode() != null && p.getCode().toLowerCase().contains(query))
+                                     || (p.getSectionName() != null && p.getSectionName().toLowerCase().contains(query))
+                                     || (p.getSkuDescription() != null && p.getSkuDescription().toLowerCase().contains(query))
+                                     || (p.getBatchNumber() != null && p.getBatchNumber().toLowerCase().contains(query)));
+        }
+
+        return stream.toList();
+    }
+
+
+    @Override
     @Transactional
     public PositionMapDetailResponse updatePositionStatus(UUID positionId, UpdatePositionStatusMapRequest request, String username) {
         LocationEntity loc = locationRepository.findById(positionId)

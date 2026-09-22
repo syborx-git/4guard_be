@@ -39,4 +39,17 @@ public interface WarehouseMapLocationJpaRepository extends JpaRepository<Locatio
 
     @Query("SELECT COUNT(l) FROM LocationEntity l WHERE l.section.id = :sectionId AND l.currentOccupancy > 0")
     long countOccupiedBySection(@Param("sectionId") UUID sectionId);
+
+    @Query("""
+        SELECT l FROM LocationEntity l
+        JOIN FETCH l.section s
+        WHERE l.branch.id = :branchId
+          AND (:sectionId IS NULL OR s.id = :sectionId)
+        ORDER BY s.code ASC, l.code ASC
+    """)
+    List<LocationEntity> findByBranchIdAndOptionalSectionId(
+        @Param("branchId") UUID branchId,
+        @Param("sectionId") UUID sectionId
+    );
 }
+

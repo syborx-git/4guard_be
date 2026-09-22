@@ -11,6 +11,8 @@ import java.util.UUID;
 public interface WarehouseMapUseCase {
     WarehouseTopologyResponse getTopology(UUID branchId);
     List<PositionMapDetailResponse> getPositionsBySection(UUID sectionId, String status, String search);
+    List<PositionMapDetailResponse> getAllPositions(UUID branchId, UUID sectionId, String status, String search);
     PositionMapDetailResponse updatePositionStatus(UUID positionId, UpdatePositionStatusMapRequest request, String username);
     List<CatBlockReasonResponse> getActiveBlockReasons();
 }
+
