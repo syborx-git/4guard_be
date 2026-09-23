@@ -156,7 +156,7 @@ public class WarehouseReceptionController {
 
     // ─── CHANGE REMISIÓN ───────────────────────────────────────────────────────
 
-    @PutMapping("/{id}/change-remision")
+    @PutMapping({"/{id}/change-shipping-note", "/{id}/change-document", "/{id}/change-waybill", "/{id}/change-remision"})
     @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER')")
     @Operation(summary = "Modificar número de remisión / documento",
                description = "Actualiza el número de remisión de la recepción con justificación obligatoria y registro en auditoría.")
