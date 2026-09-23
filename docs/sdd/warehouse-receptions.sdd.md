@@ -17,8 +17,9 @@ El submódulo **Recepción de Mercancía (F01)** controla el flujo transaccional
 3. **Andén / Terminal Montacarguista (Descarga Activa):** El montacarguista valida físicamente el arribo, inicia descarga (`IN_PROGRESS`) y escanea los códigos de tarima (SSCC/UA).
 4. **Finalización de Maniobra Física:** El montacarguista notifica fin de descarga en su terminal (`DISCHARGED`). La información consolidada de tarimas y piezas descargadas regresa a la mesa administrativa para auditoría.
 5. **Auditoría y Cierre Formal (Doble Factor):** El administrativo/supervisor audita el manifiesto descargado y aprueba el cierre formal (`COMPLETED`). Impacta `wms.inventory_items` (estado DISPONIBLE), genera movimientos `ENTRY` en `wms.inventory_movements`, **libera la rampa** y habilita la emisión oficial de Pauta / PDF F01.
-6. **Cancelación Extraordinaria:** Cancelación por Administrador con motivo obligatorio y credenciales de seguridad (`CANCELLED`). Libera la rampa.
-7. **Auditoría Integral:** Trazabilidad de cada cambio (`RECEPCION_CREADA`, `RECEPCION_ASIGNADA`, `DESCARGA_INICIADA`, `DESCARGA_FINALIZADA`, `RECEPCION_COMPLETADA`, `RECEPCION_CANCELADA`, `EDICION_CASETA`, `REMISION_MODIFICADA`).
+7. **Candado de Calidad de Vida Útil (Ajuste a 1 Año / 365 Días - ADR-019):** Al capturar o validar los parámetros de folio/remisión en recepción, si la fecha de caducidad tiene menos de 1 año (365 días) de vida útil restante respecto a la fecha actual, el sistema bloquea la asignación e impide la descarga en andén.
+8. **Mapeo Inmutable de UAs (ADR-019):** Permite re-etiquetar tarimas con SSCC GS1-128 sin sobreescribir la UA original del proveedor mediante `wms.ua_mappings`.
+9. **Auditoría Integral y Árbol de Vida:** Trazabilidad de cada evento en `wms.inventory_audit_log`.
 
 ---
 
@@ -75,6 +76,24 @@ El submódulo **Recepción de Mercancía (F01)** controla el flujo transaccional
 | `pallet_type` | VARCHAR(30) | NOT NULL, DEFAULT `MADERA_ESTANDAR` | Tipo de tarima |
 | `observations` | TEXT | NULLABLE | Observaciones por tarima |
 | `inventory_item_id` | UUID | FK `wms.inventory_items.id`, NULLABLE | Enlace al inventario tras cierre |
+| `supplier_ua_code` | VARCHAR(60) | NULLABLE | UA original del proveedor |
+| `internal_ua_code` | VARCHAR(60) | NULLABLE | UA interna 4Guard (SSCC GS1-128) |
+| `is_ua_relabelled` | BOOLEAN | DEFAULT FALSE | Bandera de re-etiquetado |
+| `lot_number` | VARCHAR(50) | NULLABLE | Lote específico de la tarima |
+| `expiration_date` | DATE | NULLABLE | Caducidad específica de la tarima |
+
+### Tabla: `wms.ua_mappings` (ADR-019)
+
+| Campo | Tipo | Restricciones | Descripción |
+|---|---|---|---|
+| `id` | UUID | PK, NOT NULL | Identificador único |
+| `reception_id` | UUID | FK `wms.warehouse_receptions.id`, NOT NULL | Recepción padre |
+| `pallet_id` | UUID | FK `wms.warehouse_reception_pallets.id`, NOT NULL | Tarima específica |
+| `supplier_ua_code` | VARCHAR(60) | NOT NULL | UA de origen del proveedor |
+| `internal_ua_code` | VARCHAR(60) | NOT NULL | SSCC GS1-128 asignado |
+| `relabelled_by` | VARCHAR(100) | NOT NULL | Usuario que ejecutó la acción |
+| `relabelled_at` | TIMESTAMPTZ | AUTO | Timestamp |
+| `reason` | VARCHAR(200) | DEFAULT 'Re-etiquetado estándar 4Guard' | Motivo |
 
 ---
 
@@ -85,13 +104,15 @@ El submódulo **Recepción de Mercancía (F01)** controla el flujo transaccional
 | Método | Ruta | Permiso | Descripción |
 |---|---|---|---|
 | `POST` | `/check-in` | `WAREHOUSE_MOVEMENTS_CREATE` | Registro de caseta (crea recepción en estado `REGISTERED`) |
-| `PUT` | `/{id}/parameters` | `WAREHOUSE_MOVEMENTS_UPDATE` | Actualizar parámetros de descarga en andén |
+| `PUT` | `/{id}/parameters` | `WAREHOUSE_MOVEMENTS_UPDATE` | Asignar rampa y capturar parámetros de folio (valida $\ge 365$ días) |
 | `GET` | `/{id}` | `WAREHOUSE_MOVEMENTS_READ` | Detalle completo de recepción y sus tarimas |
 | `GET` | `/` | `WAREHOUSE_MOVEMENTS_READ` | Listado filtrado por organización, estatus y búsqueda |
-| `POST` | `/{id}/pallets` | `WAREHOUSE_MOVEMENTS_UPDATE` | Agregar tarimas / UAs escaneadas |
+| `POST` | `/{id}/pallets` | `WAREHOUSE_MOVEMENTS_UPDATE` | Agregar tarimas / UAs escaneadas (Lote Activo) |
 | `PUT` | `/{id}/pallets/{palletId}` | `WAREHOUSE_MOVEMENTS_UPDATE` | Editar tarima individual (piezas, tipo, observaciones) |
 | `DELETE` | `/{id}/pallets/{palletId}` | `WAREHOUSE_MOVEMENTS_UPDATE` | Eliminar tarima de recepción abierta |
+| `POST` | `/{id}/relabel-uas` | `WAREHOUSE_MOVEMENTS_UPDATE` | Re-etiquetado selectivo de UAs (genera SSCC y mapeo en `ua_mappings`) |
 | `POST` | `/{id}/complete` | `WAREHOUSE_MOVEMENTS_AUTHORIZE` | Cierre formal F01 con credenciales de Líder |
 | `POST` | `/{id}/cancel` | `WAREHOUSE_MOVEMENTS_CANCEL` | Cancelación con credenciales Admin y motivo obligatorio |
 | `PUT` | `/{id}/change-remision` | `WAREHOUSE_MOVEMENTS_UPDATE` | Modificar No. Remisión con justificación |
 | `GET` | `/{id}/audit` | `WAREHOUSE_MOVEMENTS_READ` | Consultar línea de tiempo de auditoría |
+| `GET` | `/remissions/{folio}/tree` | `WAREHOUSE_MOVEMENTS_READ` | Consultar Árbol de Vida de tarimas de la remisión |

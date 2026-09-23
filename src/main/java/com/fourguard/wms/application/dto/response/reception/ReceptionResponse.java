@@ -55,6 +55,8 @@ public class ReceptionResponse {
     private String lotNumber;
     private LocalDate elaborationDate;
     private LocalDate expirationDate;
+    private Long shelfLifeDaysRemaining;
+    private String shelfLifeStatus;
     private Double piecesPerPallet;
     private String palletType;
     private String palletTypeLabel;

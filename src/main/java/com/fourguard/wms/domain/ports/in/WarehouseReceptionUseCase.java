@@ -95,4 +95,15 @@ public interface WarehouseReceptionUseCase {
      * Returns the current and next consecutive pallet number across the system/branch.
      */
     java.util.Map<String, Integer> getNextPalletNumber(UUID organizationId, UUID branchId);
+
+    /**
+     * Selectively relabels pallets with internal 4Guard SSCC GS1-128 codes,
+     * preserving supplier UA in immutable wms.ua_mappings and wms.inventory_audit_log.
+     */
+    ReceptionResponse relabelUas(UUID id, com.fourguard.wms.application.dto.request.reception.RelabelUasRequest request);
+
+    /**
+     * Returns the lifecycle Tree of Life audit events for a remission folio.
+     */
+    List<com.fourguard.wms.infrastructure.persistence.entity.InventoryAuditLogEntity> getRemissionTree(String remissionFolio);
 }

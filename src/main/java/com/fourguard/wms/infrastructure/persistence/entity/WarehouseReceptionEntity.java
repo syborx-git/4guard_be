@@ -106,6 +106,13 @@ public class WarehouseReceptionEntity extends BaseVersionedEntity {
     @Column(name = "expiration_date")
     private LocalDate expirationDate;
 
+    @Column(name = "shelf_life_days_remaining")
+    private Long shelfLifeDaysRemaining;
+
+    @Column(name = "shelf_life_status", length = 40)
+    @Builder.Default
+    private String shelfLifeStatus = "PENDING";
+
     @Column(name = "pieces_per_pallet", precision = 10, scale = 2)
     @Builder.Default
     private java.math.BigDecimal piecesPerPallet = java.math.BigDecimal.ZERO;

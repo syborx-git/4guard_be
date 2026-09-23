@@ -167,14 +167,28 @@ public class WarehouseReceptionController {
         return ResponseEntity.ok(ApiResponse.ok("Número de remisión modificado con éxito", response));
     }
 
-    // ─── AUDIT LOGS ───────────────────────────────────────────────────────────
+    // ─── RELABEL UAS (SSCC GS1-128) ───────────────────────────────────────────
 
-    @GetMapping("/{id}/audit")
+    @PostMapping("/{id}/relabel-uas")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('WAREHOUSE_SUPERVISOR')")
+    @Operation(summary = "Re-etiquetado selectivo de UAs (SSCC GS1-128)",
+               description = "Genera códigos de barras SSCC internos para las tarimas seleccionadas conservando la UA original en la bitácora inmutable.")
+    public ResponseEntity<ApiResponse<ReceptionResponse>> relabelUas(
+            @PathVariable UUID id,
+            @Valid @RequestBody RelabelUasRequest request) {
+        ReceptionResponse response = receptionUseCase.relabelUas(id, request);
+        return ResponseEntity.ok(ApiResponse.ok("Tarimas re-etiquetadas exitosamente con SSCC 4Guard", response));
+    }
+
+    // ─── REMISSION TREE OF LIFE AUDIT ─────────────────────────────────────────
+
+    @GetMapping("/remissions/{folio}/tree")
     @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('WAREHOUSE_SUPERVISOR')")
-    @Operation(summary = "Consultar trazabilidad y auditoría de la recepción",
-               description = "Retorna la línea de tiempo de auditoría con deltas de cambios.")
-    public ResponseEntity<ApiResponse<List<MovementAuditResponse>>> getAuditLogs(@PathVariable UUID id) {
-        List<MovementAuditResponse> logs = receptionUseCase.getAuditLogs(id);
-        return ResponseEntity.ok(ApiResponse.ok("Historial de auditoría obtenido con éxito", logs));
+    @Operation(summary = "Consultar Árbol de Vida de tarimas por remisión",
+               description = "Retorna el historial completo de eventos de vida de todas las tarimas asociadas a un folio de remisión.")
+    public ResponseEntity<ApiResponse<List<com.fourguard.wms.infrastructure.persistence.entity.InventoryAuditLogEntity>>> getRemissionTree(
+            @PathVariable String folio) {
+        List<com.fourguard.wms.infrastructure.persistence.entity.InventoryAuditLogEntity> tree = receptionUseCase.getRemissionTree(folio);
+        return ResponseEntity.ok(ApiResponse.ok("Árbol de vida de remisión obtenido con éxito", tree));
     }
 }

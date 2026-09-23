@@ -48,6 +48,8 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
     private final InventoryMovementRepositoryPort inventoryMovementRepositoryPort;
     private final UserRepositoryPort userRepositoryPort;
     private final AuditLogRepositoryPort auditLogRepositoryPort;
+    private final UaMappingRepositoryPort uaMappingRepositoryPort;
+    private final InventoryAuditLogRepositoryPort inventoryAuditLogRepositoryPort;
     private final AuditService auditService;
     private final SecurityAuditHelper securityAuditHelper;
     private final PasswordEncoder passwordEncoder;
@@ -409,7 +411,20 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
 
         if (request.getLotNumber() != null) entity.setLotNumber(request.getLotNumber().trim());
         if (request.getElaborationDate() != null) entity.setElaborationDate(request.getElaborationDate());
-        if (request.getExpirationDate() != null) entity.setExpirationDate(request.getExpirationDate());
+        if (request.getExpirationDate() != null) {
+            java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneOffset.UTC);
+            long daysRemaining = java.time.temporal.ChronoUnit.DAYS.between(today, request.getExpirationDate());
+            entity.setShelfLifeDaysRemaining(daysRemaining);
+            entity.setExpirationDate(request.getExpirationDate());
+
+            if (daysRemaining < 365) {
+                entity.setShelfLifeStatus("REJECTED_SHELF_LIFE_POLICY");
+                receptionRepositoryPort.save(entity);
+                throw new ValidationException("Rechazo por Política de Vida Útil (< 1 año / 365 días): El lote cuenta con sólo " + daysRemaining + " días de vida útil restante. No se permite la descarga física.");
+            } else {
+                entity.setShelfLifeStatus("APPROVED");
+            }
+        }
         if (request.getPiecesPerPallet() != null) entity.setPiecesPerPallet(BigDecimal.valueOf(request.getPiecesPerPallet()));
         if (request.getPalletType() != null && !request.getPalletType().isBlank()) {
             String cleanType = request.getPalletType().trim().toUpperCase().replace(" ", "_");
@@ -524,6 +539,9 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
                 p.setObservations(item.getObservations());
                 p.setSku(reception.getSku());
                 p.setSupplier(reception.getSupplier());
+                if (p.getSupplierUaCode() == null) p.setSupplierUaCode(code);
+                if (p.getLotNumber() == null) p.setLotNumber(reception.getLotNumber());
+                if (p.getExpirationDate() == null) p.setExpirationDate(reception.getExpirationDate());
                 palletRepositoryPort.save(p);
                 continue;
             }
@@ -540,6 +558,11 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
                     .reception(reception)
                     .palletNumber(pNum)
                     .palletCode(code)
+                    .supplierUaCode(code)
+                    .internalUaCode(null)
+                    .isUaRelabelled(false)
+                    .lotNumber(reception.getLotNumber())
+                    .expirationDate(reception.getExpirationDate())
                     .sku(reception.getSku())
                     .supplier(reception.getSupplier())
                     .pieces(BigDecimal.valueOf(item.getPieces()))
@@ -547,7 +570,29 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
                     .observations(item.getObservations())
                     .build();
 
-            newPallets.add(palletRepositoryPort.save(palletEntity));
+            WarehouseReceptionPalletEntity savedPallet = palletRepositoryPort.save(palletEntity);
+            newPallets.add(savedPallet);
+
+            // Granular Tree of Life Audit log
+            try {
+                inventoryAuditLogRepositoryPort.save(InventoryAuditLogEntity.builder()
+                        .organization(reception.getOrganization())
+                        .pallet(savedPallet)
+                        .palletCode(code)
+                        .remisionFolio(reception.getFolio())
+                        .eventType("RECEPTION_SCANNED")
+                        .targetLocation(reception.getRamp() != null ? reception.getRamp().getCode() : "ANDEN")
+                        .performedBy(securityAuditHelper.getCurrentUsername())
+                        .reason("Escaneo en andén de recepción")
+                        .metadata(Map.of(
+                                "docNumber", reception.getDocNumber() != null ? reception.getDocNumber() : "",
+                                "lotNumber", reception.getLotNumber() != null ? reception.getLotNumber() : "",
+                                "pieces", item.getPieces()
+                        ))
+                        .build());
+            } catch (Exception auditEx) {
+                log.warn("Could not write inventory_audit_log for scanned pallet {}: {}", code, auditEx.getMessage());
+            }
         }
 
         return receptionMapper.toPalletResponseList(palletRepositoryPort.findByReceptionId(receptionId));
@@ -1078,5 +1123,74 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
                 "lastPalletNumber", maxNumber,
                 "nextPalletNumber", maxNumber + 1
         );
+    }
+
+    @Override
+    @Transactional
+    public ReceptionResponse relabelUas(UUID id, RelabelUasRequest request) {
+        log.info("Relabelling UAs for reception: {}, pallet count: {}", id, request.getPalletIds().size());
+        WarehouseReceptionEntity reception = receptionRepositoryPort.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Recepción no encontrada: " + id));
+
+        String currentUser = securityAuditHelper.getCurrentUsername();
+        List<WarehouseReceptionPalletEntity> allPallets = palletRepositoryPort.findByReceptionId(id);
+        Set<UUID> targetIds = new HashSet<>(request.getPalletIds());
+
+        List<WarehouseReceptionPalletEntity> modified = new ArrayList<>();
+        long timestampSeed = System.currentTimeMillis() % 100000000000L;
+        int idx = 1;
+
+        for (WarehouseReceptionPalletEntity pallet : allPallets) {
+            if (targetIds.contains(pallet.getId())) {
+                String originalUa = pallet.getSupplierUaCode() != null ? pallet.getSupplierUaCode() : pallet.getPalletCode();
+                pallet.setSupplierUaCode(originalUa);
+
+                // Generate 18-digit SSCC GS1-128: 000750 + 12 digits
+                String generatedSscc = String.format("000750%010d%02d", timestampSeed, idx++);
+                pallet.setInternalUaCode(generatedSscc);
+                pallet.setIsUaRelabelled(true);
+                pallet.setPalletCode(generatedSscc); // The active pallet code becomes internal SSCC
+                palletRepositoryPort.save(pallet);
+
+                // Immutable mapping table record
+                UaMappingEntity mapping = UaMappingEntity.builder()
+                        .organization(reception.getOrganization())
+                        .reception(reception)
+                        .pallet(pallet)
+                        .supplierUaCode(originalUa)
+                        .internalUaCode(generatedSscc)
+                        .relabelledBy(currentUser)
+                        .reason(request.getReason() != null && !request.getReason().isBlank() ? request.getReason().trim() : "Re-etiquetado selectivo a estándar 4Guard SSCC GS1-128")
+                        .build();
+                uaMappingRepositoryPort.save(mapping);
+
+                // Tree of Life Audit Log
+                inventoryAuditLogRepositoryPort.save(InventoryAuditLogEntity.builder()
+                        .organization(reception.getOrganization())
+                        .pallet(pallet)
+                        .palletCode(generatedSscc)
+                        .remisionFolio(reception.getFolio())
+                        .eventType("UA_RELABELLED")
+                        .performedBy(currentUser)
+                        .reason(mapping.getReason())
+                        .metadata(Map.of(
+                                "originalUa", originalUa,
+                                "newSscc", generatedSscc,
+                                "palletNumber", pallet.getPalletNumber() != null ? pallet.getPalletNumber() : 0
+                        ))
+                        .build());
+
+                modified.add(pallet);
+            }
+        }
+
+        logAudit(id, "UAS_RE_ETIQUETADAS", Map.of(), Map.of("relabelledCount", modified.size(), "reason", request.getReason() != null ? request.getReason() : ""));
+        return buildReceptionResponse(reception, allPallets);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<InventoryAuditLogEntity> getRemissionTree(String remissionFolio) {
+        return inventoryAuditLogRepositoryPort.findByRemisionFolio(remissionFolio);
     }
 }
