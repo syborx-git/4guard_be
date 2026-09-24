@@ -29,13 +29,13 @@ public interface WarehouseReceptionMapper {
     @Mapping(source = "ramp.name", target = "rampName")
     @Mapping(source = "ramp.code", target = "rampCode")
     @Mapping(source = "forkliftOperator.id", target = "forkliftOperatorId")
-    @Mapping(source = "forkliftOperator.fullName", target = "forkliftOperatorName")
+    @Mapping(source = "forkliftOperator", target = "forkliftOperatorName", qualifiedByName = "forkliftOperatorToName")
     @Mapping(source = "forkliftOperator.code", target = "forkliftOperatorCode")
     @Mapping(source = "sku.id", target = "skuId")
     @Mapping(source = "sku.code", target = "skuCode")
     @Mapping(source = "sku.name", target = "productName")
     @Mapping(source = "supplier.id", target = "supplierId")
-    @Mapping(source = "supplier.commercialName", target = "supplierName")
+    @Mapping(source = "supplier", target = "supplierName", qualifiedByName = "supplierToName")
     @Mapping(source = "storageLocation.id", target = "storageLocationId")
     @Mapping(source = "storageLocation.code", target = "storageLocationCode")
     @Mapping(source = "status", target = "status", qualifiedByName = "receptionStatusToString")
@@ -56,13 +56,13 @@ public interface WarehouseReceptionMapper {
     @Mapping(source = "ramp.name", target = "rampName")
     @Mapping(source = "ramp.code", target = "rampCode")
     @Mapping(source = "forkliftOperator.id", target = "forkliftOperatorId")
-    @Mapping(source = "forkliftOperator.fullName", target = "forkliftOperatorName")
+    @Mapping(source = "forkliftOperator", target = "forkliftOperatorName", qualifiedByName = "forkliftOperatorToName")
     @Mapping(source = "forkliftOperator.code", target = "forkliftOperatorCode")
     @Mapping(source = "sku.id", target = "skuId")
     @Mapping(source = "sku.code", target = "skuCode")
     @Mapping(source = "sku.name", target = "productName")
     @Mapping(source = "supplier.id", target = "supplierId")
-    @Mapping(source = "supplier.commercialName", target = "supplierName")
+    @Mapping(source = "supplier", target = "supplierName", qualifiedByName = "supplierToName")
     @Mapping(source = "status", target = "status", qualifiedByName = "receptionStatusToString")
     @Mapping(source = "storageLocation.id", target = "storageLocationId")
     @Mapping(source = "storageLocation.code", target = "storageLocationCode")
@@ -86,7 +86,7 @@ public interface WarehouseReceptionMapper {
     @Mapping(source = "sku.code", target = "skuCode")
     @Mapping(source = "sku.name", target = "description")
     @Mapping(source = "supplier.id", target = "supplierId")
-    @Mapping(source = "supplier.commercialName", target = "supplierName")
+    @Mapping(source = "supplier", target = "supplierName", qualifiedByName = "supplierToName")
     @Mapping(source = "palletType", target = "palletTypeId", qualifiedByName = "palletTypeToString")
     @Mapping(source = "palletType", target = "palletTypeLabel", qualifiedByName = "palletTypeToLabel")
     @Mapping(source = "inventoryItem.id", target = "inventoryItemId")
@@ -107,6 +107,27 @@ public interface WarehouseReceptionMapper {
     @Named("palletTypeToLabel")
     default String palletTypeToLabel(PalletType type) {
         return type != null ? type.getDescription() : null;
+    }
+
+    @Named("forkliftOperatorToName")
+    default String forkliftOperatorToName(com.fourguard.wms.infrastructure.persistence.entity.ForkliftOperatorEntity operator) {
+        if (operator == null) return null;
+        if (operator.getFullName() != null && !operator.getFullName().isBlank()) {
+            return operator.getFullName();
+        }
+        return operator.getCode();
+    }
+
+    @Named("supplierToName")
+    default String supplierToName(com.fourguard.wms.infrastructure.persistence.entity.SupplierEntity supplier) {
+        if (supplier == null) return null;
+        if (supplier.getCommercialName() != null && !supplier.getCommercialName().isBlank()) {
+            return supplier.getCommercialName();
+        }
+        if (supplier.getLegalName() != null && !supplier.getLegalName().isBlank()) {
+            return supplier.getLegalName();
+        }
+        return supplier.getCode();
     }
 
     @Named("mapSealsToStrings")
