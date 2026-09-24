@@ -60,9 +60,9 @@ public class WarehouseReceptionLotEntity {
     @Column(name = "shelf_life_days_remaining")
     private Integer shelfLifeDaysRemaining;
 
-    @Column(name = "shelf_life_status", length = 30)
+    @Column(name = "shelf_life_status", length = 40)
     @Builder.Default
-    private String shelfLifeStatus = "COMPLIANT";
+    private String shelfLifeStatus = "APPROVED";
 
     @Column(name = "status", length = 20)
     @Builder.Default

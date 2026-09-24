@@ -9,7 +9,7 @@ SET search_path TO wms, public;
 
 -- 1. Tabla para soportar múltiples lotes por remisión en una recepción
 CREATE TABLE IF NOT EXISTS wms.warehouse_reception_lots (
-    id                          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id                          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id             UUID NOT NULL REFERENCES wms.organizations(id),
     branch_id                   UUID NOT NULL REFERENCES wms.branches(id),
     reception_id                UUID NOT NULL REFERENCES wms.warehouse_receptions(id) ON DELETE CASCADE,
@@ -20,11 +20,9 @@ CREATE TABLE IF NOT EXISTS wms.warehouse_reception_lots (
     elaboration_date            DATE,
     expiration_date             DATE NOT NULL,
     shelf_life_days_remaining   INTEGER,
-    shelf_life_status           VARCHAR(30) NOT NULL DEFAULT 'COMPLIANT'
-                                    CONSTRAINT chk_wrl_shelf_life CHECK (shelf_life_status IN ('COMPLIANT', 'WARNING', 'NON_COMPLIANT')),
+    shelf_life_status           VARCHAR(40) NOT NULL DEFAULT 'APPROVED',
     
-    status                      VARCHAR(20) NOT NULL DEFAULT 'ACTIVE'
-                                    CONSTRAINT chk_wrl_status CHECK (status IN ('ACTIVE', 'COMPLETED', 'CANCELLED')),
+    status                      VARCHAR(30) NOT NULL DEFAULT 'ACTIVE',
     observations                TEXT,
     
     version                     BIGINT NOT NULL DEFAULT 1,
@@ -53,23 +51,24 @@ INSERT INTO wms.warehouse_reception_lots (
     status, created_at, updated_at
 )
 SELECT 
-    uuid_generate_v4(),
+    gen_random_uuid(),
     wr.organization_id,
     wr.branch_id,
     wr.id,
-    COALESCE(NULLIF(wr.lot_number, ''), 'LOT-' || wr.folio),
+    COALESCE(NULLIF(TRIM(wr.lot_number), ''), 'LOT-' || wr.folio),
     wr.sku_id,
     wr.elaboration_date,
     COALESCE(wr.expiration_date, CURRENT_DATE + INTERVAL '365 days'),
     COALESCE(wr.shelf_life_days_remaining, 365),
-    COALESCE(wr.shelf_life_status, 'COMPLIANT'),
+    COALESCE(NULLIF(TRIM(wr.shelf_life_status), ''), 'APPROVED'),
     'ACTIVE',
-    wr.created_at,
-    wr.updated_at
+    COALESCE(wr.created_at, NOW()),
+    COALESCE(wr.updated_at, NOW())
 FROM wms.warehouse_receptions wr
 WHERE NOT EXISTS (
     SELECT 1 FROM wms.warehouse_reception_lots l WHERE l.reception_id = wr.id
-);
+)
+ON CONFLICT (reception_id, lot_number) DO NOTHING;
 
 -- Vincular tarimas históricas al lote correspondiente
 UPDATE wms.warehouse_reception_pallets p
@@ -77,3 +76,4 @@ SET reception_lot_id = l.id
 FROM wms.warehouse_reception_lots l
 WHERE l.reception_id = p.reception_id
   AND p.reception_lot_id IS NULL;
+
