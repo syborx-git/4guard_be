@@ -4,6 +4,7 @@ import com.fourguard.wms.application.dto.request.auth.LogoutRequest;
 import com.fourguard.wms.domain.exception.EntityNotFoundException;
 import com.fourguard.wms.domain.exception.InvalidCredentialsException;
 import com.fourguard.wms.domain.ports.in.LogoutUseCase;
+import com.fourguard.wms.domain.ports.out.TokenBlacklistPort;
 import com.fourguard.wms.domain.ports.out.UserRepositoryPort;
 import com.fourguard.wms.infrastructure.persistence.entity.UserEntity;
 import com.fourguard.wms.infrastructure.security.jwt.JwtService;
@@ -21,6 +22,7 @@ public class LogoutUseCaseImpl implements LogoutUseCase {
     private final UserRepositoryPort userRepositoryPort;
     private final JwtService jwtService;
     private final AuditService auditService;
+    private final TokenBlacklistPort tokenBlacklistPort;
 
     @Override
     @Transactional
@@ -44,9 +46,12 @@ public class LogoutUseCaseImpl implements LogoutUseCase {
         UserEntity userEntity = userRepositoryPort.findByUsername(currentUsername)
                 .orElseThrow(() -> new EntityNotFoundException("User not found: " + currentUsername));
 
+        // Revoke all active session tokens in blacklist cache/storage
+        tokenBlacklistPort.revokeUserSessions(userEntity.getId());
+
         // Persist logout event to database audit log
         auditService.log(userEntity, "LOGOUT", "USER", userEntity.getId(), null, java.util.Map.of("username", currentUsername));
 
-        log.info("[AUTH] User '{}' successfully logged out", currentUsername);
+        log.info("[AUTH] User '{}' successfully logged out and sessions revoked", currentUsername);
     }
 }

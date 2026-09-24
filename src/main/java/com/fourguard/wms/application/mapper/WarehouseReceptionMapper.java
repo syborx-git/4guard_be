@@ -41,6 +41,7 @@ public interface WarehouseReceptionMapper {
     @Mapping(source = "palletType", target = "palletType", qualifiedByName = "palletTypeToString")
     @Mapping(source = "palletType", target = "palletTypeLabel", qualifiedByName = "palletTypeToLabel")
     @Mapping(source = "seals", target = "sealNumbers", qualifiedByName = "mapSealsToStrings")
+    @Mapping(source = "lots", target = "lots")
     @Mapping(source = "pallets", target = "pallets")
     @Mapping(target = "totalPallets", expression = "java(entity.getPallets() != null ? entity.getPallets().size() : 0)")
     @Mapping(target = "totalPieces", expression = "java(entity.getPallets() != null ? entity.getPallets().stream().mapToDouble(p -> p.getPieces() != null ? p.getPieces().doubleValue() : 0.0).sum() : 0.0)")
@@ -69,6 +70,14 @@ public interface WarehouseReceptionMapper {
     @Mapping(target = "totalPallets", expression = "java(entity.getPallets() != null ? entity.getPallets().size() : 0)")
     @Mapping(target = "totalPieces", expression = "java(entity.getPallets() != null ? entity.getPallets().stream().mapToDouble(p -> p.getPieces() != null ? p.getPieces().doubleValue() : 0.0).sum() : 0.0)")
     ReceptionSummaryResponse toSummaryResponse(WarehouseReceptionEntity entity);
+
+    @Mapping(source = "sku.id", target = "skuId")
+    @Mapping(source = "sku.code", target = "skuCode")
+    @Mapping(source = "sku.name", target = "productName")
+    @Mapping(source = "reception.id", target = "receptionId")
+    com.fourguard.wms.application.dto.response.reception.ReceptionLotResponse toLotResponse(com.fourguard.wms.infrastructure.persistence.entity.WarehouseReceptionLotEntity entity);
+
+    List<com.fourguard.wms.application.dto.response.reception.ReceptionLotResponse> toLotResponseList(List<com.fourguard.wms.infrastructure.persistence.entity.WarehouseReceptionLotEntity> entities);
 
     @Mapping(source = "sku.id", target = "skuId")
     @Mapping(source = "sku.code", target = "skuCode")

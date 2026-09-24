@@ -106,6 +106,13 @@ public class WarehouseReceptionEntity extends BaseVersionedEntity {
     @Column(name = "expiration_date")
     private LocalDate expirationDate;
 
+    @Column(name = "shelf_life_days_remaining")
+    private Long shelfLifeDaysRemaining;
+
+    @Column(name = "shelf_life_status", length = 40)
+    @Builder.Default
+    private String shelfLifeStatus = "PENDING";
+
     @Column(name = "pieces_per_pallet", precision = 10, scale = 2)
     @Builder.Default
     private java.math.BigDecimal piecesPerPallet = java.math.BigDecimal.ZERO;
@@ -138,6 +145,10 @@ public class WarehouseReceptionEntity extends BaseVersionedEntity {
     private String cancelledBy;
 
     // ── Relaciones Hijas ────────────────────────────────────────────────────
+    @OneToMany(mappedBy = "reception", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @Builder.Default
+    private List<WarehouseReceptionLotEntity> lots = new ArrayList<>();
+
     @OneToMany(mappedBy = "reception", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @Builder.Default
     private List<WarehouseReceptionPalletEntity> pallets = new ArrayList<>();

@@ -303,6 +303,70 @@ public class LocationService implements LocationUseCase {
                 .collect(Collectors.toList());
     }
 
+    // =========================================================================
+    // BAY OCCUPANCY & STANDARD 22-PALLET CAPACITY
+    // =========================================================================
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<com.fourguard.wms.application.dto.response.BayOccupancyResponse> getBayOccupancyList(UUID branchId) {
+        log.debug("Fetching bay occupancy list for branch: {}", branchId);
+        List<LocationEntity> locations = (branchId != null)
+                ? locationRepositoryPort.findByBranchId(branchId)
+                : locationRepositoryPort.findAll();
+
+        // Find candidate for recommended location: active, not blocked, lowest occupancy percentage
+        UUID recommendedId = locations.stream()
+                .filter(loc -> loc.getType() != com.fourguard.wms.domain.enums.LocationType.RAMP &&
+                               loc.getStatus() == LocationStatus.ACTIVE &&
+                               !Boolean.TRUE.equals(loc.getIsBlocked()))
+                .min((a, b) -> {
+                    int capA = (a.getCapacityUnits() != null && a.getCapacityUnits() > 0) ? a.getCapacityUnits() : 22;
+                    int capB = (b.getCapacityUnits() != null && b.getCapacityUnits() > 0) ? b.getCapacityUnits() : 22;
+                    double pctA = (double) (a.getCurrentOccupancy() != null ? a.getCurrentOccupancy() : 0) / capA;
+                    double pctB = (double) (b.getCurrentOccupancy() != null ? b.getCurrentOccupancy() : 0) / capB;
+                    return Double.compare(pctA, pctB);
+                })
+                .map(LocationEntity::getId)
+                .orElse(null);
+
+        return locations.stream()
+                .filter(loc -> loc.getType() != com.fourguard.wms.domain.enums.LocationType.RAMP)
+                .map(loc -> {
+                    int capacity = (loc.getCapacityUnits() != null && loc.getCapacityUnits() > 0) ? loc.getCapacityUnits() : 22;
+                    int current = loc.getCurrentOccupancy() != null ? loc.getCurrentOccupancy() : 0;
+                    double percentage = Math.round(((double) current / capacity) * 1000.0) / 10.0;
+                    if (percentage > 100.0) percentage = 100.0;
+
+                    String trafficLight;
+                    if (percentage <= 70.0) {
+                        trafficLight = "GREEN";
+                    } else if (percentage <= 90.0) {
+                        trafficLight = "AMBER";
+                    } else {
+                        trafficLight = "RED";
+                    }
+
+                    String sectionName = loc.getSection() != null ? loc.getSection().getName() : "General";
+
+                    return com.fourguard.wms.application.dto.response.BayOccupancyResponse.builder()
+                            .id(loc.getId())
+                            .code(loc.getCode())
+                            .name(loc.getName())
+                            .zone(loc.getZone())
+                            .sectionName(sectionName)
+                            .capacityPallets(capacity)
+                            .currentStoredPallets(current)
+                            .occupancyPercentage(percentage)
+                            .status(loc.getStatus() != null ? loc.getStatus().name() : "ACTIVE")
+                            .isBlocked(Boolean.TRUE.equals(loc.getIsBlocked()))
+                            .trafficLight(trafficLight)
+                            .isRecommended(loc.getId().equals(recommendedId))
+                            .build();
+                })
+                .collect(Collectors.toList());
+    }
+
     // ── Audit Helpers ─────────────────────────────────────────────────────────
 
     private LocationEntity cloneLocationEntity(LocationEntity source) {

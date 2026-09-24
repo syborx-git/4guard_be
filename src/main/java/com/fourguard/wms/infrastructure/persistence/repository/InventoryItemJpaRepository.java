@@ -107,6 +107,22 @@ public interface InventoryItemJpaRepository extends JpaRepository<InventoryItemE
             UUID organizationId,
             UUID branchId);
 
+    /** Tenant-aware FEFO query filtered by SKU and Branch. */
+    @Query("""
+            SELECT i FROM InventoryItemEntity i
+            WHERE i.sku.id = :skuId AND i.branch.id = :branchId AND i.state = com.fourguard.wms.domain.enums.InventoryState.AVAILABLE
+            ORDER BY i.expirationDate ASC NULLS LAST
+            """)
+    List<InventoryItemEntity> findAvailableBySkuAndBranchOrderedByFefo(UUID skuId, UUID branchId);
+
+    /** Tenant-aware FEFO query filtered by Branch. */
+    @Query("""
+            SELECT i FROM InventoryItemEntity i
+            WHERE i.branch.id = :branchId AND i.state = com.fourguard.wms.domain.enums.InventoryState.AVAILABLE
+            ORDER BY i.expirationDate ASC NULLS LAST
+            """)
+    List<InventoryItemEntity> findAvailableByBranchOrderedByFefo(UUID branchId);
+
     boolean existsBySscc(String sscc);
 
     /**

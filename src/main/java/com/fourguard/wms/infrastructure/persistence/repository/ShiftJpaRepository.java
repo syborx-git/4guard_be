@@ -19,6 +19,10 @@ public interface ShiftJpaRepository extends JpaRepository<ShiftEntity, UUID> {
 
     Optional<ShiftEntity> findByIdAndIsDeletedFalse(UUID id);
 
+    List<ShiftEntity> findByStatusAndIsDeletedFalse(ShiftStatus status);
+
+    List<ShiftEntity> findByBranchIdAndStatusAndIsDeletedFalse(UUID branchId, ShiftStatus status);
+
     Optional<ShiftEntity> findByCodeAndBranchIdAndIsDeletedFalse(String code, UUID branchId);
 
     boolean existsByCodeAndBranchIdAndIsDeletedFalse(String code, UUID branchId);

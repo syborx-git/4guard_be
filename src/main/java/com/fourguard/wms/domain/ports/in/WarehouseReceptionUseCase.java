@@ -95,4 +95,32 @@ public interface WarehouseReceptionUseCase {
      * Returns the current and next consecutive pallet number across the system/branch.
      */
     java.util.Map<String, Integer> getNextPalletNumber(UUID organizationId, UUID branchId);
+
+    /**
+     * Selectively relabels pallets with internal 4Guard SSCC GS1-128 codes,
+     * preserving supplier UA in immutable wms.ua_mappings and wms.inventory_audit_log.
+     */
+    ReceptionResponse relabelUas(UUID id, com.fourguard.wms.application.dto.request.reception.RelabelUasRequest request);
+
+    /**
+     * Returns the lifecycle Tree of Life audit events for a remission folio.
+     */
+    List<com.fourguard.wms.infrastructure.persistence.entity.InventoryAuditLogEntity> getRemissionTree(String remissionFolio);
+
+    /**
+     * Returns the list of registered lots for a reception.
+     */
+    List<com.fourguard.wms.application.dto.response.reception.ReceptionLotResponse> getLotsByReceptionId(UUID receptionId);
+
+    /**
+     * Adds a new lot to an open reception, validating quality shelf life (>= 365 days).
+     */
+    com.fourguard.wms.application.dto.response.reception.ReceptionLotResponse addLot(
+            UUID receptionId,
+            com.fourguard.wms.application.dto.request.reception.AddReceptionLotRequest request);
+
+    /**
+     * Deletes a lot from an open reception if no pallets are associated with it.
+     */
+    void deleteLot(UUID receptionId, UUID lotId);
 }

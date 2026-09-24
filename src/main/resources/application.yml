@@ -1,6 +1,8 @@
 spring:
   application:
     name: 4guard-wms-be
+  profiles:
+    default: local
 
   # ── Redis auto-config excluded globally; managed manually via RedisConfig ──
   autoconfigure:

@@ -44,6 +44,26 @@ public class WarehouseReceptionPalletEntity {
     @Column(name = "pallet_code", nullable = false, length = 50)
     private String palletCode;
 
+    @Column(name = "supplier_ua_code", length = 60)
+    private String supplierUaCode;
+
+    @Column(name = "internal_ua_code", length = 60)
+    private String internalUaCode;
+
+    @Column(name = "is_ua_relabelled")
+    @Builder.Default
+    private Boolean isUaRelabelled = false;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "reception_lot_id")
+    private WarehouseReceptionLotEntity receptionLot;
+
+    @Column(name = "lot_number", length = 50)
+    private String lotNumber;
+
+    @Column(name = "expiration_date")
+    private java.time.LocalDate expirationDate;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "sku_id", nullable = false)
     private ProductSkuEntity sku;

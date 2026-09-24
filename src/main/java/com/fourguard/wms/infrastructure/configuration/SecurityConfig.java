@@ -53,7 +53,6 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(
                                 SecurityConstants.AUTH_PATTERN,
-                                SecurityConstants.RESET_PASSWORD_TEMP_PATTERN,
                                 SecurityConstants.ACTUATOR_HEALTH,
                                 SecurityConstants.SECURITY_GATE_PUBLIC_PATTERN,
                                 "/swagger-ui.html",
