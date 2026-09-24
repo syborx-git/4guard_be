@@ -11,11 +11,12 @@ import com.fourguard.wms.infrastructure.persistence.entity.WarehouseReceptionSea
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.Named;
+import org.mapstruct.ReportingPolicy;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
-@Mapper(componentModel = "spring")
+@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface WarehouseReceptionMapper {
 
     @Mapping(source = "organization.id", target = "organizationId")
@@ -75,6 +76,8 @@ public interface WarehouseReceptionMapper {
     @Mapping(source = "sku.code", target = "skuCode")
     @Mapping(source = "sku.name", target = "productName")
     @Mapping(source = "reception.id", target = "receptionId")
+    @Mapping(target = "palletsCount", ignore = true)
+    @Mapping(target = "piecesCount", ignore = true)
     com.fourguard.wms.application.dto.response.reception.ReceptionLotResponse toLotResponse(com.fourguard.wms.infrastructure.persistence.entity.WarehouseReceptionLotEntity entity);
 
     List<com.fourguard.wms.application.dto.response.reception.ReceptionLotResponse> toLotResponseList(List<com.fourguard.wms.infrastructure.persistence.entity.WarehouseReceptionLotEntity> entities);

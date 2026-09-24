@@ -248,12 +248,12 @@ public class WarehouseTransferService implements WarehouseTransferUseCase {
         WarehouseTransferEntity saved = transferRepositoryPort.save(transfer);
 
         logAudit(saved.getId(), "TRASPASO_REGISTRADO", activeUser,
-                Map.of("origin", origin.getCode()),
-                Map.of("folio", folio,
-                       "origin", origin.getCode(),
-                       "destination", destination.getCode(),
+                Map.of("origin", origin.getCode() != null ? origin.getCode() : "N/A"),
+                Map.of("folio", folio != null ? folio : "",
+                       "origin", origin.getCode() != null ? origin.getCode() : "N/A",
+                       "destination", destination.getCode() != null ? destination.getCode() : "N/A",
                        "totalPallets", String.valueOf(itemsToMove.size()),
-                       "operator", operator != null ? operator.getFullName() : "N/A"));
+                       "operator", (operator != null && operator.getFullName() != null) ? operator.getFullName() : "N/A"));
 
         return transferMapper.toResponse(saved);
     }
@@ -341,7 +341,9 @@ public class WarehouseTransferService implements WarehouseTransferUseCase {
 
         logAudit(saved.getId(), "TRASPASO_CANCELADO", admin,
                 Map.of("status", "COMPLETED"),
-                Map.of("status", "CANCELLED", "cancelledBy", saved.getCancelledBy(), "reason", request.getReason()));
+                Map.of("status", "CANCELLED",
+                       "cancelledBy", saved.getCancelledBy() != null ? saved.getCancelledBy() : "N/A",
+                       "reason", request.getReason() != null ? request.getReason() : "Cancelado por supervisor"));
 
         return transferMapper.toResponse(saved);
     }

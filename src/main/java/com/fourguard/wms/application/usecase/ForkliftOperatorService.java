@@ -306,7 +306,7 @@ public class ForkliftOperatorService implements ForkliftOperatorUseCase {
     /** Computes the license status from the expiration date. */
     private LicenseStatus computeLicenseStatus(LocalDate expirationDate) {
         if (expirationDate == null) return LicenseStatus.VENCIDA;
-        long daysRemaining = LocalDate.now().until(expirationDate).getDays();
+        long daysRemaining = java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(), expirationDate);
         if (daysRemaining < 0)  return LicenseStatus.VENCIDA;
         if (daysRemaining <= 30) return LicenseStatus.POR_VENCER;
         return LicenseStatus.VIGENTE;

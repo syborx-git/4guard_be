@@ -21,7 +21,7 @@ public interface WarehouseSectionMapper {
 
     @Mapping(source = "branch.id", target = "branchId")
     @Mapping(source = "branch.name", target = "branchName")
-    @Mapping(target = "status", expression = "java(entity.getStatus() != null ? entity.getStatus().name() : com.fourguard.wms.domain.enums.WarehouseSectionStatus.ACTIVE.name())")
+    @Mapping(source = "status", target = "status", qualifiedByName = "sectionStatusToString")
     WarehouseSectionResponse toResponse(WarehouseSectionEntity entity);
 
     @Mapping(target = "id", ignore = true)
@@ -34,4 +34,9 @@ public interface WarehouseSectionMapper {
     @Mapping(target = "updatedBy", ignore = true)
     @Mapping(target = "version", ignore = true)
     void updateEntityFromDto(UpdateWarehouseSectionRequest request, @MappingTarget WarehouseSectionEntity entity);
+
+    @Named("sectionStatusToString")
+    default String sectionStatusToString(com.fourguard.wms.domain.enums.WarehouseSectionStatus status) {
+        return status != null ? status.name() : com.fourguard.wms.domain.enums.WarehouseSectionStatus.ACTIVE.name();
+    }
 }
