@@ -1,11 +1,14 @@
 package com.fourguard.wms.application.usecase;
 
 import com.fourguard.wms.application.dto.request.CreateWarehouseSectionRequest;
+import com.fourguard.wms.application.dto.request.InitializeWarehouseSectionRequest;
 import com.fourguard.wms.application.dto.request.UpdateWarehouseSectionRequest;
 import com.fourguard.wms.application.dto.request.UpdateWarehouseSectionStatusRequest;
 import com.fourguard.wms.application.dto.response.WarehouseSectionResponse;
 import com.fourguard.wms.application.dto.response.audit.WarehouseSectionAuditResponse;
 import com.fourguard.wms.application.mapper.WarehouseSectionMapper;
+import com.fourguard.wms.domain.enums.LocationStatus;
+import com.fourguard.wms.domain.enums.LocationType;
 import com.fourguard.wms.domain.enums.WarehouseSectionStatus;
 import com.fourguard.wms.domain.exception.EntityNotFoundException;
 import com.fourguard.wms.domain.ports.in.WarehouseSectionUseCase;
@@ -19,6 +22,10 @@ import com.fourguard.wms.infrastructure.persistence.entity.BranchEntity;
 import com.fourguard.wms.infrastructure.persistence.entity.LocationEntity;
 import com.fourguard.wms.infrastructure.persistence.entity.UserEntity;
 import com.fourguard.wms.infrastructure.persistence.entity.WarehouseSectionEntity;
+import com.fourguard.wms.infrastructure.persistence.entity.WarehouseSectionSkuEntity;
+import com.fourguard.wms.infrastructure.persistence.repository.LocationJpaRepository;
+import com.fourguard.wms.infrastructure.persistence.repository.ProductSkuJpaRepository;
+import com.fourguard.wms.infrastructure.persistence.repository.WarehouseSectionSkuJpaRepository;
 import com.fourguard.wms.shared.audit.AuditService;
 import com.fourguard.wms.shared.audit.SecurityAuditHelper;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +33,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +50,9 @@ public class WarehouseSectionService implements WarehouseSectionUseCase {
     private final UserRepositoryPort userRepositoryPort;
     private final AuditLogRepositoryPort auditLogRepositoryPort;
     private final LocationRepositoryPort locationRepositoryPort;
+    private final LocationJpaRepository locationJpaRepository;
+    private final WarehouseSectionSkuJpaRepository sectionSkuRepository;
+    private final ProductSkuJpaRepository productSkuRepository;
     private final WarehouseSectionMapper sectionMapper;
     private final SecurityAuditHelper securityAuditHelper;
     private final AuditService auditService;
@@ -129,6 +140,113 @@ public class WarehouseSectionService implements WarehouseSectionUseCase {
         return sectionMapper.toResponse(saved);
     }
 
+    @Override
+    @Transactional
+    public WarehouseSectionResponse initializeWarehouseSection(UUID id, InitializeWarehouseSectionRequest request, String username) {
+        log.info("Inicializando nave de almacén ID={} con {} posiciones, capacidad={}", id, request.getPosFijas(), request.getCapacidadTarimas());
+        WarehouseSectionEntity section = sectionRepositoryPort.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Sección no encontrada con ID: " + id));
+
+        WarehouseSectionEntity originalSnapshot = cloneEntity(section);
+
+        // 1. Actualizar metadatos logísticos
+        section.setCategory(request.getCategory());
+        section.setPosFijas(request.getPosFijas());
+        section.setCapacidadTarimas(request.getCapacidadTarimas());
+        section.setFactorEstiba(request.getFactorEstiba());
+        if (request.getNotes() != null) {
+            section.setNotes(request.getNotes());
+        }
+        section.setStatus(WarehouseSectionStatus.ACTIVE);
+
+        String currentUser = (username != null && !username.isBlank()) ? username : securityAuditHelper.getCurrentUsername();
+        section.setUpdatedBy(currentUser);
+
+        WarehouseSectionEntity saved = sectionRepositoryPort.save(section);
+
+        // 2. Determinar prefijo de zona (ej. "SEC-ALM-B" -> "B", "SEC-ALM-F-D" -> "F-D", o el código directo)
+        String prefix = section.getCode();
+        if (prefix.startsWith("SEC-ALM-")) {
+            prefix = prefix.substring("SEC-ALM-".length());
+        } else if (prefix.startsWith("SEC-")) {
+            prefix = prefix.substring("SEC-".length());
+        }
+
+        // 3. Generación en lote de posiciones consecutivas en wms.locations
+        if (Boolean.TRUE.equals(request.getGenerateLocations()) && request.getPosFijas() != null && request.getPosFijas() > 0) {
+            int capacityPerPos = request.getCapacidadTarimas() / request.getPosFijas();
+            if (capacityPerPos <= 0) capacityPerPos = 22;
+
+            List<LocationEntity> existingLocations = locationJpaRepository.findBySectionId(id);
+            Map<String, LocationEntity> existingByCode = existingLocations.stream()
+                    .collect(Collectors.toMap(LocationEntity::getCode, l -> l, (a, b) -> a));
+
+            List<LocationEntity> locationsToSave = new ArrayList<>();
+            for (int i = 1; i <= request.getPosFijas(); i++) {
+                String posStr = String.format("%03d", i);
+                String code = "POS-" + prefix + "-" + posStr;
+
+                LocationEntity loc = existingByCode.get(code);
+                if (loc == null) {
+                    loc = LocationEntity.builder()
+                            .branch(section.getBranch())
+                            .section(section)
+                            .code(code)
+                            .name("Posición " + posStr + " — Nave " + prefix)
+                            .zone(prefix)
+                            .aisle(String.format("%02d", ((i - 1) / 20 + 1)))
+                            .rack(String.format("%02d", ((i - 1) % 10 + 1)))
+                            .level(1)
+                            .position(posStr)
+                            .coordX(((i - 1) % 10) * 5)
+                            .coordY(((i - 1) / 10) * 5)
+                            .coordZ(1)
+                            .type(LocationType.PALLET)
+                            .status(LocationStatus.ACTIVE)
+                            .capacityUnits(capacityPerPos)
+                            .currentOccupancy(0)
+                            .isBlocked(false)
+                            .notes(section.getName())
+                            .build();
+                    loc.setCreatedBy(currentUser);
+                    loc.setUpdatedBy(currentUser);
+                    locationsToSave.add(loc);
+                } else {
+                    loc.setCapacityUnits(capacityPerPos);
+                    loc.setStatus(LocationStatus.ACTIVE);
+                    loc.setUpdatedBy(currentUser);
+                    locationsToSave.add(loc);
+                }
+            }
+
+            if (!locationsToSave.isEmpty()) {
+                locationJpaRepository.saveAll(locationsToSave);
+                log.info("Sembradas exitosamente {} ubicaciones físicas para la sección {}", locationsToSave.size(), section.getCode());
+            }
+        }
+
+        // 4. Vincular SKUs autorizados si fueron provistos
+        if (request.getAuthorizedSkuIds() != null && !request.getAuthorizedSkuIds().isEmpty()) {
+            for (UUID skuId : request.getAuthorizedSkuIds()) {
+                if (!sectionSkuRepository.existsBySectionIdAndSkuId(id, skuId)) {
+                    productSkuRepository.findById(skuId).ifPresent(sku -> {
+                        WarehouseSectionSkuEntity sectionSku = WarehouseSectionSkuEntity.builder()
+                                .section(section)
+                                .sku(sku)
+                                .isPrimary(true)
+                                .createdAt(java.time.OffsetDateTime.now())
+                                .build();
+                        sectionSkuRepository.save(sectionSku);
+                    });
+                }
+            }
+        }
+
+        // 5. Auditoría
+        logAuditChange(currentUser, "SECTION_INITIALIZED", saved.getId(), originalSnapshot, saved);
+
+        return sectionMapper.toResponse(saved);
+    }
 
     @Override
     @Transactional(readOnly = true)
