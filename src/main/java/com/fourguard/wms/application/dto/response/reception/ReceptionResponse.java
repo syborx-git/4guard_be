@@ -68,7 +68,8 @@ public class ReceptionResponse {
     private Integer totalPallets;
     private Double totalPieces;
 
-    // Detalle de tarimas (UAs)
+    // Detalle de lotes y tarimas (UAs)
+    private List<ReceptionLotResponse> lots;
     private List<ReceptionPalletResponse> pallets;
 
     // Cierre y Cancelación

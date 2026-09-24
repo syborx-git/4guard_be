@@ -54,6 +54,10 @@ public class WarehouseReceptionPalletEntity {
     @Builder.Default
     private Boolean isUaRelabelled = false;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "reception_lot_id")
+    private WarehouseReceptionLotEntity receptionLot;
+
     @Column(name = "lot_number", length = 50)
     private String lotNumber;
 

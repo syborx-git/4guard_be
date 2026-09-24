@@ -147,6 +147,10 @@ public class WarehouseReceptionEntity extends BaseVersionedEntity {
     // ── Relaciones Hijas ────────────────────────────────────────────────────
     @OneToMany(mappedBy = "reception", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @Builder.Default
+    private List<WarehouseReceptionLotEntity> lots = new ArrayList<>();
+
+    @OneToMany(mappedBy = "reception", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @Builder.Default
     private List<WarehouseReceptionPalletEntity> pallets = new ArrayList<>();
 
     @OneToMany(mappedBy = "reception", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)

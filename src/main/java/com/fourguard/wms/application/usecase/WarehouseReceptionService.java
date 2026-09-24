@@ -36,6 +36,7 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
 
     private final WarehouseReceptionRepositoryPort receptionRepositoryPort;
     private final WarehouseReceptionPalletRepositoryPort palletRepositoryPort;
+    private final WarehouseReceptionLotRepositoryPort lotRepositoryPort;
     private final OrganizationRepositoryPort organizationRepositoryPort;
     private final BranchRepositoryPort branchRepositoryPort;
     private final CarrierRepositoryPort carrierRepositoryPort;
@@ -528,6 +529,22 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
                 } catch (IllegalArgumentException ignored) {}
             }
 
+            String targetLotNumber = (item.getLotNumber() != null && !item.getLotNumber().isBlank())
+                    ? item.getLotNumber().trim().toUpperCase()
+                    : (reception.getLotNumber() != null ? reception.getLotNumber().trim().toUpperCase() : null);
+
+            java.time.LocalDate targetExpDate = item.getExpirationDate() != null
+                    ? item.getExpirationDate()
+                    : reception.getExpirationDate();
+
+            WarehouseReceptionLotEntity matchedLot = null;
+            if (targetLotNumber != null) {
+                matchedLot = lotRepositoryPort.findByReceptionIdAndLotNumber(receptionId, targetLotNumber).orElse(null);
+                if (matchedLot != null && targetExpDate == null) {
+                    targetExpDate = matchedLot.getExpirationDate();
+                }
+            }
+
             Optional<WarehouseReceptionPalletEntity> existing = palletRepositoryPort.findByReceptionIdAndPalletCode(receptionId, code);
             if (existing.isPresent()) {
                 WarehouseReceptionPalletEntity p = existing.get();
@@ -540,8 +557,9 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
                 p.setSku(reception.getSku());
                 p.setSupplier(reception.getSupplier());
                 if (p.getSupplierUaCode() == null) p.setSupplierUaCode(code);
-                if (p.getLotNumber() == null) p.setLotNumber(reception.getLotNumber());
-                if (p.getExpirationDate() == null) p.setExpirationDate(reception.getExpirationDate());
+                if (matchedLot != null) p.setReceptionLot(matchedLot);
+                if (targetLotNumber != null) p.setLotNumber(targetLotNumber);
+                if (targetExpDate != null) p.setExpirationDate(targetExpDate);
                 palletRepositoryPort.save(p);
                 continue;
             }
@@ -556,13 +574,14 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
 
             WarehouseReceptionPalletEntity palletEntity = WarehouseReceptionPalletEntity.builder()
                     .reception(reception)
+                    .receptionLot(matchedLot)
                     .palletNumber(pNum)
                     .palletCode(code)
                     .supplierUaCode(code)
                     .internalUaCode(null)
                     .isUaRelabelled(false)
-                    .lotNumber(reception.getLotNumber())
-                    .expirationDate(reception.getExpirationDate())
+                    .lotNumber(targetLotNumber)
+                    .expirationDate(targetExpDate)
                     .sku(reception.getSku())
                     .supplier(reception.getSupplier())
                     .pieces(BigDecimal.valueOf(item.getPieces()))
@@ -934,6 +953,10 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
 
     private ReceptionResponse buildReceptionResponse(WarehouseReceptionEntity entity, List<WarehouseReceptionPalletEntity> pallets) {
         ReceptionResponse response = receptionMapper.toResponse(entity);
+        List<WarehouseReceptionLotEntity> lots = lotRepositoryPort.findByReceptionId(entity.getId());
+        if (lots != null && !lots.isEmpty()) {
+            response.setLots(receptionMapper.toLotResponseList(lots));
+        }
         if (pallets != null) {
             response.setPallets(receptionMapper.toPalletResponseList(pallets));
             response.setTotalPallets(pallets.size());
@@ -1193,4 +1216,94 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
     public List<InventoryAuditLogEntity> getRemissionTree(String remissionFolio) {
         return inventoryAuditLogRepositoryPort.findByRemisionFolio(remissionFolio);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ReceptionLotResponse> getLotsByReceptionId(UUID receptionId) {
+        List<WarehouseReceptionLotEntity> lots = lotRepositoryPort.findByReceptionId(receptionId);
+        return receptionMapper.toLotResponseList(lots);
+    }
+
+    @Override
+    @Transactional
+    public ReceptionLotResponse addLot(UUID receptionId, AddReceptionLotRequest request) {
+        WarehouseReceptionEntity reception = receptionRepositoryPort.findById(receptionId)
+                .orElseThrow(() -> new EntityNotFoundException("Recepción no encontrada: " + receptionId));
+
+        if (reception.getStatus() == ReceptionStatus.COMPLETED || reception.getStatus() == ReceptionStatus.CANCELLED) {
+            throw new ValidationException("No se pueden agregar lotes a una recepción cerrada o cancelada.");
+        }
+
+        String cleanLot = request.getLotNumber() != null ? request.getLotNumber().trim().toUpperCase() : null;
+        if (cleanLot == null || cleanLot.isBlank()) {
+            throw new ValidationException("El número de lote es obligatorio.");
+        }
+
+        Optional<WarehouseReceptionLotEntity> existingLot = lotRepositoryPort.findByReceptionIdAndLotNumber(receptionId, cleanLot);
+        if (existingLot.isPresent()) {
+            throw new ValidationException("El lote '" + cleanLot + "' ya está registrado en esta recepción.");
+        }
+
+        long daysRemaining = 0;
+        String shelfLifeStatus = "APPROVED";
+        if (request.getExpirationDate() != null) {
+            java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneOffset.UTC);
+            daysRemaining = java.time.temporal.ChronoUnit.DAYS.between(today, request.getExpirationDate());
+            if (daysRemaining < 365) {
+                shelfLifeStatus = "REJECTED_SHELF_LIFE_POLICY";
+                throw new ValidationException("🛑 Candado de Calidad: El lote '" + cleanLot + "' cuenta con " + daysRemaining +
+                        " días de vida útil restante. Se requiere un mínimo de 365 días (1 año) para su ingreso.");
+            }
+        }
+
+        WarehouseReceptionLotEntity lotEntity = WarehouseReceptionLotEntity.builder()
+                .reception(reception)
+                .lotNumber(cleanLot)
+                .elaborationDate(request.getElaborationDate())
+                .expirationDate(request.getExpirationDate())
+                .shelfLifeDaysRemaining(daysRemaining)
+                .shelfLifeStatus(shelfLifeStatus)
+                .notes(request.getNotes())
+                .build();
+
+        WarehouseReceptionLotEntity saved = lotRepositoryPort.save(lotEntity);
+
+        if (reception.getLotNumber() == null || reception.getLotNumber().isBlank()) {
+            reception.setLotNumber(cleanLot);
+            reception.setElaborationDate(request.getElaborationDate());
+            reception.setExpirationDate(request.getExpirationDate());
+            reception.setShelfLifeDaysRemaining(daysRemaining);
+            reception.setShelfLifeStatus(shelfLifeStatus);
+            receptionRepositoryPort.save(reception);
+        }
+
+        logAudit(receptionId, "LOTE_AGREGADO", Map.of(), Map.of(
+                "lotNumber", cleanLot,
+                "expirationDate", String.valueOf(request.getExpirationDate()),
+                "daysRemaining", daysRemaining
+        ));
+
+        return receptionMapper.toLotResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public void deleteLot(UUID receptionId, UUID lotId) {
+        WarehouseReceptionLotEntity lot = lotRepositoryPort.findById(lotId)
+                .orElseThrow(() -> new EntityNotFoundException("Lote no encontrado: " + lotId));
+
+        if (!lot.getReception().getId().equals(receptionId)) {
+            throw new ValidationException("El lote no pertenece a la recepción indicada.");
+        }
+
+        List<WarehouseReceptionPalletEntity> pallets = palletRepositoryPort.findByReceptionId(receptionId);
+        boolean hasPallets = pallets.stream().anyMatch(p -> p.getReceptionLot() != null && p.getReceptionLot().getId().equals(lotId));
+        if (hasPallets) {
+            throw new ValidationException("No se puede eliminar el lote '" + lot.getLotNumber() + "' porque ya tiene tarimas escaneadas asociadas.");
+        }
+
+        lotRepositoryPort.deleteById(lotId);
+        logAudit(receptionId, "LOTE_ELIMINADO", Map.of("lotNumber", lot.getLotNumber()), Map.of());
+    }
 }
+

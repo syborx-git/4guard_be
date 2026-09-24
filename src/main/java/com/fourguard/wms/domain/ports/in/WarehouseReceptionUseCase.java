@@ -106,4 +106,21 @@ public interface WarehouseReceptionUseCase {
      * Returns the lifecycle Tree of Life audit events for a remission folio.
      */
     List<com.fourguard.wms.infrastructure.persistence.entity.InventoryAuditLogEntity> getRemissionTree(String remissionFolio);
+
+    /**
+     * Returns the list of registered lots for a reception.
+     */
+    List<com.fourguard.wms.application.dto.response.reception.ReceptionLotResponse> getLotsByReceptionId(UUID receptionId);
+
+    /**
+     * Adds a new lot to an open reception, validating quality shelf life (>= 365 days).
+     */
+    com.fourguard.wms.application.dto.response.reception.ReceptionLotResponse addLot(
+            UUID receptionId,
+            com.fourguard.wms.application.dto.request.reception.AddReceptionLotRequest request);
+
+    /**
+     * Deletes a lot from an open reception if no pallets are associated with it.
+     */
+    void deleteLot(UUID receptionId, UUID lotId);
 }

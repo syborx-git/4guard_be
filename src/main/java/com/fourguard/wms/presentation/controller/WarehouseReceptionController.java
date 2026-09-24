@@ -180,6 +180,39 @@ public class WarehouseReceptionController {
         return ResponseEntity.ok(ApiResponse.ok("Tarimas re-etiquetadas exitosamente con SSCC 4Guard", response));
     }
 
+    // ─── MULTI-LOT MANAGEMENT (F01) ──────────────────────────────────────────
+
+    @GetMapping("/{id}/lots")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('FORKLIFT_OPERATOR')")
+    @Operation(summary = "Obtener lotes registrados en la recepción",
+               description = "Retorna la lista de lotes/folios con sus respectivas fechas de elaboración, caducidad y días de vida útil.")
+    public ResponseEntity<ApiResponse<List<ReceptionLotResponse>>> getLotsByReceptionId(@PathVariable UUID id) {
+        List<ReceptionLotResponse> lots = receptionUseCase.getLotsByReceptionId(id);
+        return ResponseEntity.ok(ApiResponse.ok("Lotes de la recepción obtenidos con éxito", lots));
+    }
+
+    @PostMapping("/{id}/lots")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('WAREHOUSE_SUPERVISOR')")
+    @Operation(summary = "Agregar lote / folio a la recepción",
+               description = "Registra un nuevo lote validando el candado de calidad de vida útil mínima de 365 días (ADR-019).")
+    public ResponseEntity<ApiResponse<ReceptionLotResponse>> addLot(
+            @PathVariable UUID id,
+            @Valid @RequestBody AddReceptionLotRequest request) {
+        ReceptionLotResponse response = receptionUseCase.addLot(id, request);
+        return ResponseEntity.ok(ApiResponse.ok("Lote agregado con éxito", response));
+    }
+
+    @DeleteMapping("/{id}/lots/{lotId}")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('WAREHOUSE_SUPERVISOR')")
+    @Operation(summary = "Eliminar lote de la recepción",
+               description = "Elimina un lote registrado siempre y cuando no tenga tarimas escaneadas asociadas.")
+    public ResponseEntity<ApiResponse<Void>> deleteLot(
+            @PathVariable UUID id,
+            @PathVariable UUID lotId) {
+        receptionUseCase.deleteLot(id, lotId);
+        return ResponseEntity.ok(ApiResponse.ok("Lote eliminado con éxito"));
+    }
+
     // ─── REMISSION TREE OF LIFE AUDIT ─────────────────────────────────────────
 
     @GetMapping("/remissions/{folio}/tree")
@@ -192,3 +225,5 @@ public class WarehouseReceptionController {
         return ResponseEntity.ok(ApiResponse.ok("Árbol de vida de remisión obtenido con éxito", tree));
     }
 }
+
+
