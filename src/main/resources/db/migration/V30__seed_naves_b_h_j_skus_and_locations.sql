@@ -1,5 +1,5 @@
 -- ─────────────────────────────────────────────────────────────────────────────
--- V25__seed_naves_b_h_j_skus_and_locations.sql
+-- V30__seed_naves_b_h_j_skus_and_locations.sql
 -- Actualización y homologación definitiva de Naves B, H, C y J según catálogos:
 --   - Almacén B (SEC-ALM-B): 36 posiciones fijas (Capacidad 792 tarimas / Factor 22) + 5 SKUs
 --   - Almacén H (SEC-ALM-H): 25 posiciones fijas (Capacidad 550 tarimas / Factor 22) + SKU 43940971
