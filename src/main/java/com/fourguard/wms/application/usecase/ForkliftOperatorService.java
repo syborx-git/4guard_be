@@ -407,10 +407,16 @@ public class ForkliftOperatorService implements ForkliftOperatorUseCase {
         state.put("licenseExpirationDate", entity.getLicenseExpirationDate() != null ? entity.getLicenseExpirationDate().toString() : null);
         state.put("licenseStatus",         entity.getLicenseStatus() != null ? entity.getLicenseStatus().name() : null);
         state.put("status",                entity.getStatus() != null ? entity.getStatus().name() : null);
-        state.put("shiftId",               entity.getShift() != null ? entity.getShift().getId().toString() : null);
+        try {
+            state.put("shiftId",           entity.getShift() != null ? entity.getShift().getId().toString() : null);
+        } catch (Exception ignored) {}
         state.put("shiftName",             entity.getShiftName());
-        state.put("organizationId",        entity.getOrganization() != null ? entity.getOrganization().getId().toString() : null);
-        state.put("branchId",              entity.getBranch() != null ? entity.getBranch().getId().toString() : null);
+        try {
+            state.put("organizationId",    entity.getOrganization() != null ? entity.getOrganization().getId().toString() : null);
+        } catch (Exception ignored) {}
+        try {
+            state.put("branchId",          entity.getBranch() != null ? entity.getBranch().getId().toString() : null);
+        } catch (Exception ignored) {}
         return state;
     }
 }

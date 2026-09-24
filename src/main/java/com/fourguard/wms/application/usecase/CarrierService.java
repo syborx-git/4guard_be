@@ -337,13 +337,17 @@ public class CarrierService implements CarrierUseCase {
         state.put("geographicCoverage", entity.getGeographicCoverage());
         state.put("notes", entity.getNotes());
         state.put("vehicleTypes", new ArrayList<>(entity.getVehicleTypes()));
-        if (entity.getPreferredClients() != null) {
-            state.put("preferredClients", entity.getPreferredClients().stream()
-                    .map(c -> Map.of("id", c.getId().toString(), "name", c.getName()))
-                    .collect(Collectors.toList()));
-        }
-        state.put("organizationId",
-                entity.getOrganization() != null ? entity.getOrganization().getId().toString() : null);
+        try {
+            if (entity.getPreferredClients() != null) {
+                state.put("preferredClients", entity.getPreferredClients().stream()
+                        .map(c -> Map.of("id", c.getId().toString(), "name", c.getName()))
+                        .collect(Collectors.toList()));
+            }
+        } catch (Exception ignored) {}
+        try {
+            state.put("organizationId",
+                    entity.getOrganization() != null ? entity.getOrganization().getId().toString() : null);
+        } catch (Exception ignored) {}
         return state;
     }
 

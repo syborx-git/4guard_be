@@ -429,9 +429,15 @@ public class SupplierService implements SupplierUseCase {
         state.put("notes",            entity.getNotes());
         state.put("isActive",         entity.getIsActive());
         state.put("isDeleted",        entity.getIsDeleted());
-        if (entity.getOrganization() != null) state.put("organizationId", entity.getOrganization().getId().toString());
-        if (entity.getClient()       != null) state.put("clientId",       entity.getClient().getId().toString());
-        if (entity.getBranch()       != null) state.put("branchId",       entity.getBranch().getId().toString());
+        try {
+            if (entity.getOrganization() != null) state.put("organizationId", entity.getOrganization().getId().toString());
+        } catch (Exception ignored) {}
+        try {
+            if (entity.getClient()       != null) state.put("clientId",       entity.getClient().getId().toString());
+        } catch (Exception ignored) {}
+        try {
+            if (entity.getBranch()       != null) state.put("branchId",       entity.getBranch().getId().toString());
+        } catch (Exception ignored) {}
         return state;
     }
 

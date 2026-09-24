@@ -444,12 +444,20 @@ public class ClientService implements ClientUseCase {
         state.put("address", entity.getAddress());
         state.put("phone", entity.getPhone());
         state.put("status", entity.getStatus());
-        state.put("contactsCount", entity.getContacts() != null ? entity.getContacts().size() : 0);
-        state.put("destinationsCount", entity.getDestinations() != null ? entity.getDestinations().size() : 0);
-        if (entity.getOrganization() != null) {
-            state.put("organizationId", entity.getOrganization().getId());
-            state.put("organizationName", entity.getOrganization().getName());
-        }
+        try {
+            state.put("contactsCount", entity.getContacts() != null ? entity.getContacts().size() : 0);
+        } catch (Exception ignored) {}
+        try {
+            state.put("destinationsCount", entity.getDestinations() != null ? entity.getDestinations().size() : 0);
+        } catch (Exception ignored) {}
+        try {
+            if (entity.getOrganization() != null) {
+                state.put("organizationId", entity.getOrganization().getId());
+                try {
+                    state.put("organizationName", entity.getOrganization().getName());
+                } catch (Exception ignored) {}
+            }
+        } catch (Exception ignored) {}
         return state;
     }
 

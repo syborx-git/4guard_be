@@ -378,7 +378,9 @@ public class WarehouseSectionService implements WarehouseSectionUseCase {
         state.put("code", entity.getCode());
         state.put("name", entity.getName());
         state.put("status", entity.getStatus() != null ? entity.getStatus().name() : null);
-        state.put("branchId", entity.getBranch() != null ? entity.getBranch().getId().toString() : null);
+        try {
+            state.put("branchId", entity.getBranch() != null ? entity.getBranch().getId().toString() : null);
+        } catch (Exception ignored) {}
         return state;
     }
 }
