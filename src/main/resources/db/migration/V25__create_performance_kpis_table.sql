@@ -1,5 +1,5 @@
 -- =============================================================================
--- V23: Create Performance KPIs Management Table (HU-138)
+-- V25: Create Performance KPIs Management Table (HU-138)
 -- Author: 4GUARD Engineering Team (Architect)
 -- Description: Establishes wms.performance_kpis table for dynamic KPI rules,
 --              thresholds, and evaluation configurations.
@@ -8,7 +8,7 @@
 SET search_path TO wms, public;
 
 CREATE TABLE IF NOT EXISTS wms.performance_kpis (
-    id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id                  UUID PRIMARY KEY DEFAULT wms.uuid_generate_v4(),
     organization_id     UUID REFERENCES wms.organizations(id),
     name                VARCHAR(150) NOT NULL,
     description         TEXT,
@@ -54,7 +54,7 @@ INSERT INTO wms.performance_kpis (
     frequency_value, frequency_unit, is_enabled, created_by_user, updated_by_user
 ) VALUES 
 (
-    uuid_generate_v4(),
+    wms.uuid_generate_v4(),
     'a53f0907-9fa5-4bdf-87db-2eb5e7683935',
     'Tiempo de descarga',
     'Tiempo promedio desde la llegada del camión hasta que se completa la descarga total de mercancía.',
@@ -66,7 +66,7 @@ INSERT INTO wms.performance_kpis (
     5, 'MINUTES', TRUE, 'SYSTEM', 'SYSTEM'
 ),
 (
-    uuid_generate_v4(),
+    wms.uuid_generate_v4(),
     'a53f0907-9fa5-4bdf-87db-2eb5e7683935',
     'Exactitud de inventario',
     'Porcentaje de coincidencia entre el inventario físico y el registrado en el sistema WMS.',
@@ -78,7 +78,7 @@ INSERT INTO wms.performance_kpis (
     1, 'HOURS', TRUE, 'SYSTEM', 'SYSTEM'
 ),
 (
-    uuid_generate_v4(),
+    wms.uuid_generate_v4(),
     'a53f0907-9fa5-4bdf-87db-2eb5e7683935',
     'Ocupación del almacén',
     'Porcentaje de ubicaciones ocupadas respecto al total de ubicaciones disponibles.',
@@ -90,7 +90,7 @@ INSERT INTO wms.performance_kpis (
     30, 'MINUTES', TRUE, 'SYSTEM', 'SYSTEM'
 ),
 (
-    uuid_generate_v4(),
+    wms.uuid_generate_v4(),
     'a53f0907-9fa5-4bdf-87db-2eb5e7683935',
     'Productividad de picking',
     'Cantidad de unidades o líneas procesadas por hora por operador.',
@@ -102,7 +102,7 @@ INSERT INTO wms.performance_kpis (
     15, 'MINUTES', TRUE, 'SYSTEM', 'SYSTEM'
 ),
 (
-    uuid_generate_v4(),
+    wms.uuid_generate_v4(),
     'a53f0907-9fa5-4bdf-87db-2eb5e7683935',
     'Tiempo de embarque',
     'Tiempo promedio desde el inicio de la carga del camión hasta el cierre del embarque.',
@@ -114,7 +114,7 @@ INSERT INTO wms.performance_kpis (
     10, 'MINUTES', TRUE, 'SYSTEM', 'SYSTEM'
 ),
 (
-    uuid_generate_v4(),
+    wms.uuid_generate_v4(),
     'a53f0907-9fa5-4bdf-87db-2eb5e7683935',
     'Puntualidad de transportistas',
     'Porcentaje de transportistas que llegan dentro de la ventana horaria programada.',

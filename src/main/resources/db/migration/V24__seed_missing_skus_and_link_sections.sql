@@ -46,7 +46,20 @@ SELECT
     1
 WHERE NOT EXISTS (SELECT 1 FROM wms.products_sku WHERE code = '43759735');
 
--- 2. Vincular los SKUs a sus respectivas secciones
+-- 2. Crear tabla de vinculación si no existe
+CREATE TABLE IF NOT EXISTS wms.warehouse_section_skus (
+    id          UUID PRIMARY KEY DEFAULT wms.uuid_generate_v4(),
+    section_id  UUID NOT NULL REFERENCES wms.warehouse_sections(id) ON DELETE CASCADE,
+    sku_id      UUID NOT NULL REFERENCES wms.products_sku(id) ON DELETE CASCADE,
+    is_primary  BOOLEAN DEFAULT TRUE,
+    created_at  TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uk_section_sku UNIQUE (section_id, sku_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_section_skus_section ON wms.warehouse_section_skus (section_id);
+CREATE INDEX IF NOT EXISTS idx_section_skus_sku ON wms.warehouse_section_skus (sku_id);
+
+-- 3. Vincular los SKUs a sus respectivas secciones
 INSERT INTO wms.warehouse_section_skus (id, section_id, sku_id, is_primary, created_at)
 SELECT wms.uuid_generate_v4(), s.id, p.id, true, CURRENT_TIMESTAMP
 FROM wms.warehouse_sections s, wms.products_sku p

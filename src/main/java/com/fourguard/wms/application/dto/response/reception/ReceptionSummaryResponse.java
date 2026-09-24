@@ -48,6 +48,9 @@ public class ReceptionSummaryResponse {
     private UUID supplierId;
     private String supplierName;
     private String lotNumber;
+    private LocalDate expirationDate;
+    private Long shelfLifeDaysRemaining;
+    private String shelfLifeStatus;
     private UUID storageLocationId;
     private String storageLocationCode;
     private Integer totalPallets;
