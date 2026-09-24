@@ -27,4 +27,13 @@ public class AddReceptionLotRequest {
     private LocalDate expirationDate;
 
     private String observations;
+
+    public String getNotes() {
+        return observations;
+    }
+
+    public void setNotes(String notes) {
+        this.observations = notes;
+    }
 }
+

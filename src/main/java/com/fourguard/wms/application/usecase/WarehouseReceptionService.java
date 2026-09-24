@@ -1257,13 +1257,16 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
         }
 
         WarehouseReceptionLotEntity lotEntity = WarehouseReceptionLotEntity.builder()
+                .organization(reception.getOrganization())
+                .branch(reception.getBranch())
                 .reception(reception)
+                .sku(reception.getSku())
                 .lotNumber(cleanLot)
                 .elaborationDate(request.getElaborationDate())
                 .expirationDate(request.getExpirationDate())
-                .shelfLifeDaysRemaining(daysRemaining)
+                .shelfLifeDaysRemaining((int) daysRemaining)
                 .shelfLifeStatus(shelfLifeStatus)
-                .notes(request.getNotes())
+                .observations(request.getObservations())
                 .build();
 
         WarehouseReceptionLotEntity saved = lotRepositoryPort.save(lotEntity);
