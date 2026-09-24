@@ -1,6 +1,7 @@
 package com.fourguard.wms.presentation.controller;
 
 import com.fourguard.wms.application.dto.request.CreateWarehouseSectionRequest;
+import com.fourguard.wms.application.dto.request.InitializeWarehouseSectionRequest;
 import com.fourguard.wms.application.dto.request.UpdateWarehouseSectionRequest;
 import com.fourguard.wms.application.dto.request.UpdateWarehouseSectionStatusRequest;
 import com.fourguard.wms.application.dto.response.WarehouseSectionResponse;
@@ -14,6 +15,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -72,6 +74,25 @@ public class WarehouseSectionController {
             @Valid @RequestBody UpdateWarehouseSectionStatusRequest request) {
         WarehouseSectionResponse response = sectionUseCase.updateWarehouseSectionStatus(id, request);
         return ResponseEntity.ok(ApiResponse.ok("Estado de la sección actualizado con éxito", response));
+    }
+
+    @PostMapping("/{id}/initialize")
+    @PreAuthorize("hasAuthority('SECTIONS_UPDATE') or hasRole('OPERATIONS_MANAGER')")
+    @Operation(summary = "Inicializar y activar nave de almacén", description = "Configura métricas de estiba, categoría y genera cuadrícula de ubicaciones operativas.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Nave inicializada y activada con éxito"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Datos de entrada inválidos"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "No autorizado"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Permisos insuficientes"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Sección no encontrada")
+    })
+    public ResponseEntity<ApiResponse<WarehouseSectionResponse>> initializeSection(
+            @PathVariable UUID id,
+            @Valid @RequestBody InitializeWarehouseSectionRequest request,
+            Authentication authentication) {
+        String username = authentication != null ? authentication.getName() : "SYSTEM";
+        WarehouseSectionResponse response = sectionUseCase.initializeWarehouseSection(id, request, username);
+        return ResponseEntity.ok(ApiResponse.ok("Nave de almacén inicializada y activada con éxito", response));
     }
 
 
