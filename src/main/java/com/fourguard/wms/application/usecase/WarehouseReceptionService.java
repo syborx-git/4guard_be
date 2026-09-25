@@ -462,7 +462,28 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
         } else {
             auditAction = "RECEPCION_ACTUALIZADA";
         }
-        logAudit(saved.getId(), auditAction, before, after);
+
+        boolean hasChanges = false;
+        for (Map.Entry<String, Object> entry : after.entrySet()) {
+            Object oldVal = before.get(entry.getKey());
+            Object newVal = entry.getValue();
+            if (!java.util.Objects.equals(oldVal, newVal)) {
+                hasChanges = true;
+                break;
+            }
+        }
+        if (!hasChanges) {
+            for (Map.Entry<String, Object> entry : before.entrySet()) {
+                if (entry.getValue() != null && !java.util.Objects.equals(entry.getValue(), after.get(entry.getKey()))) {
+                    hasChanges = true;
+                    break;
+                }
+            }
+        }
+
+        if (hasChanges) {
+            logAudit(saved.getId(), auditAction, before, after);
+        }
 
         List<WarehouseReceptionPalletEntity> pallets = palletRepositoryPort.findByReceptionId(saved.getId());
         return buildReceptionResponse(saved, pallets);
@@ -983,7 +1004,7 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
                         .build()).collect(Collectors.toList()) : List.of();
 
         String actionLabel = switch (log.getAction()) {
-            case "RECEPCION_CREADA" -> "Pre-Recepción Registrada en Caseta";
+            case "RECEPCION_CREADA", "CASETA_APROBADA" -> "Aprobación de Caseta y Pase a Rampa de Recepción";
             case "RECEPCION_ASIGNADA" -> "Andén y Montacarguista Asignados";
             case "DESCARGA_INICIADA" -> "Descarga Iniciada en Terminal de Montacargas";
             case "DESCARGA_FINALIZADA" -> "Descarga Física Concluida (Notificado a Mesa Administrativa)";

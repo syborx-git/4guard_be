@@ -3,8 +3,6 @@ package com.fourguard.wms.presentation.advice;
 import com.fourguard.wms.domain.exception.AccountPermanentlyLockedException;
 import com.fourguard.wms.domain.exception.AccountTemporarilyLockedException;
 import com.fourguard.wms.domain.exception.ConflictException;
-import com.fourguard.wms.domain.exception.CurrencyNotFoundException;
-import com.fourguard.wms.domain.exception.ExchangeRateNotFoundException;
 import com.fourguard.wms.domain.exception.EntityNotFoundException;
 import com.fourguard.wms.domain.exception.InvalidCredentialsException;
 import com.fourguard.wms.domain.exception.InvalidFsmTransitionException;
@@ -43,8 +41,8 @@ public class DomainExceptionHandler {
                 .body(ApiResponse.error(ex.getMessage()));
     }
 
-    @ExceptionHandler({EntityNotFoundException.class, CurrencyNotFoundException.class, ExchangeRateNotFoundException.class})
-    public ResponseEntity<ApiResponse<Void>> handleNotFound(RuntimeException ex) {
+    @ExceptionHandler(EntityNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleNotFound(EntityNotFoundException ex) {
         log.warn("[NOT-FOUND] Requested entity not found: {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(ApiResponse.error(ex.getMessage()));

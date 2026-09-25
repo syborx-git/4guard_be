@@ -189,9 +189,17 @@ public class BranchService implements CreateBranchUseCase, UpdateBranchUseCase, 
         state.put("timezone", entity.getTimezone());
         state.put("addressLine1", entity.getAddressLine1());
         state.put("status", entity.getStatus() != null ? entity.getStatus().name() : null);
-        if (entity.getOrganization() != null) {
-            state.put("organizationId", entity.getOrganization().getId());
-            state.put("organizationName", entity.getOrganization().getName());
+        try {
+            if (entity.getOrganization() != null) {
+                state.put("organizationId", entity.getOrganization().getId());
+                try {
+                    state.put("organizationName", entity.getOrganization().getName());
+                } catch (Exception ignored) {
+                    // Detached or uninitialized lazy proxy outside session
+                }
+            }
+        } catch (Exception ignored) {
+            // Detached or uninitialized lazy proxy outside session
         }
         return state;
     }

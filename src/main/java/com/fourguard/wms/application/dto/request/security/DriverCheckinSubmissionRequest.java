@@ -35,6 +35,7 @@ public class DriverCheckinSubmissionRequest {
     @NotBlank(message = "El nombre del operador / chofer es obligatorio")
     private String driverName;
     private String driverLicense;
+    private String driverPhone;
 
     @NotBlank(message = "Las placas del tracto son obligatorias")
     private String tractorPlates;

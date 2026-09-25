@@ -85,6 +85,9 @@ public class SecurityPreCheckinEntity extends BaseVersionedEntity {
     @Column(name = "driver_license", length = 100)
     private String driverLicense;
 
+    @Column(name = "driver_phone", length = 10)
+    private String driverPhone;
+
     @Column(name = "transport_type", length = 100)
     private String transportType;
 

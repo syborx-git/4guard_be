@@ -40,9 +40,26 @@ public class AuditService {
             userAgent = request.getHeader("User-Agent");
         }
 
+        UUID orgId = null;
+        try {
+            if (actor.getOrganization() != null) {
+                orgId = actor.getOrganization().getId();
+            }
+        } catch (Exception ignored) {}
+        if (orgId == null) {
+            orgId = UUID.fromString("a53f0907-9fa5-4bdf-87db-2eb5e7683935");
+        }
+
+        UUID branchId = null;
+        try {
+            if (actor.getBranch() != null) {
+                branchId = actor.getBranch().getId();
+            }
+        } catch (Exception ignored) {}
+
         AuditLogEntity logEntry = AuditLogEntity.builder()
-                .organizationId(actor.getOrganization().getId())
-                .branchId(actor.getBranch() != null ? actor.getBranch().getId() : null)
+                .organizationId(orgId)
+                .branchId(branchId)
                 .userId(actor.getId())
                 .action(action)
                 .entityType(entityType)

@@ -407,8 +407,12 @@ public class LocationService implements LocationUseCase {
         state.put("notes", entity.getNotes());
         state.put("capacityUnits", entity.getCapacityUnits());
         state.put("currentOccupancy", entity.getCurrentOccupancy());
-        state.put("branchId", entity.getBranch() != null ? entity.getBranch().getId().toString() : null);
-        state.put("sectionId", entity.getSection() != null ? entity.getSection().getId().toString() : null);
+        try {
+            state.put("branchId", entity.getBranch() != null ? entity.getBranch().getId().toString() : null);
+        } catch (Exception ignored) {}
+        try {
+            state.put("sectionId", entity.getSection() != null ? entity.getSection().getId().toString() : null);
+        } catch (Exception ignored) {}
         return state;
     }
 }
