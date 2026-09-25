@@ -169,6 +169,7 @@ public class SecurityGateService implements SecurityGateUseCase {
                 .carrierLineCode(request.getCarrierLineCode())
                 .carrierLine(request.getCarrierLine() != null ? request.getCarrierLine() : (carrier != null ? carrier.getName() : null))
                 .driverName(request.getDriverName())
+                .driverPhone(request.getDriverPhone())
                 .tractorPlates(request.getTractorPlates())
                 .docNumber(request.getDocNumber())
                 .expiresAt(OffsetDateTime.now().plusHours(24))
@@ -217,6 +218,7 @@ public class SecurityGateService implements SecurityGateUseCase {
         entity.setOperationType(opType);
         entity.setDriverName(request.getDriverName());
         entity.setDriverLicense(request.getDriverLicense());
+        entity.setDriverPhone(request.getDriverPhone());
         entity.setTractorPlates(request.getTractorPlates() != null ? request.getTractorPlates().toUpperCase().trim() : null);
         entity.setNoEcoTractor(request.getNoEcoTractor());
         entity.setBoxPlates(request.getBoxPlates() != null ? request.getBoxPlates().toUpperCase().trim() : null);
@@ -317,6 +319,7 @@ public class SecurityGateService implements SecurityGateUseCase {
                     (p.getToken() != null && p.getToken().toLowerCase().contains(q)) ||
                     (p.getGeneratedFolio() != null && p.getGeneratedFolio().toLowerCase().contains(q)) ||
                     (p.getDriverName() != null && p.getDriverName().toLowerCase().contains(q)) ||
+                    (p.getDriverPhone() != null && p.getDriverPhone().toLowerCase().contains(q)) ||
                     (p.getTractorPlates() != null && p.getTractorPlates().toLowerCase().contains(q)) ||
                     (p.getBoxPlates() != null && p.getBoxPlates().toLowerCase().contains(q)) ||
                     (p.getClientName() != null && p.getClientName().toLowerCase().contains(q)) ||
@@ -366,6 +369,7 @@ public class SecurityGateService implements SecurityGateUseCase {
         }
 
         if (request.getDriverName() != null) entity.setDriverName(request.getDriverName());
+        if (request.getDriverPhone() != null) entity.setDriverPhone(request.getDriverPhone());
         if (request.getTractorPlates() != null) entity.setTractorPlates(request.getTractorPlates().toUpperCase().trim());
         if (request.getBoxPlates() != null) entity.setBoxPlates(request.getBoxPlates().toUpperCase().trim());
         if (request.getNoEcoTractor() != null) entity.setNoEcoTractor(request.getNoEcoTractor());
@@ -548,6 +552,7 @@ public class SecurityGateService implements SecurityGateUseCase {
                 .carrierLine(entity.getCarrierLine())
                 .driverName(entity.getDriverName())
                 .driverLicense(entity.getDriverLicense())
+                .driverPhone(entity.getDriverPhone())
                 .transportType(entity.getTransportType())
                 .economicNumber(entity.getEconomicNumber() != null ? entity.getEconomicNumber() : entity.getNoEcoTractor())
                 .boxEconomicNumber(entity.getBoxEconomicNumber())

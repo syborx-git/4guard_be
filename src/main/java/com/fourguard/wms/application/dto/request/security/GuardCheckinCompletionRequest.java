@@ -35,6 +35,7 @@ public class GuardCheckinCompletionRequest {
 
     private String driverName;
     private String driverLicense;
+    private String driverPhone;
     private String tractorPlates;
     private String noEcoTractor;
     private String boxPlates;

@@ -472,8 +472,13 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
                 break;
             }
         }
-        if (before.size() != after.size()) {
-            hasChanges = true;
+        if (!hasChanges) {
+            for (Map.Entry<String, Object> entry : before.entrySet()) {
+                if (entry.getValue() != null && !java.util.Objects.equals(entry.getValue(), after.get(entry.getKey()))) {
+                    hasChanges = true;
+                    break;
+                }
+            }
         }
 
         if (hasChanges) {
@@ -999,7 +1004,7 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
                         .build()).collect(Collectors.toList()) : List.of();
 
         String actionLabel = switch (log.getAction()) {
-            case "RECEPCION_CREADA" -> "Aprobación de Caseta y Pase a Rampa de Recepción";
+            case "RECEPCION_CREADA", "CASETA_APROBADA" -> "Aprobación de Caseta y Pase a Rampa de Recepción";
             case "RECEPCION_ASIGNADA" -> "Andén y Montacarguista Asignados";
             case "DESCARGA_INICIADA" -> "Descarga Iniciada en Terminal de Montacargas";
             case "DESCARGA_FINALIZADA" -> "Descarga Física Concluida (Notificado a Mesa Administrativa)";

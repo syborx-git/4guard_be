@@ -23,6 +23,7 @@ public class GeneratePassRequest {
     private String carrierLineCode;
     private String carrierLine;
     private String driverName;
+    private String driverPhone;
     private String tractorPlates;
     private String docNumber;
 }
