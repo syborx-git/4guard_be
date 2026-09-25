@@ -37,7 +37,6 @@ public class SupplierService implements SupplierUseCase {
     private final ClientJpaRepository clientJpaRepository;
     private final BranchJpaRepository branchJpaRepository;
     private final CatSupplierTypeJpaRepository catSupplierTypeJpaRepository;
-    private final CatCurrencyJpaRepository catCurrencyJpaRepository;
     private final SupplierMapper supplierMapper;
     private final SecurityAuditHelper securityAuditHelper;
     private final AuditService auditService;
@@ -309,14 +308,6 @@ public class SupplierService implements SupplierUseCase {
     public List<SupplierTypeResponse> getSupplierTypes() {
         return catSupplierTypeJpaRepository.findByActiveTrueOrderBySortOrderAsc().stream()
                 .map(supplierMapper::toTypeResponse)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<CurrencyResponse> getCurrencies() {
-        return catCurrencyJpaRepository.findByActiveTrueOrderByCodeAsc().stream()
-                .map(supplierMapper::toCurrencyResponse)
                 .collect(Collectors.toList());
     }
 
