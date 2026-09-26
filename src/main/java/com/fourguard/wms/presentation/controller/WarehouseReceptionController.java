@@ -213,6 +213,17 @@ public class WarehouseReceptionController {
         return ResponseEntity.ok(ApiResponse.ok("Lote eliminado con éxito"));
     }
 
+    // ─── AUDIT LOGS ───────────────────────────────────────────────────────────
+
+    @GetMapping("/{id}/audit")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('WAREHOUSE_SUPERVISOR')")
+    @Operation(summary = "Consultar auditoría de la recepción",
+               description = "Retorna la línea de tiempo de auditoría de la recepción con sus deltas de modificación.")
+    public ResponseEntity<ApiResponse<List<MovementAuditResponse>>> getAuditLogs(@PathVariable UUID id) {
+        List<MovementAuditResponse> logs = receptionUseCase.getAuditLogs(id);
+        return ResponseEntity.ok(ApiResponse.ok("Historial de auditoría obtenido con éxito", logs));
+    }
+
     // ─── REMISSION TREE OF LIFE AUDIT ─────────────────────────────────────────
 
     @GetMapping("/remissions/{folio}/tree")
