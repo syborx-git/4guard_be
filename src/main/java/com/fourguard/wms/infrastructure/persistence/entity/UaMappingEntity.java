@@ -46,10 +46,10 @@ public class UaMappingEntity {
     @JoinColumn(name = "pallet_id", nullable = false)
     private WarehouseReceptionPalletEntity pallet;
 
-    @Column(name = "supplier_ua_code", nullable = false, length = 60)
+    @Column(name = "supplier_ua_code", nullable = false, length = 100)
     private String supplierUaCode;
 
-    @Column(name = "internal_ua_code", nullable = false, length = 60)
+    @Column(name = "internal_ua_code", nullable = false, length = 100)
     private String internalUaCode;
 
     @Column(name = "relabelled_by", nullable = false, length = 100)

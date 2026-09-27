@@ -301,10 +301,67 @@ public class SecurityGateService implements SecurityGateUseCase {
     @Override
     @Transactional(readOnly = true)
     public List<PassResponse> getInYardPasses(UUID organizationId, UUID branchId) {
-        List<SecurityPreCheckinEntity> list = preCheckinJpaRepository.findInYardPasses(
+        List<SecurityPreCheckinEntity> preCheckins = preCheckinJpaRepository.findInYardPasses(
                 organizationId, branchId
         );
-        return list.stream().map(this::mapToResponseWithWarehouseStatus).toList();
+        Set<String> processedFolios = new HashSet<>();
+        List<PassResponse> result = new ArrayList<>();
+
+        for (SecurityPreCheckinEntity p : preCheckins) {
+            if (p.getGeneratedFolio() != null && !p.getGeneratedFolio().isBlank()) {
+                processedFolios.add(p.getGeneratedFolio().trim());
+            }
+            result.add(mapToResponseWithWarehouseStatus(p));
+        }
+
+        // 2. Unificar todas las recepciones activas en planta de wms.warehouse_receptions
+        List<WarehouseReceptionEntity> activeReceptions = warehouseReceptionRepositoryPort.findAll(
+                WarehouseReceptionSpecification.withFilters(organizationId, branchId, null, null)
+        );
+
+        for (WarehouseReceptionEntity rec : activeReceptions) {
+            if (rec.getStatus() == ReceptionStatus.CANCELLED) {
+                continue;
+            }
+            String folio = rec.getFolio() != null ? rec.getFolio().trim() : "";
+            if (folio.isEmpty() || processedFolios.contains(folio)) {
+                continue;
+            }
+
+            // Verificar si la unidad ya realizó su check-out de caseta previamente
+            Optional<SecurityPreCheckinEntity> historyPass = preCheckinJpaRepository.findByGeneratedFolio(folio);
+            if (historyPass.isPresent() && "COMPLETED_EXIT".equalsIgnoreCase(historyPass.get().getStatus())) {
+                continue;
+            }
+
+            processedFolios.add(folio);
+            result.add(mapReceptionToPassResponse(rec));
+        }
+
+        // 3. Unificar todos los embarques (outbounds) activos en planta de wms.warehouse_outbounds
+        List<WarehouseOutboundEntity> activeOutbounds = warehouseOutboundRepositoryPort.findAll(
+                WarehouseOutboundSpecification.withFilters(organizationId, branchId, null, null)
+        );
+
+        for (WarehouseOutboundEntity out : activeOutbounds) {
+            if (out.getStatus() == OutboundStatus.CANCELLED) {
+                continue;
+            }
+            String folio = out.getFolio() != null ? out.getFolio().trim() : "";
+            if (folio.isEmpty() || processedFolios.contains(folio)) {
+                continue;
+            }
+
+            Optional<SecurityPreCheckinEntity> historyPass = preCheckinJpaRepository.findByGeneratedFolio(folio);
+            if (historyPass.isPresent() && "COMPLETED_EXIT".equalsIgnoreCase(historyPass.get().getStatus())) {
+                continue;
+            }
+
+            processedFolios.add(folio);
+            result.add(mapOutboundToPassResponse(out));
+        }
+
+        return result;
     }
 
     @Override
@@ -471,29 +528,112 @@ public class SecurityGateService implements SecurityGateUseCase {
         }
 
         String search = tokenOrFolio.trim().toUpperCase();
-        SecurityPreCheckinEntity entity = preCheckinJpaRepository.findByToken(search)
-                .or(() -> preCheckinJpaRepository.findByGeneratedFolio(tokenOrFolio.trim()))
-                .orElseThrow(() -> new EntityNotFoundException("No se encontró el pase o folio de caseta: " + tokenOrFolio));
+        Optional<SecurityPreCheckinEntity> existingPass = preCheckinJpaRepository.findByToken(search)
+                .or(() -> preCheckinJpaRepository.findByGeneratedFolio(tokenOrFolio.trim()));
 
         LocalTime exitTime = request.getDepartureTime() != null ? request.getDepartureTime().truncatedTo(ChronoUnit.SECONDS) : LocalTime.now().truncatedTo(ChronoUnit.SECONDS);
-        entity.setDepartureTime(exitTime);
-        if (request.getExitObservations() != null) {
-            entity.setExitObservations(request.getExitObservations());
-        }
-        if (request.getExitSealNumbers() != null && !request.getExitSealNumbers().isEmpty()) {
-            entity.setExitSealNumbers(request.getExitSealNumbers());
-        }
-        if (request.getGuardNotes() != null && !request.getGuardNotes().isBlank()) {
-            entity.setGuardNotes((entity.getGuardNotes() != null ? entity.getGuardNotes() + " | " : "") + request.getGuardNotes());
-        }
-
         String currentUser = securityAuditHelper.getCurrentUsername() != null ? securityAuditHelper.getCurrentUsername() : "guardia";
-        entity.setExitedBy(currentUser);
-        entity.setExitedAt(OffsetDateTime.now());
-        entity.setStatus("COMPLETED_EXIT");
 
-        SecurityPreCheckinEntity saved = preCheckinJpaRepository.save(entity);
-        return mapToResponseWithWarehouseStatus(saved);
+        if (existingPass.isPresent()) {
+            SecurityPreCheckinEntity entity = existingPass.get();
+            entity.setDepartureTime(exitTime);
+            if (request.getExitObservations() != null) {
+                entity.setExitObservations(request.getExitObservations());
+            }
+            if (request.getExitSealNumbers() != null && !request.getExitSealNumbers().isEmpty()) {
+                entity.setExitSealNumbers(request.getExitSealNumbers());
+            }
+            if (request.getGuardNotes() != null && !request.getGuardNotes().isBlank()) {
+                entity.setGuardNotes((entity.getGuardNotes() != null ? entity.getGuardNotes() + " | " : "") + request.getGuardNotes());
+            }
+
+            entity.setExitedBy(currentUser);
+            entity.setExitedAt(OffsetDateTime.now());
+            entity.setStatus("COMPLETED_EXIT");
+
+            SecurityPreCheckinEntity saved = preCheckinJpaRepository.save(entity);
+            return mapToResponseWithWarehouseStatus(saved);
+        }
+
+        // Si no existía pase de pre-checkin, buscar directamente en recepciones o embarques y registrar la salida
+        Optional<WarehouseReceptionEntity> receptionOpt = warehouseReceptionRepositoryPort.findByFolio(tokenOrFolio.trim());
+        if (receptionOpt.isPresent()) {
+            WarehouseReceptionEntity rec = receptionOpt.get();
+            SecurityPreCheckinEntity newEntity = SecurityPreCheckinEntity.builder()
+                    .token("OUT-" + rec.getFolio())
+                    .organization(rec.getOrganization())
+                    .branch(rec.getBranch())
+                    .status("COMPLETED_EXIT")
+                    .operationType("DESCARGA")
+                    .client(rec.getClient())
+                    .clientCode(rec.getClient() != null ? rec.getClient().getExternalId() : null)
+                    .clientName(rec.getClient() != null ? rec.getClient().getName() : null)
+                    .carrier(rec.getCarrier())
+                    .carrierLine(rec.getCarrier() != null ? rec.getCarrier().getName() : null)
+                    .driverName(rec.getDriverName())
+                    .tractorPlates(rec.getTractorPlates())
+                    .boxPlates(rec.getBoxPlates())
+                    .docNumber(rec.getDocNumber())
+                    .docDate(rec.getDocDate())
+                    .receptionTime(rec.getReceptionTime())
+                    .ramp(rec.getRamp())
+                    .rampNumber(parseRampNumber(rec.getRamp()))
+                    .rampCode(rec.getRamp() != null ? rec.getRamp().getCode() : null)
+                    .generatedFolio(rec.getFolio())
+                    .departureTime(exitTime)
+                    .exitObservations(request.getExitObservations())
+                    .exitSealNumbers(request.getExitSealNumbers())
+                    .guardNotes(request.getGuardNotes())
+                    .exitedBy(currentUser)
+                    .exitedAt(OffsetDateTime.now())
+                    .processedBy(currentUser)
+                    .processedAt(rec.getCreatedAt())
+                    .expiresAt(OffsetDateTime.now().plusDays(1))
+                    .build();
+            SecurityPreCheckinEntity saved = preCheckinJpaRepository.save(newEntity);
+            return mapToResponseWithWarehouseStatus(saved);
+        }
+
+        Optional<WarehouseOutboundEntity> outboundOpt = warehouseOutboundRepositoryPort.findByFolio(tokenOrFolio.trim());
+        if (outboundOpt.isPresent()) {
+            WarehouseOutboundEntity out = outboundOpt.get();
+            SecurityPreCheckinEntity newEntity = SecurityPreCheckinEntity.builder()
+                    .token("OUT-" + out.getFolio())
+                    .organization(out.getOrganization())
+                    .branch(out.getBranch())
+                    .status("COMPLETED_EXIT")
+                    .operationType("CARGA")
+                    .client(out.getClient())
+                    .clientCode(out.getClient() != null ? out.getClient().getExternalId() : null)
+                    .clientName(out.getClient() != null ? out.getClient().getName() : null)
+                    .carrier(out.getCarrier())
+                    .carrierLine(out.getCarrier() != null ? out.getCarrier().getName() : null)
+                    .driverName(out.getDriverName())
+                    .tractorPlates(out.getTractorPlates())
+                    .boxPlates(out.getBoxPlates())
+                    .transportType(out.getTransportType())
+                    .economicNumber(out.getEconomicNumber())
+                    .boxEconomicNumber(out.getBoxEconomicNumber())
+                    .docNumber(out.getRemisionNo())
+                    .ramp(out.getRamp())
+                    .rampNumber(parseRampNumber(out.getRamp()))
+                    .rampCode(out.getRamp() != null ? out.getRamp().getCode() : null)
+                    .generatedFolio(out.getFolio())
+                    .departureTime(exitTime)
+                    .exitObservations(request.getExitObservations())
+                    .exitSealNumbers(request.getExitSealNumbers())
+                    .guardNotes(request.getGuardNotes())
+                    .exitedBy(currentUser)
+                    .exitedAt(OffsetDateTime.now())
+                    .processedBy(currentUser)
+                    .processedAt(out.getCreatedAt())
+                    .expiresAt(OffsetDateTime.now().plusDays(1))
+                    .build();
+            SecurityPreCheckinEntity saved = preCheckinJpaRepository.save(newEntity);
+            return mapToResponseWithWarehouseStatus(saved);
+        }
+
+        throw new EntityNotFoundException("No se encontró el pase o folio de caseta: " + tokenOrFolio);
     }
 
     @Override
@@ -508,6 +648,77 @@ public class SecurityGateService implements SecurityGateUseCase {
         }
 
         preCheckinJpaRepository.delete(entity);
+    }
+
+    private PassResponse mapReceptionToPassResponse(WarehouseReceptionEntity rec) {
+        List<String> seals = rec.getSeals() != null
+                ? rec.getSeals().stream().map(WarehouseReceptionSealEntity::getSealNumber).toList()
+                : Collections.emptyList();
+
+        return PassResponse.builder()
+                .id(rec.getId())
+                .token(rec.getFolio())
+                .organizationId(rec.getOrganization() != null ? rec.getOrganization().getId() : null)
+                .branchId(rec.getBranch() != null ? rec.getBranch().getId() : null)
+                .status("COMPLETED")
+                .operationType("DESCARGA")
+                .clientId(rec.getClient() != null ? rec.getClient().getId() : null)
+                .clientCode(rec.getClient() != null ? rec.getClient().getExternalId() : null)
+                .clientName(rec.getClient() != null ? rec.getClient().getName() : null)
+                .carrierId(rec.getCarrier() != null ? rec.getCarrier().getId() : null)
+                .carrierLine(rec.getCarrier() != null ? rec.getCarrier().getName() : null)
+                .driverName(rec.getDriverName())
+                .tractorPlates(rec.getTractorPlates())
+                .boxPlates(rec.getBoxPlates())
+                .sealNumbers(seals)
+                .docNumber(rec.getDocNumber())
+                .docDate(rec.getDocDate())
+                .receptionTime(rec.getReceptionTime())
+                .rampId(rec.getRamp() != null ? rec.getRamp().getId() : null)
+                .rampNumber(parseRampNumber(rec.getRamp()))
+                .rampCode(rec.getRamp() != null ? rec.getRamp().getCode() : null)
+                .generatedFolio(rec.getFolio())
+                .observations(rec.getObservations())
+                .warehouseStatus(rec.getStatus() != null ? rec.getStatus().name() : "REGISTERED")
+                .isReadyForExit(rec.getStatus() == ReceptionStatus.COMPLETED)
+                .createdAt(rec.getCreatedAt())
+                .build();
+    }
+
+    private PassResponse mapOutboundToPassResponse(WarehouseOutboundEntity out) {
+        List<String> seals = (out.getSealNumber() != null && !out.getSealNumber().isBlank())
+                ? List.of(out.getSealNumber().split("\\s*,\\s*"))
+                : Collections.emptyList();
+
+        return PassResponse.builder()
+                .id(out.getId())
+                .token(out.getFolio())
+                .organizationId(out.getOrganization() != null ? out.getOrganization().getId() : null)
+                .branchId(out.getBranch() != null ? out.getBranch().getId() : null)
+                .status("COMPLETED")
+                .operationType("CARGA")
+                .clientId(out.getClient() != null ? out.getClient().getId() : null)
+                .clientCode(out.getClient() != null ? out.getClient().getExternalId() : null)
+                .clientName(out.getClient() != null ? out.getClient().getName() : null)
+                .carrierId(out.getCarrier() != null ? out.getCarrier().getId() : null)
+                .carrierLine(out.getCarrier() != null ? out.getCarrier().getName() : null)
+                .driverName(out.getDriverName())
+                .tractorPlates(out.getTractorPlates())
+                .boxPlates(out.getBoxPlates())
+                .transportType(out.getTransportType())
+                .economicNumber(out.getEconomicNumber())
+                .boxEconomicNumber(out.getBoxEconomicNumber())
+                .sealNumbers(seals)
+                .docNumber(out.getRemisionNo())
+                .rampId(out.getRamp() != null ? out.getRamp().getId() : null)
+                .rampNumber(parseRampNumber(out.getRamp()))
+                .rampCode(out.getRamp() != null ? out.getRamp().getCode() : null)
+                .generatedFolio(out.getFolio())
+                .observations(out.getObservations())
+                .warehouseStatus(out.getStatus() != null ? out.getStatus().name() : "REGISTERED")
+                .isReadyForExit(out.getStatus() == OutboundStatus.COMPLETED)
+                .createdAt(out.getCreatedAt())
+                .build();
     }
 
     private PassResponse mapToResponse(SecurityPreCheckinEntity entity) {
@@ -583,6 +794,27 @@ public class SecurityGateService implements SecurityGateUseCase {
                 .expiresAt(entity.getExpiresAt())
                 .createdAt(entity.getCreatedAt())
                 .build();
+    }
+
+    private Integer parseRampNumber(LocationEntity ramp) {
+        if (ramp == null) return null;
+        if (ramp.getCode() != null) {
+            String digits = ramp.getCode().replaceAll("\\D+", "");
+            if (!digits.isBlank()) {
+                try {
+                    return Integer.parseInt(digits);
+                } catch (NumberFormatException ignored) {}
+            }
+        }
+        if (ramp.getName() != null) {
+            String digits = ramp.getName().replaceAll("\\D+", "");
+            if (!digits.isBlank()) {
+                try {
+                    return Integer.parseInt(digits);
+                } catch (NumberFormatException ignored) {}
+            }
+        }
+        return null;
     }
 
     private String generateUniqueToken() {

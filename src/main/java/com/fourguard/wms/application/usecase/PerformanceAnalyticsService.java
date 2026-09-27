@@ -1,6 +1,7 @@
 package com.fourguard.wms.application.usecase;
 
-import com.fourguard.wms.application.dto.response.performance.PerformanceMetricsDto.*;
+import com.fourguard.wms.application.dto.response.performance.PerformanceMetricsDto;
+import static com.fourguard.wms.application.dto.response.performance.PerformanceMetricsDto.*;
 import com.fourguard.wms.infrastructure.persistence.entity.*;
 import com.fourguard.wms.infrastructure.persistence.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -24,13 +25,11 @@ public class PerformanceAnalyticsService {
     private final ShiftJpaRepository shiftJpaRepository;
     private final ForkliftOperatorJpaRepository forkliftOperatorJpaRepository;
     private final WarehouseReceptionJpaRepository warehouseReceptionJpaRepository;
-    private final WarehouseReceptionPalletJpaRepository warehouseReceptionPalletJpaRepository;
     private final WarehouseOutboundJpaRepository warehouseOutboundJpaRepository;
     private final WarehouseTransferJpaRepository warehouseTransferJpaRepository;
     private final LocationJpaRepository locationJpaRepository;
     private final IncidenceJpaRepository incidenceJpaRepository;
     private final SecurityPreCheckinJpaRepository securityPreCheckinJpaRepository;
-    private final CarrierJpaRepository carrierJpaRepository;
     private final PerformanceKpiJpaRepository performanceKpiJpaRepository;
 
     /**
@@ -48,7 +47,7 @@ public class PerformanceAnalyticsService {
         String branchName = "Todas las Sucursales";
         if (branchId != null) {
             branchName = branchJpaRepository.findById(branchId)
-                    .map(BranchEntity::getName)
+                    .map(b -> b.getName())
                     .orElse("Sucursal Seleccionada");
         }
 
@@ -570,7 +569,11 @@ public class PerformanceAnalyticsService {
                     .build());
         }
 
-        double avgTurnaround = driverList.isEmpty() ? 3.4 : driverList.stream().mapToDouble(DriverPerformanceDetail::getAvgTurnaroundHours).average().orElse(3.4);
+        double avgTurnaround = driverList.isEmpty() ? 3.4 : driverList.stream()
+                .filter(d -> d != null && d.getAvgTurnaroundHours() != null)
+                .mapToDouble(d -> d.getAvgTurnaroundHours())
+                .average()
+                .orElse(3.4);
 
         return CircuitoDelicadoSummaryResponse.builder()
                 .totalTripsMonth(totalTrips)
@@ -776,33 +779,34 @@ public class PerformanceAnalyticsService {
     public OperationalUserTargetsDto saveUserTargets(UUID organizationId, OperationalUserTargetsDto dto, String username) {
         List<PerformanceKpiEntity> kpis = performanceKpiJpaRepository.findByIsEnabledTrue();
 
-        for (PerformanceKpiEntity k : kpis) {
-            if (k.getName() != null) {
-                String n = k.getName().toLowerCase();
-                if ((n.contains("ocupación") || n.contains("ocupacion")) && dto.getTargetOccupancyPercentage() != null) {
-                    k.setTargetThreshold(dto.getTargetOccupancyPercentage());
-                    k.setUpdatedByUser(username);
-                }
-                if ((n.contains("exactitud") || n.contains("ira")) && dto.getTargetIraPercentage() != null) {
-                    k.setTargetThreshold(dto.getTargetIraPercentage());
-                    k.setUpdatedByUser(username);
-                }
-                if ((n.contains("puntualidad") || n.contains("otif")) && dto.getTargetOtifPercentage() != null) {
-                    k.setTargetThreshold(dto.getTargetOtifPercentage());
-                    k.setUpdatedByUser(username);
-                }
-                if (n.contains("descarga") && dto.getTargetInboundUnloadMinutes() != null) {
-                    k.setTargetThreshold(dto.getTargetInboundUnloadMinutes());
-                    k.setUpdatedByUser(username);
-                }
-                if ((n.contains("picking") || n.contains("productividad")) && dto.getTargetForkliftPph() != null) {
-                    k.setTargetThreshold(dto.getTargetForkliftPph());
-                    k.setUpdatedByUser(username);
+        if (kpis != null && !kpis.isEmpty()) {
+            for (PerformanceKpiEntity k : kpis) {
+                if (k != null && k.getName() != null) {
+                    String n = k.getName().toLowerCase();
+                    if ((n.contains("ocupación") || n.contains("ocupacion")) && dto.getTargetOccupancyPercentage() != null) {
+                        k.setTargetThreshold(dto.getTargetOccupancyPercentage());
+                        k.setUpdatedByUser(username);
+                    }
+                    if ((n.contains("exactitud") || n.contains("ira")) && dto.getTargetIraPercentage() != null) {
+                        k.setTargetThreshold(dto.getTargetIraPercentage());
+                        k.setUpdatedByUser(username);
+                    }
+                    if ((n.contains("puntualidad") || n.contains("otif")) && dto.getTargetOtifPercentage() != null) {
+                        k.setTargetThreshold(dto.getTargetOtifPercentage());
+                        k.setUpdatedByUser(username);
+                    }
+                    if (n.contains("descarga") && dto.getTargetInboundUnloadMinutes() != null) {
+                        k.setTargetThreshold(dto.getTargetInboundUnloadMinutes());
+                        k.setUpdatedByUser(username);
+                    }
+                    if ((n.contains("picking") || n.contains("productividad")) && dto.getTargetForkliftPph() != null) {
+                        k.setTargetThreshold(dto.getTargetForkliftPph());
+                        k.setUpdatedByUser(username);
+                    }
                 }
             }
+            performanceKpiJpaRepository.saveAll(kpis);
         }
-
-        performanceKpiJpaRepository.saveAll(kpis);
 
         dto.setLastUpdatedBy(username != null ? username : "admin");
         dto.setLastUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC));

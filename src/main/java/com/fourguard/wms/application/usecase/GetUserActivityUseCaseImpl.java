@@ -68,13 +68,13 @@ public class GetUserActivityUseCaseImpl implements GetUserActivityUseCase {
 
         // 3. Batch fetch user information for enrichment
         List<UUID> userIds = logs.stream()
-                .map(AuditLogEntity::getUserId)
+                .map(log -> log.getUserId())
                 .filter(Objects::nonNull)
                 .distinct()
                 .collect(Collectors.toList());
 
         Map<UUID, String> usernameMap = userRepositoryPort.findAllById(userIds).stream()
-                .collect(Collectors.toMap(UserEntity::getId, UserEntity::getUsername));
+                .collect(Collectors.toMap(user -> user.getId(), user -> user.getUsername()));
 
         // 4. Map to response DTOs
         return logs.stream()
