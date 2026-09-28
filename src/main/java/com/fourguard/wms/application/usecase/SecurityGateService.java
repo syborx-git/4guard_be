@@ -475,7 +475,7 @@ public class SecurityGateService implements SecurityGateUseCase {
 
         List<String> finalSeals = (entity.getSealNumbers() != null && !entity.getSealNumbers().isEmpty())
                 ? entity.getSealNumbers()
-                : List.of("SEAL-4G-001");
+                : ("CARGA".equalsIgnoreCase(opType) ? List.of("PENDIENTE_ANDEN") : List.of("SEAL-4G-001"));
 
         if ("CARGA".equalsIgnoreCase(opType)) {
             // Register Outbound in wms.warehouse_outbounds (Folio SAL-YYYY-XXXXXX)
@@ -500,7 +500,10 @@ public class SecurityGateService implements SecurityGateUseCase {
             outReq.setBoxPlates(entity.getBoxPlates() != null ? entity.getBoxPlates() : "S/P");
             outReq.setEconomicNumber(entity.getNoEcoTractor());
             outReq.setBoxEconomicNumber(entity.getBoxEconomicNumber());
-            outReq.setSealNumber(String.join(", ", finalSeals));
+            String outboundSeal = (entity.getSealNumbers() != null && !entity.getSealNumbers().isEmpty())
+                    ? String.join(", ", entity.getSealNumbers())
+                    : "PENDIENTE_ANDEN";
+            outReq.setSealNumber(outboundSeal);
             outReq.setRemisionNo(entity.getDocNumber() != null ? entity.getDocNumber() : "CP-" + entity.getToken());
             outReq.setObservations(entity.getObservations());
             outReq.setStatus("REGISTERED");

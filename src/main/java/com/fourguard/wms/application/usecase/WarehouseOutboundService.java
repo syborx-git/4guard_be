@@ -334,18 +334,40 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
 
         WarehouseOutboundEntity saved = outboundRepositoryPort.save(outbound);
 
-        logAudit(saved.getId(), "SALIDA_REGISTRADA",
-                Map.of(),
-                Map.of("folio", folio,
-                       "status", targetStatus.name(),
-                       "client", client.getName(),
-                       "destination", destName != null ? destName : "N/A",
-                       "carrier", carrier != null ? carrier.getName() : "N/A",
-                       "ramp", ramp != null ? (ramp.getCode() != null ? ramp.getCode() : (ramp.getName() != null ? ramp.getName() : "Rampa")) : "N/A",
-                       "forkliftOperator", operator != null ? operator.getFullName() : (request.getForkliftOperatorName() != null ? request.getForkliftOperatorName() : "N/A"),
-                       "sealNumber", request.getSealNumber() != null ? request.getSealNumber() : "N/A",
-                       "totalPallets", String.valueOf(itemsToDispatch.size()),
-                       "totalPieces", String.valueOf(totalPieces)));
+        Map<String, String> initialData = new LinkedHashMap<>();
+        initialData.put("folio", folio);
+        initialData.put("status", targetStatus.name());
+        initialData.put("client", client.getName());
+        if (destName != null && !destName.isBlank() && !"N/A".equalsIgnoreCase(destName)) {
+            initialData.put("destination", destName);
+        }
+        if (carrier != null) {
+            initialData.put("carrier", carrier.getName());
+        }
+        if (request.getDriverName() != null && !request.getDriverName().isBlank()) {
+            initialData.put("driver", request.getDriverName());
+        }
+        if (request.getTractorPlates() != null && !request.getTractorPlates().isBlank()) {
+            initialData.put("tractorPlates", request.getTractorPlates());
+        }
+        if (request.getBoxPlates() != null && !request.getBoxPlates().isBlank()) {
+            initialData.put("boxPlates", request.getBoxPlates());
+        }
+        if (ramp != null) {
+            initialData.put("ramp", ramp.getCode() != null ? ramp.getCode() : (ramp.getName() != null ? ramp.getName() : "Rampa"));
+        }
+        if (operator != null) {
+            initialData.put("forkliftOperator", operator.getFullName());
+        }
+        if (request.getSealNumber() != null && !request.getSealNumber().isBlank() && !"PENDIENTE_ANDEN".equals(request.getSealNumber())) {
+            initialData.put("sealNumber", request.getSealNumber());
+        }
+        if (targetStatus == OutboundStatus.COMPLETED) {
+            initialData.put("totalPallets", String.valueOf(itemsToDispatch.size()));
+            initialData.put("totalPieces", String.valueOf(totalPieces));
+        }
+
+        logAudit(saved.getId(), "SALIDA_REGISTRADA", Map.of(), initialData);
 
         return outboundMapper.toResponse(saved);
     }
@@ -433,10 +455,13 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
                 }
             }
             if (ramp != null) {
-                String oldRamp = outbound.getRamp() != null ? (outbound.getRamp().getCode() != null ? outbound.getRamp().getCode() : outbound.getRamp().getName()) : "N/A";
-                outbound.setRamp(ramp);
-                oldValues.put("ramp", oldRamp);
-                newValues.put("ramp", ramp.getCode() != null ? ramp.getCode() : (ramp.getName() != null ? ramp.getName() : "Rampa"));
+                String oldRamp = outbound.getRamp() != null ? (outbound.getRamp().getCode() != null ? outbound.getRamp().getCode() : outbound.getRamp().getName()) : "Sin asignar";
+                String newRamp = ramp.getCode() != null ? ramp.getCode() : (ramp.getName() != null ? ramp.getName() : "Rampa");
+                if (!Objects.equals(oldRamp, newRamp)) {
+                    outbound.setRamp(ramp);
+                    oldValues.put("ramp", oldRamp);
+                    newValues.put("ramp", newRamp);
+                }
             }
         }
 
@@ -444,80 +469,195 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
         if (request.getForkliftOperatorId() != null) {
             ForkliftOperatorEntity operator = forkliftOperatorRepositoryPort.findById(request.getForkliftOperatorId()).orElse(null);
             if (operator != null) {
-                String oldOp = outbound.getForkliftOperator() != null ? outbound.getForkliftOperator().getFullName() : "N/A";
-                outbound.setForkliftOperator(operator);
-                oldValues.put("forkliftOperator", oldOp);
-                newValues.put("forkliftOperator", operator.getFullName());
+                String oldOp = outbound.getForkliftOperator() != null ? outbound.getForkliftOperator().getFullName() : "Sin asignar";
+                String newOp = operator.getFullName();
+                if (!Objects.equals(oldOp, newOp)) {
+                    outbound.setForkliftOperator(operator);
+                    oldValues.put("forkliftOperator", oldOp);
+                    newValues.put("forkliftOperator", newOp);
+                }
             }
         }
 
         // 4. Vehicle & Driver data
         if (request.getDriverName() != null && !request.getDriverName().isBlank()) {
-            oldValues.put("driverName", outbound.getDriverName());
-            newValues.put("driverName", request.getDriverName());
-            outbound.setDriverName(request.getDriverName());
+            String oldDriver = outbound.getDriverName();
+            String newDriver = request.getDriverName().trim();
+            if (!Objects.equals(oldDriver, newDriver)) {
+                oldValues.put("driverName", oldDriver != null ? oldDriver : "Sin especificar");
+                newValues.put("driverName", newDriver);
+                outbound.setDriverName(newDriver);
+            }
         }
         if (request.getTractorPlates() != null && !request.getTractorPlates().isBlank()) {
-            oldValues.put("tractorPlates", outbound.getTractorPlates());
-            newValues.put("tractorPlates", request.getTractorPlates());
-            outbound.setTractorPlates(request.getTractorPlates());
+            String oldTractor = outbound.getTractorPlates();
+            String newTractor = request.getTractorPlates().trim();
+            if (!Objects.equals(oldTractor, newTractor)) {
+                oldValues.put("tractorPlates", oldTractor != null ? oldTractor : "Sin especificar");
+                newValues.put("tractorPlates", newTractor);
+                outbound.setTractorPlates(newTractor);
+            }
         }
         if (request.getBoxPlates() != null && !request.getBoxPlates().isBlank()) {
-            oldValues.put("boxPlates", outbound.getBoxPlates());
-            newValues.put("boxPlates", request.getBoxPlates());
-            outbound.setBoxPlates(request.getBoxPlates());
+            String oldBox = outbound.getBoxPlates();
+            String newBox = request.getBoxPlates().trim();
+            if (!Objects.equals(oldBox, newBox)) {
+                oldValues.put("boxPlates", oldBox != null ? oldBox : "Sin especificar");
+                newValues.put("boxPlates", newBox);
+                outbound.setBoxPlates(newBox);
+            }
         }
         if (request.getEconomicNumber() != null) {
-            outbound.setEconomicNumber(request.getEconomicNumber());
+            String oldEco = outbound.getEconomicNumber() != null ? outbound.getEconomicNumber().trim() : "";
+            String newEco = request.getEconomicNumber().trim();
+            if (!Objects.equals(oldEco, newEco) && (!oldEco.isEmpty() || !newEco.isEmpty())) {
+                oldValues.put("economicNumber", !oldEco.isEmpty() ? oldEco : "Sin especificar");
+                newValues.put("economicNumber", !newEco.isEmpty() ? newEco : "Sin especificar");
+                outbound.setEconomicNumber(!newEco.isEmpty() ? newEco : null);
+            }
         }
         if (request.getBoxEconomicNumber() != null) {
-            outbound.setBoxEconomicNumber(request.getBoxEconomicNumber());
+            String oldBoxEco = outbound.getBoxEconomicNumber() != null ? outbound.getBoxEconomicNumber().trim() : "";
+            String newBoxEco = request.getBoxEconomicNumber().trim();
+            if (!Objects.equals(oldBoxEco, newBoxEco) && (!oldBoxEco.isEmpty() || !newBoxEco.isEmpty())) {
+                oldValues.put("boxEconomicNumber", !oldBoxEco.isEmpty() ? oldBoxEco : "Sin especificar");
+                newValues.put("boxEconomicNumber", !newBoxEco.isEmpty() ? newBoxEco : "Sin especificar");
+                outbound.setBoxEconomicNumber(!newBoxEco.isEmpty() ? newBoxEco : null);
+            }
         }
 
         // 5. Seal number
         if (request.getSealNumber() != null && !request.getSealNumber().isBlank()) {
-            oldValues.put("sealNumber", outbound.getSealNumber());
-            newValues.put("sealNumber", request.getSealNumber());
-            outbound.setSealNumber(request.getSealNumber());
+            String oldSeal = outbound.getSealNumber();
+            String newSeal = request.getSealNumber().trim();
+            if (!Objects.equals(oldSeal, newSeal)) {
+                oldValues.put("sealNumber", oldSeal != null ? oldSeal : "Sin especificar");
+                newValues.put("sealNumber", newSeal);
+                outbound.setSealNumber(newSeal);
+            }
         }
 
-        // 6. Destination update
+        // 6. Destination update (con resolución flexible por ID y por nombre en catálogo de destinos)
+        ClientDestinationEntity dest = null;
         if (request.getDestinationId() != null) {
-            ClientDestinationEntity dest = clientDestinationRepositoryPort.findById(request.getDestinationId()).orElse(null);
-            if (dest != null) {
-                oldValues.put("destination", outbound.getDestinationName());
-                newValues.put("destination", dest.getPlantName());
-                outbound.setDestination(dest);
-                outbound.setDestinationName(dest.getPlantName());
-                outbound.setDestinationAddress(dest.getFullAddress() != null ? dest.getFullAddress() : "");
+            dest = clientDestinationRepositoryPort.findById(request.getDestinationId()).orElse(null);
+        }
+        if (dest == null && request.getDestinationName() != null && !request.getDestinationName().isBlank()) {
+            String searchName = request.getDestinationName().trim();
+            dest = clientDestinationRepositoryPort.findAll().stream()
+                    .filter(d -> (d.getPlantName() != null && d.getPlantName().equalsIgnoreCase(searchName)) ||
+                                 (d.getDestinationCode() != null && d.getDestinationCode().equalsIgnoreCase(searchName)))
+                    .findFirst()
+                    .orElse(null);
+        }
+        String newDestName = dest != null ? dest.getPlantName() : (request.getDestinationName() != null ? request.getDestinationName().trim() : null);
+        String newDestAddress = (dest != null && dest.getFullAddress() != null && !dest.getFullAddress().isBlank())
+                ? dest.getFullAddress()
+                : (request.getDestinationAddress() != null ? request.getDestinationAddress().trim() : null);
+
+        if (newDestName != null && !newDestName.isBlank()) {
+            String oldDest = outbound.getDestinationName();
+            if (oldDest == null && outbound.getDestination() != null) {
+                oldDest = outbound.getDestination().getPlantName();
             }
-        } else if (request.getDestinationName() != null && !request.getDestinationName().isBlank()) {
-            oldValues.put("destination", outbound.getDestinationName());
-            newValues.put("destination", request.getDestinationName());
-            outbound.setDestinationName(request.getDestinationName());
-            if (request.getDestinationAddress() != null) {
-                outbound.setDestinationAddress(request.getDestinationAddress());
+            String oldDestClean = (oldDest != null && !oldDest.isBlank() && !"Sin especificar".equalsIgnoreCase(oldDest)) ? oldDest.trim() : "";
+            String newDestClean = newDestName.trim();
+
+            if (!oldDestClean.equalsIgnoreCase(newDestClean)) {
+                oldValues.put("destination", !oldDestClean.isEmpty() ? oldDestClean : "Sin especificar");
+                newValues.put("destination", newDestClean);
+                outbound.setDestination(dest);
+                outbound.setDestinationName(newDestClean);
+                if (newDestAddress != null && !newDestAddress.isBlank()) {
+                    outbound.setDestinationAddress(newDestAddress);
+                }
+            } else {
+                if (dest != null) outbound.setDestination(dest);
+                outbound.setDestinationName(newDestClean);
+                if (newDestAddress != null && !newDestAddress.isBlank()) {
+                    outbound.setDestinationAddress(newDestAddress);
+                }
             }
         }
 
         // 7. Carrier update
+        CarrierEntity carrier = null;
         if (request.getCarrierId() != null) {
-            CarrierEntity carrier = carrierRepositoryPort.findById(request.getCarrierId()).orElse(null);
-            if (carrier != null) {
-                oldValues.put("carrier", outbound.getCarrier() != null ? outbound.getCarrier().getName() : outbound.getCarrierName());
-                newValues.put("carrier", carrier.getName());
+            carrier = carrierRepositoryPort.findById(request.getCarrierId()).orElse(null);
+        } else if (request.getCarrierName() != null && !request.getCarrierName().isBlank() && outbound.getOrganization() != null) {
+            List<CarrierEntity> orgCarriers = carrierRepositoryPort.findByOrganizationId(outbound.getOrganization().getId());
+            String searchName = request.getCarrierName().trim();
+            carrier = orgCarriers.stream()
+                    .filter(c -> (c.getName() != null && c.getName().equalsIgnoreCase(searchName)) ||
+                                 (c.getTradeName() != null && c.getTradeName().equalsIgnoreCase(searchName)))
+                    .findFirst()
+                    .orElse(null);
+        }
+        if (carrier != null) {
+            String oldCarrier = outbound.getCarrier() != null ? outbound.getCarrier().getName() : "Sin especificar";
+            String newCarrier = carrier.getName();
+            if (!Objects.equals(oldCarrier, newCarrier)) {
+                oldValues.put("carrier", oldCarrier);
+                newValues.put("carrier", newCarrier);
                 outbound.setCarrier(carrier);
-                outbound.setCarrierName(carrier.getName());
             }
-        } else if (request.getCarrierName() != null && !request.getCarrierName().isBlank()) {
-            oldValues.put("carrier", outbound.getCarrierName());
-            newValues.put("carrier", request.getCarrierName());
-            outbound.setCarrierName(request.getCarrierName());
         }
 
         // 8. Observations
-        if (request.getObservations() != null) {
+        if (request.getObservations() != null && !Objects.equals(outbound.getObservations(), request.getObservations())) {
+            oldValues.put("observations", outbound.getObservations() != null ? outbound.getObservations() : "Sin especificar");
+            newValues.put("observations", request.getObservations());
             outbound.setObservations(request.getObservations());
+        }
+
+        // 9. Pallets / Items assignment and update
+        if (request.getSelectedItemIds() != null) {
+            List<InventoryItemEntity> itemsToDispatch = new ArrayList<>();
+            if (!request.getSelectedItemIds().isEmpty()) {
+                itemsToDispatch = inventoryItemJpaRepository.findAllByIdInWithDetails(request.getSelectedItemIds());
+                for (InventoryItemEntity item : itemsToDispatch) {
+                    if (item.getState() != InventoryState.AVAILABLE && item.getState() != InventoryState.EXPIRED && item.getState() != InventoryState.DISPATCHED) {
+                        throw new ValidationException("La tarima " + (item.getSscc() != null ? item.getSscc() : item.getExternalUa()) + " no está disponible para despacho (Estado: " + item.getState() + ")");
+                    }
+                }
+            }
+
+            if (outbound.getItems() != null) {
+                outbound.getItems().clear();
+            } else {
+                outbound.setItems(new ArrayList<>());
+            }
+
+            Set<UUID> distinctSkuIds = itemsToDispatch.stream()
+                    .filter(i -> i.getSku() != null)
+                    .map(i -> i.getSku().getId())
+                    .collect(Collectors.toSet());
+            double totalPieces = itemsToDispatch.stream()
+                    .mapToDouble(i -> i.getQuantity() != null ? i.getQuantity().doubleValue() : 0.0)
+                    .sum();
+
+            for (InventoryItemEntity item : itemsToDispatch) {
+                String locCode = item.getLocation() != null ? item.getLocation().getCode() : "N/A";
+                outbound.getItems().add(WarehouseOutboundItemEntity.builder()
+                        .outbound(outbound)
+                        .item(item)
+                        .pieces(item.getQuantity() != null ? item.getQuantity() : BigDecimal.ZERO)
+                        .palletCode(item.getSscc() != null ? item.getSscc() : item.getExternalUa())
+                        .lotNumber(item.getBatchNumber())
+                        .expirationDate(item.getExpirationDate())
+                        .locationCode(locCode)
+                        .build());
+            }
+
+            int oldPallets = outbound.getTotalPallets() != null ? outbound.getTotalPallets() : 0;
+            if (oldPallets != itemsToDispatch.size()) {
+                oldValues.put("totalPallets", oldPallets);
+                newValues.put("totalPallets", itemsToDispatch.size());
+            }
+
+            outbound.setTotalPallets(itemsToDispatch.size());
+            outbound.setTotalPieces(BigDecimal.valueOf(totalPieces));
+            outbound.setDistinctSkus(distinctSkuIds.size());
         }
 
         String currentUsername = securityAuditHelper.getCurrentUsername();
@@ -927,8 +1067,11 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
                         .build()).collect(Collectors.toList()) : List.of();
 
         String actionLabel = switch (log.getAction()) {
-            case "SALIDA_REGISTRADA" -> "Despacho Outbound Confirmado";
-            case "SALIDA_CANCELADA" -> "Cancelación de Despacho Outbound";
+            case "SALIDA_REGISTRADA" -> "Arribo & Registro en Caseta";
+            case "SALIDA_MODIFICADA", "SALIDA_ACTUALIZADA" -> "Ficha de Salida Actualizada";
+            case "SALIDA_ASIGNADA" -> "Asignación de Andén";
+            case "SALIDA_DESPACHADA", "OUTBOUND_COMPLETED", "SALIDA_AUTORIZADA" -> "Despacho Outbound Confirmado";
+            case "SALIDA_CANCELADA" -> "Cancelación Extraordinaria con Autorización";
             default -> log.getAction();
         };
 
@@ -955,10 +1098,15 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
         if (field == null || field.isBlank()) return "Dato";
         return switch (field.trim()) {
             case "client", "clientId", "clientName" -> "Cliente / Destinatario";
+            case "destination", "destinationId", "destinationName", "plant" -> "Planta / Destino";
             case "carrier", "carrierId", "carrierName" -> "Línea Transportista";
             case "forkliftOperator", "forklift_operator", "operator" -> "Operador de Montacargas";
             case "driver", "driverName" -> "Operador del Transporte";
-            case "plates", "tractorPlates", "boxPlates" -> "Placas (Tractor / Caja)";
+            case "plates", "tractorPlates" -> "Placas del Tracto";
+            case "boxPlates" -> "Placas de la Caja";
+            case "economicNumber" -> "No. Económico Tractor";
+            case "boxEconomicNumber" -> "No. Económico Caja";
+            case "ramp", "rampId", "rampNumber" -> "Rampa Asignada";
             case "status" -> "Estado Operativo";
             case "reason", "cancellationReason" -> "Motivo / Justificación";
             case "authorizedBy", "authorized_by" -> "Autorizado Por (Supervisor)";
@@ -967,6 +1115,7 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
             case "totalPieces", "pieces" -> "Piezas Totales Despachadas";
             case "folio" -> "Folio de Operación";
             case "sealNumber" -> "Número de Sello / Marchamo";
+            case "observations" -> "Observaciones";
             default -> field;
         };
     }
