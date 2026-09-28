@@ -3,6 +3,7 @@ package com.fourguard.wms.application.usecase;
 import com.fourguard.wms.application.dto.request.auth.LogoutRequest;
 import com.fourguard.wms.domain.exception.EntityNotFoundException;
 import com.fourguard.wms.domain.exception.InvalidCredentialsException;
+import com.fourguard.wms.domain.ports.out.TokenBlacklistPort;
 import com.fourguard.wms.domain.ports.out.UserRepositoryPort;
 import com.fourguard.wms.infrastructure.persistence.entity.UserEntity;
 import com.fourguard.wms.infrastructure.security.jwt.JwtService;
@@ -32,6 +33,9 @@ class LogoutUseCaseImplTest {
 
     @Mock
     private AuditService auditService;
+
+    @Mock
+    private TokenBlacklistPort tokenBlacklistPort;
 
     @InjectMocks
     private LogoutUseCaseImpl logoutUseCase;
@@ -64,6 +68,7 @@ class LogoutUseCaseImplTest {
 
         // Assert
         verify(userRepositoryPort, times(1)).findByUsername(username);
+        verify(tokenBlacklistPort, times(1)).revokeUserSessions(userEntity.getId());
         verify(auditService, times(1)).log(eq(userEntity), eq("LOGOUT"), eq("USER"), eq(userEntity.getId()), any(), any());
     }
 
@@ -77,6 +82,7 @@ class LogoutUseCaseImplTest {
                 logoutUseCase.logout(logoutRequest, username));
 
         verify(userRepositoryPort, never()).findByUsername(anyString());
+        verify(tokenBlacklistPort, never()).revokeUserSessions(any());
     }
 
     @Test
@@ -90,6 +96,7 @@ class LogoutUseCaseImplTest {
                 logoutUseCase.logout(logoutRequest, username));
 
         verify(userRepositoryPort, never()).findByUsername(anyString());
+        verify(tokenBlacklistPort, never()).revokeUserSessions(any());
     }
 
     @Test
@@ -102,5 +109,7 @@ class LogoutUseCaseImplTest {
         // Act & Assert
         assertThrows(EntityNotFoundException.class, () ->
                 logoutUseCase.logout(logoutRequest, username));
+
+        verify(tokenBlacklistPort, never()).revokeUserSessions(any());
     }
 }
