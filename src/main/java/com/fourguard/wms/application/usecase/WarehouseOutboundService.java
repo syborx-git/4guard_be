@@ -59,6 +59,7 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
     private final SecurityAuditHelper securityAuditHelper;
     private final PasswordEncoder passwordEncoder;
     private final WarehouseOutboundMapper outboundMapper;
+    private final com.fourguard.wms.infrastructure.persistence.repository.WarehouseReceptionPalletJpaRepository receptionPalletJpaRepository;
 
     @Override
     @Transactional
@@ -584,15 +585,50 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
         List<InventoryItemEntity> availableItems = inventoryItemJpaRepository.findAvailableBatchesWithFilters(
                 organizationId, branchId, clientId, skuId, cleanSearch);
 
-        // Group by (sapFolio / remisionNo, lotNumber, expirationDate, sku)
+        List<UUID> itemIds = availableItems.stream().map(InventoryItemEntity::getId).toList();
+        List<String> palletCodes = availableItems.stream()
+                .flatMap(i -> java.util.stream.Stream.of(i.getSscc(), i.getExternalUa()))
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(s -> !s.isBlank())
+                .map(String::toUpperCase)
+                .distinct()
+                .toList();
+
+        Map<UUID, Integer> palletNumberByItemId = new HashMap<>();
+        Map<String, Integer> palletNumberByCode = new HashMap<>();
+
+        if (!palletCodes.isEmpty() || !itemIds.isEmpty()) {
+            List<WarehouseReceptionPalletEntity> recPallets = receptionPalletJpaRepository.findPalletsByCodesOrItemIds(
+                    palletCodes.isEmpty() ? List.of("__NONE__") : palletCodes,
+                    itemIds.isEmpty() ? List.of(UUID.randomUUID()) : itemIds
+            );
+            for (WarehouseReceptionPalletEntity rp : recPallets) {
+                if (rp.getInventoryItem() != null && rp.getPalletNumber() != null) {
+                    palletNumberByItemId.put(rp.getInventoryItem().getId(), rp.getPalletNumber());
+                }
+                if (rp.getPalletCode() != null && rp.getPalletNumber() != null) {
+                    palletNumberByCode.put(rp.getPalletCode().trim().toUpperCase(), rp.getPalletNumber());
+                }
+                if (rp.getSupplierUaCode() != null && rp.getPalletNumber() != null) {
+                    palletNumberByCode.put(rp.getSupplierUaCode().trim().toUpperCase(), rp.getPalletNumber());
+                }
+                if (rp.getInternalUaCode() != null && rp.getPalletNumber() != null) {
+                    palletNumberByCode.put(rp.getInternalUaCode().trim().toUpperCase(), rp.getPalletNumber());
+                }
+            }
+        }
+
+        // Group by (sapFolio / remisionNo, lotNumber, expirationDate, sku, locationCode) with deterministic order
         Map<String, List<InventoryItemEntity>> grouped = availableItems.stream().collect(
                 Collectors.groupingBy(i -> {
                     String rem = i.getSapFolio() != null ? i.getSapFolio() : "REM-SIN-FOLIO";
                     String lot = i.getBatchNumber() != null ? i.getBatchNumber() : "LOTE-GENERAL";
                     String exp = i.getExpirationDate() != null ? i.getExpirationDate().toString() : "SIN-CADUCIDAD";
                     String sku = i.getSku() != null ? i.getSku().getId().toString() : "SKU-NIL";
-                    return rem + "___" + lot + "___" + exp + "___" + sku;
-                })
+                    String loc = i.getLocation() != null ? i.getLocation().getId().toString() : "LOC-NIL";
+                    return rem + "___" + lot + "___" + exp + "___" + sku + "___" + loc;
+                }, LinkedHashMap::new, Collectors.toList())
         );
 
         List<InventoryBatchResponse> batches = new ArrayList<>();
@@ -605,9 +641,23 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
 
             List<InventoryBatchResponse.BatchPalletItemResponse> palletResponses = groupItems.stream().map(item -> {
                 String pLoc = item.getLocation() != null ? item.getLocation().getCode() : "N/A";
+                Integer pNum = palletNumberByItemId.get(item.getId());
+                if (pNum == null && item.getSscc() != null) {
+                    pNum = palletNumberByCode.get(item.getSscc().trim().toUpperCase());
+                }
+                if (pNum == null && item.getExternalUa() != null) {
+                    pNum = palletNumberByCode.get(item.getExternalUa().trim().toUpperCase());
+                }
+                if (pNum == null && item.getMetadata() != null && item.getMetadata().get("palletNumber") != null) {
+                    try {
+                        pNum = Integer.parseInt(item.getMetadata().get("palletNumber").toString());
+                    } catch (Exception ignored) {}
+                }
+
                 return InventoryBatchResponse.BatchPalletItemResponse.builder()
                         .itemId(item.getId())
-                        .palletCode(item.getSscc())
+                        .palletNumber(pNum)
+                        .palletCode(item.getSscc() != null ? item.getSscc() : item.getExternalUa())
                         .skuCode(item.getSku() != null ? item.getSku().getCode() : "")
                         .description(item.getSku() != null ? item.getSku().getName() : "")
                         .lotNumber(item.getBatchNumber())
@@ -618,6 +668,10 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
                         .locationCode(pLoc)
                         .build();
             }).collect(Collectors.toList());
+
+            palletResponses.sort(Comparator.comparing(
+                    p -> p.getPalletNumber() != null ? p.getPalletNumber() : Integer.MAX_VALUE
+            ));
 
             batches.add(InventoryBatchResponse.builder()
                     .remisionNo(first.getSapFolio() != null ? first.getSapFolio() : "REM-0000")

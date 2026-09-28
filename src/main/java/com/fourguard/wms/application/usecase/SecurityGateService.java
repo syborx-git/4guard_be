@@ -695,6 +695,11 @@ public class SecurityGateService implements SecurityGateUseCase {
                 ? rec.getSeals().stream().map(WarehouseReceptionSealEntity::getSealNumber).toList()
                 : Collections.emptyList();
 
+        LocalDate docDate = rec.getDocDate() != null ? rec.getDocDate()
+                : (rec.getCreatedAt() != null ? rec.getCreatedAt().toLocalDate() : LocalDate.now());
+        LocalTime receptionTime = rec.getReceptionTime() != null ? rec.getReceptionTime()
+                : (rec.getCreatedAt() != null ? rec.getCreatedAt().toLocalTime() : LocalTime.now());
+
         return PassResponse.builder()
                 .id(rec.getId())
                 .token(rec.getFolio())
@@ -712,8 +717,8 @@ public class SecurityGateService implements SecurityGateUseCase {
                 .boxPlates(rec.getBoxPlates())
                 .sealNumbers(seals)
                 .docNumber(rec.getDocNumber())
-                .docDate(rec.getDocDate())
-                .receptionTime(rec.getReceptionTime())
+                .docDate(docDate)
+                .receptionTime(receptionTime)
                 .rampId(rec.getRamp() != null ? rec.getRamp().getId() : null)
                 .rampNumber(parseRampNumber(rec.getRamp()))
                 .rampCode(rec.getRamp() != null ? rec.getRamp().getCode() : null)
@@ -729,6 +734,9 @@ public class SecurityGateService implements SecurityGateUseCase {
         List<String> seals = (out.getSealNumber() != null && !out.getSealNumber().isBlank())
                 ? List.of(out.getSealNumber().split("\\s*,\\s*"))
                 : Collections.emptyList();
+
+        LocalDate docDate = out.getCreatedAt() != null ? out.getCreatedAt().toLocalDate() : LocalDate.now();
+        LocalTime receptionTime = out.getCreatedAt() != null ? out.getCreatedAt().toLocalTime() : LocalTime.now();
 
         return PassResponse.builder()
                 .id(out.getId())
@@ -750,6 +758,8 @@ public class SecurityGateService implements SecurityGateUseCase {
                 .boxEconomicNumber(out.getBoxEconomicNumber())
                 .sealNumbers(seals)
                 .docNumber(out.getRemisionNo())
+                .docDate(docDate)
+                .receptionTime(receptionTime)
                 .rampId(out.getRamp() != null ? out.getRamp().getId() : null)
                 .rampNumber(parseRampNumber(out.getRamp()))
                 .rampCode(out.getRamp() != null ? out.getRamp().getCode() : null)
@@ -788,6 +798,28 @@ public class SecurityGateService implements SecurityGateUseCase {
             }
         }
 
+        LocalTime recTime = entity.getReceptionTime();
+        if (recTime == null) {
+            if (entity.getProcessedAt() != null) {
+                recTime = entity.getProcessedAt().toLocalTime();
+            } else if (entity.getCreatedAt() != null) {
+                recTime = entity.getCreatedAt().toLocalTime();
+            } else {
+                recTime = LocalTime.now();
+            }
+        }
+
+        LocalDate dDate = entity.getDocDate();
+        if (dDate == null) {
+            if (entity.getProcessedAt() != null) {
+                dDate = entity.getProcessedAt().toLocalDate();
+            } else if (entity.getCreatedAt() != null) {
+                dDate = entity.getCreatedAt().toLocalDate();
+            } else {
+                dDate = LocalDate.now();
+            }
+        }
+
         return PassResponse.builder()
                 .id(entity.getId())
                 .token(entity.getToken())
@@ -813,8 +845,8 @@ public class SecurityGateService implements SecurityGateUseCase {
                 .boxDimensions(entity.getBoxDimensions())
                 .sealNumbers(entity.getSealNumbers())
                 .docNumber(entity.getDocNumber())
-                .docDate(entity.getDocDate())
-                .receptionTime(entity.getReceptionTime())
+                .docDate(dDate)
+                .receptionTime(recTime)
                 .departureTime(entity.getDepartureTime())
                 .checklistData(entity.getChecklistData())
                 .observations(entity.getObservations())

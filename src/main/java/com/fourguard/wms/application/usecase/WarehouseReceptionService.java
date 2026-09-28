@@ -957,6 +957,7 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
                     .manufacturingDate(palletMfg)
                     .expirationDate(palletExp)
                     .sapFolio(reception.getDocNumber())
+                    .metadata(pallet.getPalletNumber() != null ? Map.of("palletNumber", pallet.getPalletNumber()) : null)
                     .createdBy(currentUser)
                     .updatedBy(currentUser)
                     .build();
