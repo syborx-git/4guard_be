@@ -481,7 +481,41 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
             outbound.setSealNumber(request.getSealNumber());
         }
 
-        // 6. Observations
+        // 6. Destination update
+        if (request.getDestinationId() != null) {
+            ClientDestinationEntity dest = clientDestinationRepositoryPort.findById(request.getDestinationId()).orElse(null);
+            if (dest != null) {
+                oldValues.put("destination", outbound.getDestinationName());
+                newValues.put("destination", dest.getPlantName());
+                outbound.setDestination(dest);
+                outbound.setDestinationName(dest.getPlantName());
+                outbound.setDestinationAddress(dest.getFullAddress() != null ? dest.getFullAddress() : "");
+            }
+        } else if (request.getDestinationName() != null && !request.getDestinationName().isBlank()) {
+            oldValues.put("destination", outbound.getDestinationName());
+            newValues.put("destination", request.getDestinationName());
+            outbound.setDestinationName(request.getDestinationName());
+            if (request.getDestinationAddress() != null) {
+                outbound.setDestinationAddress(request.getDestinationAddress());
+            }
+        }
+
+        // 7. Carrier update
+        if (request.getCarrierId() != null) {
+            CarrierEntity carrier = carrierRepositoryPort.findById(request.getCarrierId()).orElse(null);
+            if (carrier != null) {
+                oldValues.put("carrier", outbound.getCarrier() != null ? outbound.getCarrier().getName() : outbound.getCarrierName());
+                newValues.put("carrier", carrier.getName());
+                outbound.setCarrier(carrier);
+                outbound.setCarrierName(carrier.getName());
+            }
+        } else if (request.getCarrierName() != null && !request.getCarrierName().isBlank()) {
+            oldValues.put("carrier", outbound.getCarrierName());
+            newValues.put("carrier", request.getCarrierName());
+            outbound.setCarrierName(request.getCarrierName());
+        }
+
+        // 8. Observations
         if (request.getObservations() != null) {
             outbound.setObservations(request.getObservations());
         }
