@@ -670,8 +670,9 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
         if (reception.getOrganization() != null && reception.getBranch() != null) {
             currentMax = palletRepositoryPort.findMaxPalletNumber(reception.getOrganization().getId(), reception.getBranch().getId());
         }
-        if (currentMax == 0) {
-            currentMax = palletRepositoryPort.findMaxPalletNumber();
+        int globalMax = palletRepositoryPort.findMaxPalletNumber();
+        if (globalMax > currentMax) {
+            currentMax = globalMax;
         }
 
         List<WarehouseReceptionPalletEntity> newPallets = new ArrayList<>();
@@ -823,11 +824,46 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
         }
         if (request.getObservations() != null) pallet.setObservations(request.getObservations());
 
+        if (request.getLotNumber() != null && !request.getLotNumber().isBlank()) {
+            String cleanLot = request.getLotNumber().trim().toUpperCase();
+            pallet.setLotNumber(cleanLot);
+            java.time.LocalDate expDate = request.getExpirationDate() != null ? request.getExpirationDate() : pallet.getExpirationDate();
+            WarehouseReceptionLotEntity matchedLot = lotRepositoryPort.findByReceptionIdAndLotNumber(receptionId, cleanLot).orElse(null);
+            if (matchedLot == null && expDate != null) {
+                long days = 0;
+                String sLife = "APPROVED";
+                java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneOffset.UTC);
+                days = java.time.temporal.ChronoUnit.DAYS.between(today, expDate);
+                if (days < 365) sLife = "REJECTED_SHELF_LIFE_POLICY";
+                WarehouseReceptionLotEntity autoLot = WarehouseReceptionLotEntity.builder()
+                        .organization(reception.getOrganization())
+                        .branch(reception.getBranch())
+                        .reception(reception)
+                        .sku(reception.getSku())
+                        .lotNumber(cleanLot)
+                        .expirationDate(expDate)
+                        .shelfLifeDaysRemaining((int) days)
+                        .shelfLifeStatus(sLife)
+                        .build();
+                matchedLot = lotRepositoryPort.save(autoLot);
+            }
+            if (matchedLot != null) {
+                pallet.setReceptionLot(matchedLot);
+                if (expDate == null) expDate = matchedLot.getExpirationDate();
+            }
+            if (expDate != null) {
+                pallet.setExpirationDate(expDate);
+            }
+        } else if (request.getExpirationDate() != null) {
+            pallet.setExpirationDate(request.getExpirationDate());
+        }
+
         WarehouseReceptionPalletEntity saved = palletRepositoryPort.save(pallet);
 
         logAudit(receptionId, "TARIMA_EDITADA",
                 Map.of("palletCode", saved.getPalletCode(), "pieces", oldPieces != null ? oldPieces.toString() : "0"),
-                Map.of("palletCode", saved.getPalletCode(), "pieces", saved.getPieces() != null ? saved.getPieces().toString() : "0"));
+                Map.of("palletCode", saved.getPalletCode(), "pieces", saved.getPieces() != null ? saved.getPieces().toString() : "0",
+                       "lotNumber", saved.getLotNumber() != null ? saved.getLotNumber() : ""));
 
         return receptionMapper.toPalletResponse(saved);
     }
@@ -1390,8 +1426,9 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
         if (organizationId != null && branchId != null) {
             maxNumber = palletRepositoryPort.findMaxPalletNumber(organizationId, branchId);
         }
-        if (maxNumber == 0) {
-            maxNumber = palletRepositoryPort.findMaxPalletNumber();
+        int globalMax = palletRepositoryPort.findMaxPalletNumber();
+        if (globalMax > maxNumber) {
+            maxNumber = globalMax;
         }
         return Map.of(
                 "lastPalletNumber", maxNumber,

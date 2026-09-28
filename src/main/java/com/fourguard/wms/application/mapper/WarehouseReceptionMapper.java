@@ -90,6 +90,8 @@ public interface WarehouseReceptionMapper {
     @Mapping(source = "palletType", target = "palletTypeId", qualifiedByName = "palletTypeToString")
     @Mapping(source = "palletType", target = "palletTypeLabel", qualifiedByName = "palletTypeToLabel")
     @Mapping(source = "inventoryItem.id", target = "inventoryItemId")
+    @Mapping(target = "lotNumber", expression = "java(entity.getLotNumber() != null && !entity.getLotNumber().isBlank() ? entity.getLotNumber() : (entity.getReceptionLot() != null ? entity.getReceptionLot().getLotNumber() : null))")
+    @Mapping(target = "expirationDate", expression = "java(entity.getExpirationDate() != null ? entity.getExpirationDate() : (entity.getReceptionLot() != null ? entity.getReceptionLot().getExpirationDate() : null))")
     ReceptionPalletResponse toPalletResponse(WarehouseReceptionPalletEntity entity);
 
     List<ReceptionPalletResponse> toPalletResponseList(List<WarehouseReceptionPalletEntity> entities);

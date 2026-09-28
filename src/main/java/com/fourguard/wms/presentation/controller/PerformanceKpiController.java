@@ -1,6 +1,5 @@
 package com.fourguard.wms.presentation.controller;
 
-import com.fourguard.wms.application.dto.response.performance.PerformanceMetricsDto;
 import static com.fourguard.wms.application.dto.response.performance.PerformanceMetricsDto.*;
 import com.fourguard.wms.application.usecase.PerformanceKpiManagementService;
 import com.fourguard.wms.shared.response.ApiResponse;
@@ -16,7 +15,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping({"/performance-kpis", "/performance/kpis"})
+@RequestMapping({ "/performance-kpis", "/performance/kpis" })
 @RequiredArgsConstructor
 @Tag(name = "Catálogo y Gestión de KPIs (HU-138)", description = "CRUD de reglas, umbrales y semáforos de KPIs en base de datos")
 public class PerformanceKpiController {
