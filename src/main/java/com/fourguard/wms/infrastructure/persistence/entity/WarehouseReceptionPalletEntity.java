@@ -41,13 +41,13 @@ public class WarehouseReceptionPalletEntity {
     @Builder.Default
     private Integer palletNumber = 1;
 
-    @Column(name = "pallet_code", nullable = false, length = 50)
+    @Column(name = "pallet_code", nullable = false, length = 100)
     private String palletCode;
 
-    @Column(name = "supplier_ua_code", length = 60)
+    @Column(name = "supplier_ua_code", length = 100)
     private String supplierUaCode;
 
-    @Column(name = "internal_ua_code", length = 60)
+    @Column(name = "internal_ua_code", length = 100)
     private String internalUaCode;
 
     @Column(name = "is_ua_relabelled")
@@ -58,7 +58,7 @@ public class WarehouseReceptionPalletEntity {
     @JoinColumn(name = "reception_lot_id")
     private WarehouseReceptionLotEntity receptionLot;
 
-    @Column(name = "lot_number", length = 50)
+    @Column(name = "lot_number", length = 100)
     private String lotNumber;
 
     @Column(name = "expiration_date")

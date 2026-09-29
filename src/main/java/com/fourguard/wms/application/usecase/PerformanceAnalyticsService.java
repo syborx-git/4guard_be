@@ -1,6 +1,6 @@
 package com.fourguard.wms.application.usecase;
 
-import com.fourguard.wms.application.dto.response.performance.PerformanceMetricsDto.*;
+import static com.fourguard.wms.application.dto.response.performance.PerformanceMetricsDto.*;
 import com.fourguard.wms.infrastructure.persistence.entity.*;
 import com.fourguard.wms.infrastructure.persistence.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -24,20 +24,20 @@ public class PerformanceAnalyticsService {
     private final ShiftJpaRepository shiftJpaRepository;
     private final ForkliftOperatorJpaRepository forkliftOperatorJpaRepository;
     private final WarehouseReceptionJpaRepository warehouseReceptionJpaRepository;
-    private final WarehouseReceptionPalletJpaRepository warehouseReceptionPalletJpaRepository;
     private final WarehouseOutboundJpaRepository warehouseOutboundJpaRepository;
     private final WarehouseTransferJpaRepository warehouseTransferJpaRepository;
     private final LocationJpaRepository locationJpaRepository;
     private final IncidenceJpaRepository incidenceJpaRepository;
     private final SecurityPreCheckinJpaRepository securityPreCheckinJpaRepository;
-    private final CarrierJpaRepository carrierJpaRepository;
     private final PerformanceKpiJpaRepository performanceKpiJpaRepository;
 
     /**
-     * Calcula los 5 KPIs Ejecutivos clave a partir de datos reales en base de datos (HU-141, HU-159).
+     * Calcula los 5 KPIs Ejecutivos clave a partir de datos reales en base de datos
+     * (HU-141, HU-159).
      */
     @Transactional(readOnly = true)
-    public ExecutiveKpiResponse getExecutiveKpi(UUID organizationId, UUID branchId, OffsetDateTime startDate, OffsetDateTime endDate) {
+    public ExecutiveKpiResponse getExecutiveKpi(UUID organizationId, UUID branchId, OffsetDateTime startDate,
+            OffsetDateTime endDate) {
         if (startDate == null) {
             startDate = LocalDate.now().atStartOfDay().atOffset(ZoneOffset.UTC);
         }
@@ -48,7 +48,7 @@ public class PerformanceAnalyticsService {
         String branchName = "Todas las Sucursales";
         if (branchId != null) {
             branchName = branchJpaRepository.findById(branchId)
-                    .map(BranchEntity::getName)
+                    .map(b -> b.getName())
                     .orElse("Sucursal Seleccionada");
         }
 
@@ -71,7 +71,7 @@ public class PerformanceAnalyticsService {
 
         // 4. Promedios de ciclo en base a órdenes
         double avgDockToStockHours = 1.4; // Meta <= 2.0 hrs
-        double avgOrderCycleHours = 2.8;  // Meta <= 4.0 hrs
+        double avgOrderCycleHours = 2.8; // Meta <= 4.0 hrs
 
         // 5. Conteo de operaciones reales generadas
         long totalReceptions = warehouseReceptionJpaRepository.count();
@@ -97,7 +97,8 @@ public class PerformanceAnalyticsService {
      * Tiempos y piezas de recepción descargadas desde la base de datos (HU-138).
      */
     @Transactional(readOnly = true)
-    public InboundProcessTimesResponse getInboundProcessTimes(UUID organizationId, UUID branchId, OffsetDateTime startDate, OffsetDateTime endDate) {
+    public InboundProcessTimesResponse getInboundProcessTimes(UUID organizationId, UUID branchId,
+            OffsetDateTime startDate, OffsetDateTime endDate) {
         List<WarehouseReceptionEntity> receptions = warehouseReceptionJpaRepository.findAll();
         long totalReceptions = receptions.size();
 
@@ -166,7 +167,8 @@ public class PerformanceAnalyticsService {
     }
 
     /**
-     * Ranking de productividad de montacarguistas calculado sobre movimientos reales (HU-138, HU-161).
+     * Ranking de productividad de montacarguistas calculado sobre movimientos
+     * reales (HU-138, HU-161).
      */
     @Transactional(readOnly = true)
     public List<OperatorProductivityResponse> getOperatorRanking(UUID organizationId, UUID branchId, UUID shiftId) {
@@ -178,12 +180,14 @@ public class PerformanceAnalyticsService {
         List<OperatorProductivityResponse> responses = new ArrayList<>();
 
         for (ForkliftOperatorEntity op : operators) {
-            if (op.isDeleted()) continue;
+            if (op.isDeleted())
+                continue;
 
             // Filtro por shift si se proporciona
             if (shiftId != null) {
                 boolean matchesShift = op.getShift() != null && op.getShift().getId().equals(shiftId);
-                if (!matchesShift) continue;
+                if (!matchesShift)
+                    continue;
             }
 
             long receptions = allReceptions.stream()
@@ -211,7 +215,8 @@ public class PerformanceAnalyticsService {
 
             if (op.getShift() != null) {
                 opShiftId = op.getShift().getId();
-                shiftDisplayName = op.getShift().getName() + " (" + op.getShift().getStartTime() + " - " + op.getShift().getEndTime() + ")";
+                shiftDisplayName = op.getShift().getName() + " (" + op.getShift().getStartTime() + " - "
+                        + op.getShift().getEndTime() + ")";
                 if (op.getShift().getNetDurationMinutes() != null && op.getShift().getNetDurationMinutes() > 0) {
                     hours = op.getShift().getNetDurationMinutes() / 60.0;
                 }
@@ -222,7 +227,8 @@ public class PerformanceAnalyticsService {
             double pph = hours > 0 ? Math.round((total / hours) * 100.0) / 100.0 : 0.0;
             String badge = pph >= 6.0 ? "OPTIMAL" : (pph >= 4.0 ? "WARNING" : "CRITICAL");
             long targetMovs = Math.round(hours * 6.0);
-            double compliance = targetMovs > 0 ? Math.min(150.0, Math.round((total * 1000.0) / targetMovs) / 10.0) : 100.0;
+            double compliance = targetMovs > 0 ? Math.min(150.0, Math.round((total * 1000.0) / targetMovs) / 10.0)
+                    : 100.0;
 
             responses.add(OperatorProductivityResponse.builder()
                     .operatorId(op.getId())
@@ -307,16 +313,19 @@ public class PerformanceAnalyticsService {
     }
 
     /**
-     * Resumen de productividad y eficiencia agrupado por turnos de trabajo detectados dinámicamente en BD (HU-140, HU-161).
+     * Resumen de productividad y eficiencia agrupado por turnos de trabajo
+     * detectados dinámicamente en BD (HU-140, HU-161).
      */
     @Transactional(readOnly = true)
     public List<ShiftProductivitySummaryResponse> getShiftProductivitySummaries(UUID organizationId, UUID branchId) {
         List<ShiftEntity> activeShifts = (branchId != null)
-                ? shiftJpaRepository.findByBranchIdAndStatusAndIsDeletedFalse(branchId, com.fourguard.wms.domain.enums.ShiftStatus.ACTIVE)
+                ? shiftJpaRepository.findByBranchIdAndStatusAndIsDeletedFalse(branchId,
+                        com.fourguard.wms.domain.enums.ShiftStatus.ACTIVE)
                 : shiftJpaRepository.findByStatusAndIsDeletedFalse(com.fourguard.wms.domain.enums.ShiftStatus.ACTIVE);
 
         if (activeShifts.isEmpty()) {
-            // Si no hay filtro de sucursal o no hay activos, consultar todos los turnos no eliminados
+            // Si no hay filtro de sucursal o no hay activos, consultar todos los turnos no
+            // eliminados
             activeShifts = shiftJpaRepository.findAll().stream()
                     .filter(s -> !Boolean.TRUE.equals(s.getIsDeleted()))
                     .toList();
@@ -330,7 +339,8 @@ public class PerformanceAnalyticsService {
         List<WarehouseOutboundEntity> allOutbounds = warehouseOutboundJpaRepository.findAll();
 
         long totalMovs = allReceptions.size() + allTransfers.size() + allOutbounds.size();
-        if (totalMovs == 0) totalMovs = 58L;
+        if (totalMovs == 0)
+            totalMovs = 58L;
 
         List<ShiftProductivitySummaryResponse> summaries = new ArrayList<>();
 
@@ -340,7 +350,8 @@ public class PerformanceAnalyticsService {
                     .shiftId(UUID.randomUUID())
                     .shiftName("Turno Matutino")
                     .timeRange("06:00 - 14:00")
-                    .activeOperatorsCount((int) operators.stream().filter(o -> o.getShiftName() == null || o.getShiftName().contains("Matutino")).count())
+                    .activeOperatorsCount((int) operators.stream()
+                            .filter(o -> o.getShiftName() == null || o.getShiftName().contains("Matutino")).count())
                     .totalMovements(Math.round(totalMovs * 0.55))
                     .avgMovementsPerHour(6.8)
                     .targetPph(6.0)
@@ -351,7 +362,8 @@ public class PerformanceAnalyticsService {
                     .shiftId(UUID.randomUUID())
                     .shiftName("Turno Vespertino")
                     .timeRange("14:00 - 21:30")
-                    .activeOperatorsCount((int) operators.stream().filter(o -> o.getShiftName() != null && o.getShiftName().contains("Vespertino")).count())
+                    .activeOperatorsCount((int) operators.stream()
+                            .filter(o -> o.getShiftName() != null && o.getShiftName().contains("Vespertino")).count())
                     .totalMovements(Math.round(totalMovs * 0.35))
                     .avgMovementsPerHour(5.4)
                     .targetPph(6.0)
@@ -362,8 +374,10 @@ public class PerformanceAnalyticsService {
                     .shiftId(UUID.randomUUID())
                     .shiftName("Turno Nocturno")
                     .timeRange("21:30 - 06:00")
-                    .activeOperatorsCount((int) operators.stream().filter(o -> o.getShiftName() != null && o.getShiftName().contains("Nocturno")).count())
-                    .totalMovements(Math.max(0L, totalMovs - Math.round(totalMovs * 0.55) - Math.round(totalMovs * 0.35)))
+                    .activeOperatorsCount((int) operators.stream()
+                            .filter(o -> o.getShiftName() != null && o.getShiftName().contains("Nocturno")).count())
+                    .totalMovements(
+                            Math.max(0L, totalMovs - Math.round(totalMovs * 0.55) - Math.round(totalMovs * 0.35)))
                     .avgMovementsPerHour(6.2)
                     .targetPph(6.0)
                     .compliancePercentage(103.3)
@@ -379,9 +393,15 @@ public class PerformanceAnalyticsService {
 
                 long shiftMovements = 0;
                 for (ForkliftOperatorEntity op : shiftOps) {
-                    long rec = allReceptions.stream().filter(r -> r.getForkliftOperator() != null && r.getForkliftOperator().getId().equals(op.getId())).count();
-                    long tra = allTransfers.stream().filter(t -> t.getForkliftOperator() != null && t.getForkliftOperator().getId().equals(op.getId())).count();
-                    long out = allOutbounds.stream().filter(o -> o.getForkliftOperator() != null && o.getForkliftOperator().getId().equals(op.getId())).count();
+                    long rec = allReceptions.stream().filter(
+                            r -> r.getForkliftOperator() != null && r.getForkliftOperator().getId().equals(op.getId()))
+                            .count();
+                    long tra = allTransfers.stream().filter(
+                            t -> t.getForkliftOperator() != null && t.getForkliftOperator().getId().equals(op.getId()))
+                            .count();
+                    long out = allOutbounds.stream().filter(
+                            o -> o.getForkliftOperator() != null && o.getForkliftOperator().getId().equals(op.getId()))
+                            .count();
                     long sum = rec + tra + out;
                     if (sum == 0) {
                         sum = 28L;
@@ -400,7 +420,8 @@ public class PerformanceAnalyticsService {
                     shiftHours = shift.getNetDurationMinutes() / 60.0;
                 } else if (shift.getStartTime() != null && shift.getEndTime() != null) {
                     long minutes = java.time.Duration.between(shift.getStartTime(), shift.getEndTime()).toMinutes();
-                    if (minutes < 0) minutes += 24 * 60; // Nocturno / cruce de medianoche
+                    if (minutes < 0)
+                        minutes += 24 * 60; // Nocturno / cruce de medianoche
                     shiftHours = minutes > 0 ? minutes / 60.0 : 7.5;
                 }
 
@@ -410,7 +431,8 @@ public class PerformanceAnalyticsService {
                         : (shiftMovements > 0 ? Math.round((shiftMovements / shiftHours) * 100.0) / 100.0 : 0.0);
 
                 double targetPph = 6.0;
-                double compliance = targetPph > 0 ? Math.min(150.0, Math.round((avgPph / targetPph) * 1000.0) / 10.0) : 100.0;
+                double compliance = targetPph > 0 ? Math.min(150.0, Math.round((avgPph / targetPph) * 1000.0) / 10.0)
+                        : 100.0;
                 String status = avgPph >= 6.0 ? "OPTIMAL" : (avgPph >= 4.0 ? "WARNING" : "CRITICAL");
 
                 String timeRange = String.format("%s - %s",
@@ -480,7 +502,8 @@ public class PerformanceAnalyticsService {
     }
 
     /**
-     * Circuito Delicado: Métricas de los 10 Choferes y 7 Unidades de Transporte Propio (Pablo Requirements).
+     * Circuito Delicado: Métricas de los 10 Choferes y 7 Unidades de Transporte
+     * Propio (Pablo Requirements).
      */
     @Transactional(readOnly = true)
     public CircuitoDelicadoSummaryResponse getCircuitoDelicado(UUID organizationId, UUID branchId) {
@@ -489,19 +512,19 @@ public class PerformanceAnalyticsService {
 
         // Lista de los 10 Choferes Dedicados del Circuito
         String[] driverNames = {
-            "Jorge Ramírez Méndez", "Fernando Castro Ortiz", "Alejandro Morales Vera",
-            "Miguel Ángel Torres", "Ricardo Soto Lugo", "Armando Vega Delgado",
-            "Héctor Beltrán Ríos", "Gabriel Rivas Cruz", "Esteban Nava Gómez", "Oscar Pineda Silva"
+                "Jorge Ramírez Méndez", "Fernando Castro Ortiz", "Alejandro Morales Vera",
+                "Miguel Ángel Torres", "Ricardo Soto Lugo", "Armando Vega Delgado",
+                "Héctor Beltrán Ríos", "Gabriel Rivas Cruz", "Esteban Nava Gómez", "Oscar Pineda Silva"
         };
         String[] driverLicenses = {
-            "FED-2024-8812", "FED-2023-7721", "FED-2024-9933", "FED-2023-5544",
-            "FED-2024-1122", "FED-2024-3344", "FED-2023-6677", "FED-2024-4455",
-            "FED-2023-2211", "FED-2024-7788"
+                "FED-2024-8812", "FED-2023-7721", "FED-2024-9933", "FED-2023-5544",
+                "FED-2024-1122", "FED-2024-3344", "FED-2023-6677", "FED-2024-4455",
+                "FED-2023-2211", "FED-2024-7788"
         };
         String[] assignedPlates = {
-            "98-AA-1A", "45-BB-2B", "12-CC-3C", "67-DD-4D",
-            "89-EE-5E", "23-FF-6F", "56-GG-7G", "98-AA-1A",
-            "45-BB-2B", "12-CC-3C"
+                "98-AA-1A", "45-BB-2B", "12-CC-3C", "67-DD-4D",
+                "89-EE-5E", "23-FF-6F", "56-GG-7G", "98-AA-1A",
+                "45-BB-2B", "12-CC-3C"
         };
 
         List<DriverPerformanceDetail> driverList = new ArrayList<>();
@@ -518,7 +541,8 @@ public class PerformanceAnalyticsService {
                     .count();
             if (trips == 0) {
                 // Cálculo proporcional basado en pre-registros
-                trips = preCheckins.stream().filter(p -> p.getDriverName() != null && p.getDriverName().equalsIgnoreCase(name)).count();
+                trips = preCheckins.stream()
+                        .filter(p -> p.getDriverName() != null && p.getDriverName().equalsIgnoreCase(name)).count();
             }
             if (trips == 0) {
                 trips = 12L + (i % 6);
@@ -548,9 +572,10 @@ public class PerformanceAnalyticsService {
         }
 
         // Lista de las 7 Unidades de Transporte
-        String[] ecoNumbers = {"TR-01", "TR-02", "TR-03", "TR-04", "TR-05", "TR-06", "TR-07"};
-        String[] unitPlates = {"98-AA-1A", "45-BB-2B", "12-CC-3C", "67-DD-4D", "89-EE-5E", "23-FF-6F", "56-GG-7G"};
-        String[] transportTypes = {"TORTON 2 EJES", "TRACTOCAMION 3 EJES", "RABON REFRIGERADO", "TRACTOCAMION 3 EJES", "TORTON 2 EJES", "TRACTOCAMION 3 EJES", "RABON SECO"};
+        String[] ecoNumbers = { "TR-01", "TR-02", "TR-03", "TR-04", "TR-05", "TR-06", "TR-07" };
+        String[] unitPlates = { "98-AA-1A", "45-BB-2B", "12-CC-3C", "67-DD-4D", "89-EE-5E", "23-FF-6F", "56-GG-7G" };
+        String[] transportTypes = { "TORTON 2 EJES", "TRACTOCAMION 3 EJES", "RABON REFRIGERADO", "TRACTOCAMION 3 EJES",
+                "TORTON 2 EJES", "TRACTOCAMION 3 EJES", "RABON SECO" };
 
         List<VehiclePerformanceDetail> vehicleList = new ArrayList<>();
         for (int i = 0; i < 7; i++) {
@@ -570,7 +595,12 @@ public class PerformanceAnalyticsService {
                     .build());
         }
 
-        double avgTurnaround = driverList.isEmpty() ? 3.4 : driverList.stream().mapToDouble(DriverPerformanceDetail::getAvgTurnaroundHours).average().orElse(3.4);
+        double avgTurnaround = driverList.isEmpty() ? 3.4
+                : driverList.stream()
+                        .filter(d -> d != null && d.getAvgTurnaroundHours() != null)
+                        .mapToDouble(d -> d.getAvgTurnaroundHours())
+                        .average()
+                        .orElse(3.4);
 
         return CircuitoDelicadoSummaryResponse.builder()
                 .totalTripsMonth(totalTrips)
@@ -585,7 +615,8 @@ public class PerformanceAnalyticsService {
     }
 
     /**
-     * Medición de Ciclo Puerta a Puerta (Caseta QR -> Rampa -> Salida) y Candados de Calidad/Peso (HU-151 -> HU-154).
+     * Medición de Ciclo Puerta a Puerta (Caseta QR -> Rampa -> Salida) y Candados
+     * de Calidad/Peso (HU-151 -> HU-154).
      */
     @Transactional(readOnly = true)
     public GateToGateCycleResponse getGateToGateCycle(UUID organizationId, UUID branchId) {
@@ -610,10 +641,12 @@ public class PerformanceAnalyticsService {
     }
 
     /**
-     * Historial cronológico detallado (Timeline Audit) por folio, SSCC o montacarguista.
+     * Historial cronológico detallado (Timeline Audit) por folio, SSCC o
+     * montacarguista.
      */
     @Transactional(readOnly = true)
-    public List<MovementAuditTimelineDto> getMovementAuditTimeline(UUID organizationId, UUID branchId, String folio, String sscc, UUID operatorId) {
+    public List<MovementAuditTimelineDto> getMovementAuditTimeline(UUID organizationId, UUID branchId, String folio,
+            String sscc, UUID operatorId) {
         List<MovementAuditTimelineDto> timeline = new ArrayList<>();
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
 
@@ -694,7 +727,8 @@ public class PerformanceAnalyticsService {
                 .durationSeconds(360)
                 .qualityLockStatus("APROBADO")
                 .status("COMPLETADO")
-                .details("Peso verificado: 1,420.50 kg (Diferencia +0.4% vs proyectado, dentro del rango ±2%). Checklist F01 17/17 aprobado.")
+                .details(
+                        "Peso verificado: 1,420.50 kg (Diferencia +0.4% vs proyectado, dentro del rango ±2%). Checklist F01 17/17 aprobado.")
                 .build());
 
         timeline.add(MovementAuditTimelineDto.builder()
@@ -717,7 +751,8 @@ public class PerformanceAnalyticsService {
     }
 
     /**
-     * Encola la generación asíncrona de reportes Excel de 21 columnas con firma (HU-158).
+     * Encola la generación asíncrona de reportes Excel de 21 columnas con firma
+     * (HU-158).
      */
     public ExportJobResponseDto enqueueExportJob(UUID organizationId, UUID branchId, String reportType) {
         String jobId = "JOB-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
@@ -732,7 +767,8 @@ public class PerformanceAnalyticsService {
     }
 
     /**
-     * Obtiene la calibración de metas operativas activas desde la base de datos (HU-138, HU-141).
+     * Obtiene la calibración de metas operativas activas desde la base de datos
+     * (HU-138, HU-141).
      */
     @Transactional(readOnly = true)
     public OperationalUserTargetsDto getUserTargets(UUID organizationId) {
@@ -747,11 +783,16 @@ public class PerformanceAnalyticsService {
         for (PerformanceKpiEntity k : kpis) {
             if (k.getName() != null) {
                 String n = k.getName().toLowerCase();
-                if ((n.contains("ocupación") || n.contains("ocupacion")) && k.getTargetThreshold() != null) occupancy = k.getTargetThreshold();
-                if ((n.contains("exactitud") || n.contains("ira")) && k.getTargetThreshold() != null) ira = k.getTargetThreshold();
-                if ((n.contains("puntualidad") || n.contains("otif")) && k.getTargetThreshold() != null) otif = k.getTargetThreshold();
-                if (n.contains("descarga") && k.getTargetThreshold() != null) unload = k.getTargetThreshold();
-                if ((n.contains("picking") || n.contains("productividad")) && k.getTargetThreshold() != null) pph = k.getTargetThreshold();
+                if ((n.contains("ocupación") || n.contains("ocupacion")) && k.getTargetThreshold() != null)
+                    occupancy = k.getTargetThreshold();
+                if ((n.contains("exactitud") || n.contains("ira")) && k.getTargetThreshold() != null)
+                    ira = k.getTargetThreshold();
+                if ((n.contains("puntualidad") || n.contains("otif")) && k.getTargetThreshold() != null)
+                    otif = k.getTargetThreshold();
+                if (n.contains("descarga") && k.getTargetThreshold() != null)
+                    unload = k.getTargetThreshold();
+                if ((n.contains("picking") || n.contains("productividad")) && k.getTargetThreshold() != null)
+                    pph = k.getTargetThreshold();
             }
         }
 
@@ -773,36 +814,39 @@ public class PerformanceAnalyticsService {
      * Actualiza y sincroniza las metas operativas en la base de datos (HU-138).
      */
     @Transactional
-    public OperationalUserTargetsDto saveUserTargets(UUID organizationId, OperationalUserTargetsDto dto, String username) {
+    public OperationalUserTargetsDto saveUserTargets(UUID organizationId, OperationalUserTargetsDto dto,
+            String username) {
         List<PerformanceKpiEntity> kpis = performanceKpiJpaRepository.findByIsEnabledTrue();
 
-        for (PerformanceKpiEntity k : kpis) {
-            if (k.getName() != null) {
-                String n = k.getName().toLowerCase();
-                if ((n.contains("ocupación") || n.contains("ocupacion")) && dto.getTargetOccupancyPercentage() != null) {
-                    k.setTargetThreshold(dto.getTargetOccupancyPercentage());
-                    k.setUpdatedByUser(username);
-                }
-                if ((n.contains("exactitud") || n.contains("ira")) && dto.getTargetIraPercentage() != null) {
-                    k.setTargetThreshold(dto.getTargetIraPercentage());
-                    k.setUpdatedByUser(username);
-                }
-                if ((n.contains("puntualidad") || n.contains("otif")) && dto.getTargetOtifPercentage() != null) {
-                    k.setTargetThreshold(dto.getTargetOtifPercentage());
-                    k.setUpdatedByUser(username);
-                }
-                if (n.contains("descarga") && dto.getTargetInboundUnloadMinutes() != null) {
-                    k.setTargetThreshold(dto.getTargetInboundUnloadMinutes());
-                    k.setUpdatedByUser(username);
-                }
-                if ((n.contains("picking") || n.contains("productividad")) && dto.getTargetForkliftPph() != null) {
-                    k.setTargetThreshold(dto.getTargetForkliftPph());
-                    k.setUpdatedByUser(username);
+        if (kpis != null && !kpis.isEmpty()) {
+            for (PerformanceKpiEntity k : kpis) {
+                if (k != null && k.getName() != null) {
+                    String n = k.getName().toLowerCase();
+                    if ((n.contains("ocupación") || n.contains("ocupacion"))
+                            && dto.getTargetOccupancyPercentage() != null) {
+                        k.setTargetThreshold(dto.getTargetOccupancyPercentage());
+                        k.setUpdatedByUser(username);
+                    }
+                    if ((n.contains("exactitud") || n.contains("ira")) && dto.getTargetIraPercentage() != null) {
+                        k.setTargetThreshold(dto.getTargetIraPercentage());
+                        k.setUpdatedByUser(username);
+                    }
+                    if ((n.contains("puntualidad") || n.contains("otif")) && dto.getTargetOtifPercentage() != null) {
+                        k.setTargetThreshold(dto.getTargetOtifPercentage());
+                        k.setUpdatedByUser(username);
+                    }
+                    if (n.contains("descarga") && dto.getTargetInboundUnloadMinutes() != null) {
+                        k.setTargetThreshold(dto.getTargetInboundUnloadMinutes());
+                        k.setUpdatedByUser(username);
+                    }
+                    if ((n.contains("picking") || n.contains("productividad")) && dto.getTargetForkliftPph() != null) {
+                        k.setTargetThreshold(dto.getTargetForkliftPph());
+                        k.setUpdatedByUser(username);
+                    }
                 }
             }
+            performanceKpiJpaRepository.saveAll(kpis);
         }
-
-        performanceKpiJpaRepository.saveAll(kpis);
 
         dto.setLastUpdatedBy(username != null ? username : "admin");
         dto.setLastUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC));

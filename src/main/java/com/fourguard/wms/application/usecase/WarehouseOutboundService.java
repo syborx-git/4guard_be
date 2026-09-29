@@ -59,6 +59,7 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
     private final SecurityAuditHelper securityAuditHelper;
     private final PasswordEncoder passwordEncoder;
     private final WarehouseOutboundMapper outboundMapper;
+    private final com.fourguard.wms.infrastructure.persistence.repository.WarehouseReceptionPalletJpaRepository receptionPalletJpaRepository;
 
     @Override
     @Transactional
@@ -218,9 +219,6 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
                 if (item.getBranch() != null && !item.getBranch().getId().equals(branch.getId())) {
                     throw new ValidationException("La tarima " + item.getSscc() + " pertenece a otra sucursal.");
                 }
-                if (item.getClient() != null && !item.getClient().getId().equals(client.getId())) {
-                    throw new ValidationException("La tarima " + item.getSscc() + " pertenece a otro cliente (" + item.getClient().getName() + ").");
-                }
             }
         }
 
@@ -333,18 +331,40 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
 
         WarehouseOutboundEntity saved = outboundRepositoryPort.save(outbound);
 
-        logAudit(saved.getId(), "SALIDA_REGISTRADA",
-                Map.of(),
-                Map.of("folio", folio,
-                       "status", targetStatus.name(),
-                       "client", client.getName(),
-                       "destination", destName != null ? destName : "N/A",
-                       "carrier", carrier != null ? carrier.getName() : "N/A",
-                       "ramp", ramp != null ? (ramp.getCode() != null ? ramp.getCode() : (ramp.getName() != null ? ramp.getName() : "Rampa")) : "N/A",
-                       "forkliftOperator", operator != null ? operator.getFullName() : (request.getForkliftOperatorName() != null ? request.getForkliftOperatorName() : "N/A"),
-                       "sealNumber", request.getSealNumber() != null ? request.getSealNumber() : "N/A",
-                       "totalPallets", String.valueOf(itemsToDispatch.size()),
-                       "totalPieces", String.valueOf(totalPieces)));
+        Map<String, String> initialData = new LinkedHashMap<>();
+        initialData.put("folio", folio);
+        initialData.put("status", targetStatus.name());
+        initialData.put("client", client.getName());
+        if (destName != null && !destName.isBlank() && !"N/A".equalsIgnoreCase(destName)) {
+            initialData.put("destination", destName);
+        }
+        if (carrier != null) {
+            initialData.put("carrier", carrier.getName());
+        }
+        if (request.getDriverName() != null && !request.getDriverName().isBlank()) {
+            initialData.put("driver", request.getDriverName());
+        }
+        if (request.getTractorPlates() != null && !request.getTractorPlates().isBlank()) {
+            initialData.put("tractorPlates", request.getTractorPlates());
+        }
+        if (request.getBoxPlates() != null && !request.getBoxPlates().isBlank()) {
+            initialData.put("boxPlates", request.getBoxPlates());
+        }
+        if (ramp != null) {
+            initialData.put("ramp", ramp.getCode() != null ? ramp.getCode() : (ramp.getName() != null ? ramp.getName() : "Rampa"));
+        }
+        if (operator != null) {
+            initialData.put("forkliftOperator", operator.getFullName());
+        }
+        if (request.getSealNumber() != null && !request.getSealNumber().isBlank() && !"PENDIENTE_ANDEN".equals(request.getSealNumber())) {
+            initialData.put("sealNumber", request.getSealNumber());
+        }
+        if (targetStatus == OutboundStatus.COMPLETED) {
+            initialData.put("totalPallets", String.valueOf(itemsToDispatch.size()));
+            initialData.put("totalPieces", String.valueOf(totalPieces));
+        }
+
+        logAudit(saved.getId(), "SALIDA_REGISTRADA", Map.of(), initialData);
 
         return outboundMapper.toResponse(saved);
     }
@@ -424,65 +444,235 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
             LocationEntity ramp = null;
             if (request.getRampId() != null) {
                 ramp = locationRepositoryPort.findById(request.getRampId()).orElse(null);
-            } else if (request.getRampNumber() != null && outbound.getBranch() != null) {
+            } else if (request.getRampNumber() != null) {
                 String formattedCode = String.format("LOC-RAMP-%02d", request.getRampNumber());
-                ramp = locationRepositoryPort.findByBranchIdAndCode(outbound.getBranch().getId(), formattedCode).orElse(null);
+                if (outbound.getBranch() != null) {
+                    ramp = locationRepositoryPort.findByBranchIdAndCode(outbound.getBranch().getId(), formattedCode).orElse(null);
+                }
                 if (ramp == null) {
                     ramp = locationRepositoryPort.findFirstByCode(formattedCode).orElse(null);
                 }
             }
-            if (ramp != null) {
-                String oldRamp = outbound.getRamp() != null ? (outbound.getRamp().getCode() != null ? outbound.getRamp().getCode() : outbound.getRamp().getName()) : "N/A";
-                outbound.setRamp(ramp);
+            String oldRamp = outbound.getRamp() != null ? (outbound.getRamp().getCode() != null ? outbound.getRamp().getCode() : outbound.getRamp().getName()) : "Sin asignar";
+            String newRamp = ramp != null ? (ramp.getCode() != null ? ramp.getCode() : (ramp.getName() != null ? ramp.getName() : ("Rampa " + request.getRampNumber()))) : (request.getRampNumber() != null ? ("Rampa " + request.getRampNumber()) : null);
+            if (newRamp != null && !Objects.equals(oldRamp, newRamp)) {
+                if (ramp != null) {
+                    outbound.setRamp(ramp);
+                }
                 oldValues.put("ramp", oldRamp);
-                newValues.put("ramp", ramp.getCode() != null ? ramp.getCode() : (ramp.getName() != null ? ramp.getName() : "Rampa"));
+                newValues.put("ramp", newRamp);
             }
         }
 
         // 3. Forklift Operator assignment
+        ForkliftOperatorEntity operator = null;
         if (request.getForkliftOperatorId() != null) {
-            ForkliftOperatorEntity operator = forkliftOperatorRepositoryPort.findById(request.getForkliftOperatorId()).orElse(null);
-            if (operator != null) {
-                String oldOp = outbound.getForkliftOperator() != null ? outbound.getForkliftOperator().getFullName() : "N/A";
+            operator = forkliftOperatorRepositoryPort.findById(request.getForkliftOperatorId()).orElse(null);
+        }
+        if (operator == null && request.getForkliftOperatorName() != null && !request.getForkliftOperatorName().isBlank()) {
+            String opSearch = request.getForkliftOperatorName().trim();
+            operator = forkliftOperatorRepositoryPort.findAll().stream()
+                    .filter(o -> (o.getFullName() != null && o.getFullName().equalsIgnoreCase(opSearch)) ||
+                                 (o.getCode() != null && o.getCode().equalsIgnoreCase(opSearch)))
+                    .findFirst()
+                    .orElse(null);
+        }
+        if (operator != null) {
+            String oldOp = outbound.getForkliftOperator() != null ? outbound.getForkliftOperator().getFullName() : "Sin asignar";
+            String newOp = operator.getFullName();
+            if (!Objects.equals(oldOp, newOp)) {
                 outbound.setForkliftOperator(operator);
                 oldValues.put("forkliftOperator", oldOp);
-                newValues.put("forkliftOperator", operator.getFullName());
+                newValues.put("forkliftOperator", newOp);
+            }
+        } else if (request.getForkliftOperatorName() != null && !request.getForkliftOperatorName().isBlank()) {
+            String oldOp = outbound.getForkliftOperator() != null ? outbound.getForkliftOperator().getFullName() : "Sin asignar";
+            String newOp = request.getForkliftOperatorName().trim();
+            if (!Objects.equals(oldOp, newOp)) {
+                oldValues.put("forkliftOperator", oldOp);
+                newValues.put("forkliftOperator", newOp);
             }
         }
 
         // 4. Vehicle & Driver data
         if (request.getDriverName() != null && !request.getDriverName().isBlank()) {
-            oldValues.put("driverName", outbound.getDriverName());
-            newValues.put("driverName", request.getDriverName());
-            outbound.setDriverName(request.getDriverName());
+            String oldDriver = outbound.getDriverName();
+            String newDriver = request.getDriverName().trim();
+            if (!Objects.equals(oldDriver, newDriver)) {
+                oldValues.put("driverName", oldDriver != null ? oldDriver : "Sin especificar");
+                newValues.put("driverName", newDriver);
+                outbound.setDriverName(newDriver);
+            }
         }
         if (request.getTractorPlates() != null && !request.getTractorPlates().isBlank()) {
-            oldValues.put("tractorPlates", outbound.getTractorPlates());
-            newValues.put("tractorPlates", request.getTractorPlates());
-            outbound.setTractorPlates(request.getTractorPlates());
+            String oldTractor = outbound.getTractorPlates();
+            String newTractor = request.getTractorPlates().trim();
+            if (!Objects.equals(oldTractor, newTractor)) {
+                oldValues.put("tractorPlates", oldTractor != null ? oldTractor : "Sin especificar");
+                newValues.put("tractorPlates", newTractor);
+                outbound.setTractorPlates(newTractor);
+            }
         }
         if (request.getBoxPlates() != null && !request.getBoxPlates().isBlank()) {
-            oldValues.put("boxPlates", outbound.getBoxPlates());
-            newValues.put("boxPlates", request.getBoxPlates());
-            outbound.setBoxPlates(request.getBoxPlates());
+            String oldBox = outbound.getBoxPlates();
+            String newBox = request.getBoxPlates().trim();
+            if (!Objects.equals(oldBox, newBox)) {
+                oldValues.put("boxPlates", oldBox != null ? oldBox : "Sin especificar");
+                newValues.put("boxPlates", newBox);
+                outbound.setBoxPlates(newBox);
+            }
         }
         if (request.getEconomicNumber() != null) {
-            outbound.setEconomicNumber(request.getEconomicNumber());
+            String oldEco = outbound.getEconomicNumber() != null ? outbound.getEconomicNumber().trim() : "";
+            String newEco = request.getEconomicNumber().trim();
+            if (!Objects.equals(oldEco, newEco) && (!oldEco.isEmpty() || !newEco.isEmpty())) {
+                oldValues.put("economicNumber", !oldEco.isEmpty() ? oldEco : "Sin especificar");
+                newValues.put("economicNumber", !newEco.isEmpty() ? newEco : "Sin especificar");
+                outbound.setEconomicNumber(!newEco.isEmpty() ? newEco : null);
+            }
         }
         if (request.getBoxEconomicNumber() != null) {
-            outbound.setBoxEconomicNumber(request.getBoxEconomicNumber());
+            String oldBoxEco = outbound.getBoxEconomicNumber() != null ? outbound.getBoxEconomicNumber().trim() : "";
+            String newBoxEco = request.getBoxEconomicNumber().trim();
+            if (!Objects.equals(oldBoxEco, newBoxEco) && (!oldBoxEco.isEmpty() || !newBoxEco.isEmpty())) {
+                oldValues.put("boxEconomicNumber", !oldBoxEco.isEmpty() ? oldBoxEco : "Sin especificar");
+                newValues.put("boxEconomicNumber", !newBoxEco.isEmpty() ? newBoxEco : "Sin especificar");
+                outbound.setBoxEconomicNumber(!newBoxEco.isEmpty() ? newBoxEco : null);
+            }
         }
 
         // 5. Seal number
         if (request.getSealNumber() != null && !request.getSealNumber().isBlank()) {
-            oldValues.put("sealNumber", outbound.getSealNumber());
-            newValues.put("sealNumber", request.getSealNumber());
-            outbound.setSealNumber(request.getSealNumber());
+            String oldSeal = outbound.getSealNumber();
+            String newSeal = request.getSealNumber().trim();
+            if (!Objects.equals(oldSeal, newSeal)) {
+                oldValues.put("sealNumber", oldSeal != null ? oldSeal : "Sin especificar");
+                newValues.put("sealNumber", newSeal);
+                outbound.setSealNumber(newSeal);
+            }
         }
 
-        // 6. Observations
-        if (request.getObservations() != null) {
+        // 6. Destination update (con resolución flexible por ID y por nombre en catálogo de destinos)
+        ClientDestinationEntity dest = null;
+        if (request.getDestinationId() != null) {
+            dest = clientDestinationRepositoryPort.findById(request.getDestinationId()).orElse(null);
+        }
+        if (dest == null && request.getDestinationName() != null && !request.getDestinationName().isBlank()) {
+            String searchName = request.getDestinationName().trim();
+            dest = clientDestinationRepositoryPort.findAll().stream()
+                    .filter(d -> (d.getPlantName() != null && d.getPlantName().equalsIgnoreCase(searchName)) ||
+                                 (d.getDestinationCode() != null && d.getDestinationCode().equalsIgnoreCase(searchName)))
+                    .findFirst()
+                    .orElse(null);
+        }
+        String newDestName = dest != null ? dest.getPlantName() : (request.getDestinationName() != null ? request.getDestinationName().trim() : null);
+        String newDestAddress = (dest != null && dest.getFullAddress() != null && !dest.getFullAddress().isBlank())
+                ? dest.getFullAddress()
+                : (request.getDestinationAddress() != null ? request.getDestinationAddress().trim() : null);
+
+        if (newDestName != null && !newDestName.isBlank()) {
+            String oldDest = outbound.getDestinationName();
+            if (oldDest == null && outbound.getDestination() != null) {
+                oldDest = outbound.getDestination().getPlantName();
+            }
+            String oldDestClean = (oldDest != null && !oldDest.isBlank() && !"Sin especificar".equalsIgnoreCase(oldDest)) ? oldDest.trim() : "";
+            String newDestClean = newDestName.trim();
+
+            if (!oldDestClean.equalsIgnoreCase(newDestClean)) {
+                oldValues.put("destination", !oldDestClean.isEmpty() ? oldDestClean : "Sin especificar");
+                newValues.put("destination", newDestClean);
+                outbound.setDestination(dest);
+                outbound.setDestinationName(newDestClean);
+                if (newDestAddress != null && !newDestAddress.isBlank()) {
+                    outbound.setDestinationAddress(newDestAddress);
+                }
+            } else {
+                if (dest != null) outbound.setDestination(dest);
+                outbound.setDestinationName(newDestClean);
+                if (newDestAddress != null && !newDestAddress.isBlank()) {
+                    outbound.setDestinationAddress(newDestAddress);
+                }
+            }
+        }
+
+        // 7. Carrier update
+        CarrierEntity carrier = null;
+        if (request.getCarrierId() != null) {
+            carrier = carrierRepositoryPort.findById(request.getCarrierId()).orElse(null);
+        } else if (request.getCarrierName() != null && !request.getCarrierName().isBlank() && outbound.getOrganization() != null) {
+            List<CarrierEntity> orgCarriers = carrierRepositoryPort.findByOrganizationId(outbound.getOrganization().getId());
+            String searchName = request.getCarrierName().trim();
+            carrier = orgCarriers.stream()
+                    .filter(c -> (c.getName() != null && c.getName().equalsIgnoreCase(searchName)) ||
+                                 (c.getTradeName() != null && c.getTradeName().equalsIgnoreCase(searchName)))
+                    .findFirst()
+                    .orElse(null);
+        }
+        if (carrier != null) {
+            String oldCarrier = outbound.getCarrier() != null ? outbound.getCarrier().getName() : "Sin especificar";
+            String newCarrier = carrier.getName();
+            if (!Objects.equals(oldCarrier, newCarrier)) {
+                oldValues.put("carrier", oldCarrier);
+                newValues.put("carrier", newCarrier);
+                outbound.setCarrier(carrier);
+            }
+        }
+
+        // 8. Observations
+        if (request.getObservations() != null && !Objects.equals(outbound.getObservations(), request.getObservations())) {
+            oldValues.put("observations", outbound.getObservations() != null ? outbound.getObservations() : "Sin especificar");
+            newValues.put("observations", request.getObservations());
             outbound.setObservations(request.getObservations());
+        }
+
+        // 9. Pallets / Items assignment and update
+        if (request.getSelectedItemIds() != null) {
+            List<InventoryItemEntity> itemsToDispatch = new ArrayList<>();
+            if (!request.getSelectedItemIds().isEmpty()) {
+                itemsToDispatch = inventoryItemJpaRepository.findAllByIdInWithDetails(request.getSelectedItemIds());
+                for (InventoryItemEntity item : itemsToDispatch) {
+                    if (item.getState() != InventoryState.AVAILABLE && item.getState() != InventoryState.EXPIRED && item.getState() != InventoryState.DISPATCHED) {
+                        throw new ValidationException("La tarima " + (item.getSscc() != null ? item.getSscc() : item.getExternalUa()) + " no está disponible para despacho (Estado: " + item.getState() + ")");
+                    }
+                }
+            }
+
+            if (outbound.getItems() != null) {
+                outbound.getItems().clear();
+            } else {
+                outbound.setItems(new ArrayList<>());
+            }
+
+            Set<UUID> distinctSkuIds = itemsToDispatch.stream()
+                    .filter(i -> i.getSku() != null)
+                    .map(i -> i.getSku().getId())
+                    .collect(Collectors.toSet());
+            double totalPieces = itemsToDispatch.stream()
+                    .mapToDouble(i -> i.getQuantity() != null ? i.getQuantity().doubleValue() : 0.0)
+                    .sum();
+
+            for (InventoryItemEntity item : itemsToDispatch) {
+                String locCode = item.getLocation() != null ? item.getLocation().getCode() : "N/A";
+                outbound.getItems().add(WarehouseOutboundItemEntity.builder()
+                        .outbound(outbound)
+                        .item(item)
+                        .pieces(item.getQuantity() != null ? item.getQuantity() : BigDecimal.ZERO)
+                        .palletCode(item.getSscc() != null ? item.getSscc() : item.getExternalUa())
+                        .lotNumber(item.getBatchNumber())
+                        .expirationDate(item.getExpirationDate())
+                        .locationCode(locCode)
+                        .build());
+            }
+
+            int oldPallets = outbound.getTotalPallets() != null ? outbound.getTotalPallets() : 0;
+            if (oldPallets != itemsToDispatch.size()) {
+                oldValues.put("totalPallets", oldPallets);
+                newValues.put("totalPallets", itemsToDispatch.size());
+            }
+
+            outbound.setTotalPallets(itemsToDispatch.size());
+            outbound.setTotalPieces(BigDecimal.valueOf(totalPieces));
+            outbound.setDistinctSkus(distinctSkuIds.size());
         }
 
         String currentUsername = securityAuditHelper.getCurrentUsername();
@@ -491,7 +681,20 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
         WarehouseOutboundEntity saved = outboundRepositoryPort.save(outbound);
 
         if (!newValues.isEmpty()) {
-            logAudit(saved.getId(), "SALIDA_MODIFICADA", oldValues, newValues);
+            String auditAction = "SALIDA_MODIFICADA";
+            if (newValues.containsKey("status")) {
+                String newSt = String.valueOf(newValues.get("status"));
+                auditAction = switch (newSt) {
+                    case "ASSIGNED" -> "SALIDA_ASIGNADA";
+                    case "IN_PROGRESS" -> "SALIDA_EN_CARGA";
+                    case "LOADED" -> "SALIDA_CARGADA";
+                    case "COMPLETED" -> "SALIDA_DESPACHADA";
+                    default -> "SALIDA_MODIFICADA";
+                };
+            } else if (newValues.containsKey("ramp") || newValues.containsKey("forkliftOperator")) {
+                auditAction = "SALIDA_ASIGNADA";
+            }
+            logAudit(saved.getId(), auditAction, oldValues, newValues);
         }
 
         return outboundMapper.toResponse(saved);
@@ -515,13 +718,18 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
         outbound.setCancellationReason(request.getReason());
         outbound.setCancelledBy(admin.getFirstName() + " " + admin.getLastName());
 
-        // Revert items back to AVAILABLE
+        // Revert items back to AVAILABLE and restore location occupancy
         if (outbound.getItems() != null) {
             for (WarehouseOutboundItemEntity oi : outbound.getItems()) {
                 InventoryItemEntity item = oi.getItem();
-                if (item != null && item.getState() == InventoryState.DISPATCHED) {
+                if (item != null && (item.getState() == InventoryState.DISPATCHED || item.getState() == InventoryState.RESERVED)) {
+                    boolean wasDispatched = (item.getState() == InventoryState.DISPATCHED);
                     item.setState(InventoryState.AVAILABLE);
                     inventoryItemRepositoryPort.save(item);
+
+                    if (wasDispatched && item.getLocation() != null && item.getLocation().getId() != null) {
+                        locationRepositoryPort.incrementOccupancy(item.getLocation().getId(), 1);
+                    }
 
                     InventoryMovementEntity comp = InventoryMovementEntity.builder()
                             .item(item)
@@ -584,15 +792,50 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
         List<InventoryItemEntity> availableItems = inventoryItemJpaRepository.findAvailableBatchesWithFilters(
                 organizationId, branchId, clientId, skuId, cleanSearch);
 
-        // Group by (sapFolio / remisionNo, lotNumber, expirationDate, sku)
+        List<UUID> itemIds = availableItems.stream().map(InventoryItemEntity::getId).toList();
+        List<String> palletCodes = availableItems.stream()
+                .flatMap(i -> java.util.stream.Stream.of(i.getSscc(), i.getExternalUa()))
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(s -> !s.isBlank())
+                .map(String::toUpperCase)
+                .distinct()
+                .toList();
+
+        Map<UUID, Integer> palletNumberByItemId = new HashMap<>();
+        Map<String, Integer> palletNumberByCode = new HashMap<>();
+
+        if (!palletCodes.isEmpty() || !itemIds.isEmpty()) {
+            List<WarehouseReceptionPalletEntity> recPallets = receptionPalletJpaRepository.findPalletsByCodesOrItemIds(
+                    palletCodes.isEmpty() ? List.of("__NONE__") : palletCodes,
+                    itemIds.isEmpty() ? List.of(UUID.randomUUID()) : itemIds
+            );
+            for (WarehouseReceptionPalletEntity rp : recPallets) {
+                if (rp.getInventoryItem() != null && rp.getPalletNumber() != null) {
+                    palletNumberByItemId.put(rp.getInventoryItem().getId(), rp.getPalletNumber());
+                }
+                if (rp.getPalletCode() != null && rp.getPalletNumber() != null) {
+                    palletNumberByCode.put(rp.getPalletCode().trim().toUpperCase(), rp.getPalletNumber());
+                }
+                if (rp.getSupplierUaCode() != null && rp.getPalletNumber() != null) {
+                    palletNumberByCode.put(rp.getSupplierUaCode().trim().toUpperCase(), rp.getPalletNumber());
+                }
+                if (rp.getInternalUaCode() != null && rp.getPalletNumber() != null) {
+                    palletNumberByCode.put(rp.getInternalUaCode().trim().toUpperCase(), rp.getPalletNumber());
+                }
+            }
+        }
+
+        // Group by (sapFolio / remisionNo, lotNumber, expirationDate, sku, locationCode) with deterministic order
         Map<String, List<InventoryItemEntity>> grouped = availableItems.stream().collect(
                 Collectors.groupingBy(i -> {
                     String rem = i.getSapFolio() != null ? i.getSapFolio() : "REM-SIN-FOLIO";
                     String lot = i.getBatchNumber() != null ? i.getBatchNumber() : "LOTE-GENERAL";
                     String exp = i.getExpirationDate() != null ? i.getExpirationDate().toString() : "SIN-CADUCIDAD";
                     String sku = i.getSku() != null ? i.getSku().getId().toString() : "SKU-NIL";
-                    return rem + "___" + lot + "___" + exp + "___" + sku;
-                })
+                    String loc = i.getLocation() != null ? i.getLocation().getId().toString() : "LOC-NIL";
+                    return rem + "___" + lot + "___" + exp + "___" + sku + "___" + loc;
+                }, LinkedHashMap::new, Collectors.toList())
         );
 
         List<InventoryBatchResponse> batches = new ArrayList<>();
@@ -605,9 +848,23 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
 
             List<InventoryBatchResponse.BatchPalletItemResponse> palletResponses = groupItems.stream().map(item -> {
                 String pLoc = item.getLocation() != null ? item.getLocation().getCode() : "N/A";
+                Integer pNum = palletNumberByItemId.get(item.getId());
+                if (pNum == null && item.getSscc() != null) {
+                    pNum = palletNumberByCode.get(item.getSscc().trim().toUpperCase());
+                }
+                if (pNum == null && item.getExternalUa() != null) {
+                    pNum = palletNumberByCode.get(item.getExternalUa().trim().toUpperCase());
+                }
+                if (pNum == null && item.getMetadata() != null && item.getMetadata().get("palletNumber") != null) {
+                    try {
+                        pNum = Integer.parseInt(item.getMetadata().get("palletNumber").toString());
+                    } catch (Exception ignored) {}
+                }
+
                 return InventoryBatchResponse.BatchPalletItemResponse.builder()
                         .itemId(item.getId())
-                        .palletCode(item.getSscc())
+                        .palletNumber(pNum)
+                        .palletCode(item.getSscc() != null ? item.getSscc() : item.getExternalUa())
                         .skuCode(item.getSku() != null ? item.getSku().getCode() : "")
                         .description(item.getSku() != null ? item.getSku().getName() : "")
                         .lotNumber(item.getBatchNumber())
@@ -618,6 +875,10 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
                         .locationCode(pLoc)
                         .build();
             }).collect(Collectors.toList());
+
+            palletResponses.sort(Comparator.comparing(
+                    p -> p.getPalletNumber() != null ? p.getPalletNumber() : Integer.MAX_VALUE
+            ));
 
             batches.add(InventoryBatchResponse.builder()
                     .remisionNo(first.getSapFolio() != null ? first.getSapFolio() : "REM-0000")
@@ -839,8 +1100,15 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
                         .build()).collect(Collectors.toList()) : List.of();
 
         String actionLabel = switch (log.getAction()) {
-            case "SALIDA_REGISTRADA" -> "Despacho Outbound Confirmado";
-            case "SALIDA_CANCELADA" -> "Cancelación de Despacho Outbound";
+            case "SALIDA_REGISTRADA" -> "Arribo & Registro en Caseta";
+            case "SALIDA_MODIFICADA", "SALIDA_ACTUALIZADA" -> "Ficha de Salida Actualizada";
+            case "SALIDA_ASIGNADA" -> "Asignación de Andén & Montacarguista";
+            case "SALIDA_EN_CARGA", "CARGA_INICIADA" -> "Inicio de Carga en Andén (Terminal RF)";
+            case "SALIDA_CARGADA", "CARGA_CONCLUIDA" -> "Carga Física Concluida (Por Auditar)";
+            case "SALIDA_DESPACHADA", "OUTBOUND_COMPLETED", "SALIDA_AUTORIZADA" -> "Despacho Outbound Confirmado (F03)";
+            case "SALIDA_CANCELADA" -> "Cancelación Extraordinaria con Autorización";
+            case "TARIMAS_ASIGNADAS" -> "Tarimas de Inventario Asignadas (FEFO)";
+            case "REMISION_MODIFICADA" -> "Modificación de Remisión / Carta Porte";
             default -> log.getAction();
         };
 
@@ -867,10 +1135,15 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
         if (field == null || field.isBlank()) return "Dato";
         return switch (field.trim()) {
             case "client", "clientId", "clientName" -> "Cliente / Destinatario";
+            case "destination", "destinationId", "destinationName", "plant" -> "Planta / Destino";
             case "carrier", "carrierId", "carrierName" -> "Línea Transportista";
             case "forkliftOperator", "forklift_operator", "operator" -> "Operador de Montacargas";
             case "driver", "driverName" -> "Operador del Transporte";
-            case "plates", "tractorPlates", "boxPlates" -> "Placas (Tractor / Caja)";
+            case "plates", "tractorPlates" -> "Placas del Tracto";
+            case "boxPlates" -> "Placas de la Caja";
+            case "economicNumber" -> "No. Económico Tractor";
+            case "boxEconomicNumber" -> "No. Económico Caja";
+            case "ramp", "rampId", "rampNumber" -> "Rampa Asignada";
             case "status" -> "Estado Operativo";
             case "reason", "cancellationReason" -> "Motivo / Justificación";
             case "authorizedBy", "authorized_by" -> "Autorizado Por (Supervisor)";
@@ -879,6 +1152,7 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
             case "totalPieces", "pieces" -> "Piezas Totales Despachadas";
             case "folio" -> "Folio de Operación";
             case "sealNumber" -> "Número de Sello / Marchamo";
+            case "observations" -> "Observaciones";
             default -> field;
         };
     }

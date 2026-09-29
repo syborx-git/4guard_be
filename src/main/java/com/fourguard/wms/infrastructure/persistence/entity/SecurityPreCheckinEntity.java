@@ -51,7 +51,7 @@ public class SecurityPreCheckinEntity extends BaseVersionedEntity {
 
     @Column(nullable = false, length = 30)
     @Builder.Default
-    private String status = "PENDING_DRIVER"; // PENDING_DRIVER, SUBMITTED, COMPLETED, CANCELLED
+    private String status = "PENDING_DRIVER"; // PENDING_DRIVER, SUBMITTED, COMPLETED, COMPLETED_EXIT, CANCELLED
 
     @Column(name = "operation_type", nullable = false, length = 20)
     @Builder.Default

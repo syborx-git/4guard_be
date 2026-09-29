@@ -327,7 +327,7 @@ public class LocationService implements LocationUseCase {
                     double pctB = (double) (b.getCurrentOccupancy() != null ? b.getCurrentOccupancy() : 0) / capB;
                     return Double.compare(pctA, pctB);
                 })
-                .map(LocationEntity::getId)
+                .map(loc -> loc.getId())
                 .orElse(null);
 
         return locations.stream()
@@ -361,7 +361,7 @@ public class LocationService implements LocationUseCase {
                             .status(loc.getStatus() != null ? loc.getStatus().name() : "ACTIVE")
                             .isBlocked(Boolean.TRUE.equals(loc.getIsBlocked()))
                             .trafficLight(trafficLight)
-                            .isRecommended(loc.getId().equals(recommendedId))
+                            .isRecommended(java.util.Objects.equals(loc.getId(), recommendedId))
                             .build();
                 })
                 .collect(Collectors.toList());

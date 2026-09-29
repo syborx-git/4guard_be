@@ -14,7 +14,10 @@ import java.util.UUID;
 public class UpdateReceptionParametersRequest {
 
     private UUID skuId;
+    private String skuCode;
+    private String productName;
     private UUID supplierId;
+    private String supplierName;
     private String lotNumber;
     private LocalDate elaborationDate;
     private LocalDate expirationDate;

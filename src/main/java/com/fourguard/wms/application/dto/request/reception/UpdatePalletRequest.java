@@ -10,4 +10,6 @@ public class UpdatePalletRequest {
     private Double pieces;
     private String palletType;
     private String observations;
+    private String lotNumber;
+    private java.time.LocalDate expirationDate;
 }

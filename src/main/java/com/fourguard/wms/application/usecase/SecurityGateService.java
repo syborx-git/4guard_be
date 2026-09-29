@@ -43,8 +43,6 @@ public class SecurityGateService implements SecurityGateUseCase {
     private final BranchRepositoryPort branchRepositoryPort;
     private final ClientRepositoryPort clientRepositoryPort;
     private final CarrierRepositoryPort carrierRepositoryPort;
-    private final LocationRepositoryPort locationRepositoryPort;
-    private final ForkliftOperatorRepositoryPort forkliftOperatorRepositoryPort;
     private final WarehouseReceptionRepositoryPort warehouseReceptionRepositoryPort;
     private final WarehouseOutboundRepositoryPort warehouseOutboundRepositoryPort;
     private final WarehouseReceptionUseCase warehouseReceptionUseCase;
@@ -64,24 +62,30 @@ public class SecurityGateService implements SecurityGateUseCase {
                 ? carrierRepositoryPort.findByOrganizationId(organizationId)
                 : carrierRepositoryPort.findAll();
 
-        List<SecurityGatePublicCatalogsResponse.CatalogItemDto> clientDtos = (clientEntities != null ? clientEntities : Collections.<ClientEntity>emptyList()).stream()
-                .filter(c -> c.getStatus() == null || "ACTIVE".equalsIgnoreCase(c.getStatus()) || "ACTIVO".equalsIgnoreCase(c.getStatus()))
+        List<SecurityGatePublicCatalogsResponse.CatalogItemDto> clientDtos = (clientEntities != null ? clientEntities
+                : Collections.<ClientEntity>emptyList()).stream()
+                .filter(c -> c.getStatus() == null || "ACTIVE".equalsIgnoreCase(c.getStatus())
+                        || "ACTIVO".equalsIgnoreCase(c.getStatus()))
                 .map(c -> SecurityGatePublicCatalogsResponse.CatalogItemDto.builder()
                         .id(c.getId().toString())
-                        .code(c.getExternalId() != null && !c.getExternalId().isBlank() ? c.getExternalId() : c.getId().toString())
+                        .code(c.getExternalId() != null && !c.getExternalId().isBlank() ? c.getExternalId()
+                                : c.getId().toString())
                         .name(c.getName())
                         .tradeName(c.getName())
                         .build())
                 .sorted(Comparator.comparing(SecurityGatePublicCatalogsResponse.CatalogItemDto::getName))
                 .toList();
 
-        List<SecurityGatePublicCatalogsResponse.CatalogItemDto> carrierDtos = (carrierEntities != null ? carrierEntities : Collections.<CarrierEntity>emptyList()).stream()
-                .filter(c -> c.getStatus() == null || c.getStatus() == com.fourguard.wms.domain.enums.CarrierStatus.ACTIVE)
+        List<SecurityGatePublicCatalogsResponse.CatalogItemDto> carrierDtos = (carrierEntities != null ? carrierEntities
+                : Collections.<CarrierEntity>emptyList()).stream()
+                .filter(c -> c.getStatus() == null
+                        || c.getStatus() == com.fourguard.wms.domain.enums.CarrierStatus.ACTIVE)
                 .map(c -> SecurityGatePublicCatalogsResponse.CatalogItemDto.builder()
                         .id(c.getId().toString())
                         .code(c.getId().toString())
                         .name(c.getName())
-                        .tradeName(c.getTradeName() != null && !c.getTradeName().isBlank() ? c.getTradeName() : c.getName())
+                        .tradeName(c.getTradeName() != null && !c.getTradeName().isBlank() ? c.getTradeName()
+                                : c.getName())
                         .build())
                 .sorted(Comparator.comparing(SecurityGatePublicCatalogsResponse.CatalogItemDto::getTradeName))
                 .toList();
@@ -98,8 +102,7 @@ public class SecurityGateService implements SecurityGateUseCase {
                 "Tolva",
                 "Pipa",
                 "Camioneta / Van",
-                "Otro (Especificar)"
-        );
+                "Otro (Especificar)");
 
         List<String> boxDimensions = List.of(
                 "53 Pies",
@@ -110,8 +113,7 @@ public class SecurityGateService implements SecurityGateUseCase {
                 "Rabón",
                 "3.5 Toneladas",
                 "N/A - Plataforma",
-                "Otra Medida"
-        );
+                "Otra Medida");
 
         return SecurityGatePublicCatalogsResponse.builder()
                 .clients(clientDtos)
@@ -124,10 +126,12 @@ public class SecurityGateService implements SecurityGateUseCase {
     @Override
     @Transactional
     public PassResponse generatePass(GeneratePassRequest request) {
-        log.info("Generating digital pass QR for organization: {}, branch: {}", request.getOrganizationId(), request.getBranchId());
+        log.info("Generating digital pass QR for organization: {}, branch: {}", request.getOrganizationId(),
+                request.getBranchId());
 
         OrganizationEntity organization = organizationRepositoryPort.findById(request.getOrganizationId())
-                .orElseThrow(() -> new EntityNotFoundException("Organización no encontrada: " + request.getOrganizationId()));
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "Organización no encontrada: " + request.getOrganizationId()));
 
         BranchEntity branch = branchRepositoryPort.findById(request.getBranchId())
                 .orElseThrow(() -> new EntityNotFoundException("Sucursal no encontrada: " + request.getBranchId()));
@@ -137,8 +141,9 @@ public class SecurityGateService implements SecurityGateUseCase {
         ClientEntity client = null;
         if (request.getClientCode() != null && !request.getClientCode().isBlank()) {
             client = clientRepositoryPort.findByOrganizationId(organization.getId()).stream()
-                    .filter(c -> (c.getExternalId() != null && c.getExternalId().equalsIgnoreCase(request.getClientCode())) ||
-                                 (c.getName() != null && c.getName().equalsIgnoreCase(request.getClientCode())))
+                    .filter(c -> (c.getExternalId() != null
+                            && c.getExternalId().equalsIgnoreCase(request.getClientCode())) ||
+                            (c.getName() != null && c.getName().equalsIgnoreCase(request.getClientCode())))
                     .findFirst()
                     .orElse(null);
         }
@@ -146,8 +151,9 @@ public class SecurityGateService implements SecurityGateUseCase {
         CarrierEntity carrier = null;
         if (request.getCarrierLineCode() != null && !request.getCarrierLineCode().isBlank()) {
             carrier = carrierRepositoryPort.findByOrganizationId(organization.getId()).stream()
-                    .filter(c -> (c.getTaxId() != null && c.getTaxId().equalsIgnoreCase(request.getCarrierLineCode())) ||
-                                 (c.getName() != null && c.getName().equalsIgnoreCase(request.getCarrierLineCode())))
+                    .filter(c -> (c.getTaxId() != null && c.getTaxId().equalsIgnoreCase(request.getCarrierLineCode()))
+                            ||
+                            (c.getName() != null && c.getName().equalsIgnoreCase(request.getCarrierLineCode())))
                     .findFirst()
                     .orElse(null);
         }
@@ -164,10 +170,12 @@ public class SecurityGateService implements SecurityGateUseCase {
                 .operationType(opType)
                 .client(client)
                 .clientCode(request.getClientCode())
-                .clientName(request.getClientName() != null ? request.getClientName() : (client != null ? client.getName() : null))
+                .clientName(request.getClientName() != null ? request.getClientName()
+                        : (client != null ? client.getName() : null))
                 .carrier(carrier)
                 .carrierLineCode(request.getCarrierLineCode())
-                .carrierLine(request.getCarrierLine() != null ? request.getCarrierLine() : (carrier != null ? carrier.getName() : null))
+                .carrierLine(request.getCarrierLine() != null ? request.getCarrierLine()
+                        : (carrier != null ? carrier.getName() : null))
                 .driverName(request.getDriverName())
                 .driverPhone(request.getDriverPhone())
                 .tractorPlates(request.getTractorPlates())
@@ -187,7 +195,8 @@ public class SecurityGateService implements SecurityGateUseCase {
         }
 
         SecurityPreCheckinEntity entity = preCheckinJpaRepository.findByToken(token.trim().toUpperCase())
-                .orElseThrow(() -> new EntityNotFoundException("El pase de acceso no existe o ya no es válido: " + token));
+                .orElseThrow(
+                        () -> new EntityNotFoundException("El pase de acceso no existe o ya no es válido: " + token));
 
         if (entity.getExpiresAt().isBefore(OffsetDateTime.now())) {
             throw new ValidationException("El pase de acceso ha expirado. Solicite un nuevo código QR en Caseta.");
@@ -219,7 +228,8 @@ public class SecurityGateService implements SecurityGateUseCase {
         entity.setDriverName(request.getDriverName());
         entity.setDriverLicense(request.getDriverLicense());
         entity.setDriverPhone(request.getDriverPhone());
-        entity.setTractorPlates(request.getTractorPlates() != null ? request.getTractorPlates().toUpperCase().trim() : null);
+        entity.setTractorPlates(
+                request.getTractorPlates() != null ? request.getTractorPlates().toUpperCase().trim() : null);
         entity.setNoEcoTractor(request.getNoEcoTractor());
         entity.setBoxPlates(request.getBoxPlates() != null ? request.getBoxPlates().toUpperCase().trim() : null);
         entity.setBoxDimensions(request.getBoxDimensions());
@@ -228,9 +238,10 @@ public class SecurityGateService implements SecurityGateUseCase {
         if (request.getClientCode() != null && !request.getClientCode().isBlank()) {
             entity.setClientCode(request.getClientCode());
             clientRepositoryPort.findByOrganizationId(entity.getOrganization().getId()).stream()
-                    .filter(c -> (c.getExternalId() != null && c.getExternalId().equalsIgnoreCase(request.getClientCode())) ||
-                                 (c.getId() != null && c.getId().toString().equalsIgnoreCase(request.getClientCode())) ||
-                                 (c.getName() != null && c.getName().equalsIgnoreCase(request.getClientCode())))
+                    .filter(c -> (c.getExternalId() != null
+                            && c.getExternalId().equalsIgnoreCase(request.getClientCode())) ||
+                            (c.getId() != null && c.getId().toString().equalsIgnoreCase(request.getClientCode())) ||
+                            (c.getName() != null && c.getName().equalsIgnoreCase(request.getClientCode())))
                     .findFirst()
                     .ifPresent(entity::setClient);
         }
@@ -246,9 +257,11 @@ public class SecurityGateService implements SecurityGateUseCase {
         if (request.getCarrierLineCode() != null && !request.getCarrierLineCode().isBlank()) {
             entity.setCarrierLineCode(request.getCarrierLineCode());
             carrierRepositoryPort.findByOrganizationId(entity.getOrganization().getId()).stream()
-                    .filter(c -> (c.getTaxId() != null && c.getTaxId().equalsIgnoreCase(request.getCarrierLineCode())) ||
-                                 (c.getId() != null && c.getId().toString().equalsIgnoreCase(request.getCarrierLineCode())) ||
-                                 (c.getName() != null && c.getName().equalsIgnoreCase(request.getCarrierLineCode())))
+                    .filter(c -> (c.getTaxId() != null && c.getTaxId().equalsIgnoreCase(request.getCarrierLineCode()))
+                            ||
+                            (c.getId() != null && c.getId().toString().equalsIgnoreCase(request.getCarrierLineCode()))
+                            ||
+                            (c.getName() != null && c.getName().equalsIgnoreCase(request.getCarrierLineCode())))
                     .findFirst()
                     .ifPresent(entity::setCarrier);
         }
@@ -257,7 +270,8 @@ public class SecurityGateService implements SecurityGateUseCase {
             if (entity.getCarrier() == null) {
                 carrierRepositoryPort.findByOrganizationId(entity.getOrganization().getId()).stream()
                         .filter(c -> (c.getName() != null && c.getName().equalsIgnoreCase(request.getCarrierLine())) ||
-                                     (c.getTradeName() != null && c.getTradeName().equalsIgnoreCase(request.getCarrierLine())))
+                                (c.getTradeName() != null
+                                        && c.getTradeName().equalsIgnoreCase(request.getCarrierLine())))
                         .findFirst()
                         .ifPresent(entity::setCarrier);
             }
@@ -269,12 +283,15 @@ public class SecurityGateService implements SecurityGateUseCase {
         }
         entity.setDocNumber(docNo);
         entity.setDocDate(request.getDocDate() != null ? request.getDocDate() : LocalDate.now());
-        entity.setReceptionTime(request.getReceptionTime() != null ? request.getReceptionTime().truncatedTo(ChronoUnit.SECONDS) : LocalTime.now().truncatedTo(ChronoUnit.SECONDS));
+        entity.setReceptionTime(
+                request.getReceptionTime() != null ? request.getReceptionTime().truncatedTo(ChronoUnit.SECONDS)
+                        : LocalTime.now().truncatedTo(ChronoUnit.SECONDS));
 
         if (request.getSealNumbers() != null && !request.getSealNumbers().isEmpty()) {
             List<String> upperSeals = new ArrayList<>();
             for (String s : request.getSealNumbers()) {
-                if (s != null && !s.isBlank()) upperSeals.add(s.toUpperCase().trim());
+                if (s != null && !s.isBlank())
+                    upperSeals.add(s.toUpperCase().trim());
             }
             entity.setSealNumbers(upperSeals);
         }
@@ -293,38 +310,90 @@ public class SecurityGateService implements SecurityGateUseCase {
     @Transactional(readOnly = true)
     public List<PassResponse> getActivePasses(UUID organizationId, UUID branchId) {
         List<SecurityPreCheckinEntity> list = preCheckinJpaRepository.findActivePasses(
-                organizationId, branchId, OffsetDateTime.now()
-        );
+                organizationId, branchId, OffsetDateTime.now());
         return list.stream().map(this::mapToResponseWithWarehouseStatus).toList();
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<PassResponse> getInYardPasses(UUID organizationId, UUID branchId) {
-        List<SecurityPreCheckinEntity> list = preCheckinJpaRepository.findInYardPasses(
-                organizationId, branchId
-        );
-        return list.stream().map(this::mapToResponseWithWarehouseStatus).toList();
+        List<SecurityPreCheckinEntity> preCheckins = preCheckinJpaRepository.findInYardPasses(
+                organizationId, branchId);
+        Set<String> processedFolios = new HashSet<>();
+        List<PassResponse> result = new ArrayList<>();
+
+        for (SecurityPreCheckinEntity p : preCheckins) {
+            if (p.getGeneratedFolio() != null && !p.getGeneratedFolio().isBlank()) {
+                processedFolios.add(p.getGeneratedFolio().trim());
+            }
+            result.add(mapToResponseWithWarehouseStatus(p));
+        }
+
+        // 2. Unificar todas las recepciones activas en planta de
+        // wms.warehouse_receptions
+        List<WarehouseReceptionEntity> activeReceptions = warehouseReceptionRepositoryPort.findAll(
+                WarehouseReceptionSpecification.withFilters(organizationId, branchId, null, null));
+
+        for (WarehouseReceptionEntity rec : activeReceptions) {
+            if (rec.getStatus() == ReceptionStatus.CANCELLED) {
+                continue;
+            }
+            String folio = rec.getFolio() != null ? rec.getFolio().trim() : "";
+            if (folio.isEmpty() || processedFolios.contains(folio)) {
+                continue;
+            }
+
+            // Verificar si la unidad ya realizó su check-out de caseta previamente
+            Optional<SecurityPreCheckinEntity> historyPass = preCheckinJpaRepository.findByGeneratedFolio(folio);
+            if (historyPass.isPresent() && "COMPLETED_EXIT".equalsIgnoreCase(historyPass.get().getStatus())) {
+                continue;
+            }
+
+            processedFolios.add(folio);
+            result.add(mapReceptionToPassResponse(rec));
+        }
+
+        // 3. Unificar todos los embarques (outbounds) activos en planta de
+        // wms.warehouse_outbounds
+        List<WarehouseOutboundEntity> activeOutbounds = warehouseOutboundRepositoryPort.findAll(
+                WarehouseOutboundSpecification.withFilters(organizationId, branchId, null, null));
+
+        for (WarehouseOutboundEntity out : activeOutbounds) {
+            if (out.getStatus() == OutboundStatus.CANCELLED) {
+                continue;
+            }
+            String folio = out.getFolio() != null ? out.getFolio().trim() : "";
+            if (folio.isEmpty() || processedFolios.contains(folio)) {
+                continue;
+            }
+
+            Optional<SecurityPreCheckinEntity> historyPass = preCheckinJpaRepository.findByGeneratedFolio(folio);
+            if (historyPass.isPresent() && "COMPLETED_EXIT".equalsIgnoreCase(historyPass.get().getStatus())) {
+                continue;
+            }
+
+            processedFolios.add(folio);
+            result.add(mapOutboundToPassResponse(out));
+        }
+
+        return result;
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<PassResponse> getHistoryPasses(UUID organizationId, UUID branchId, String search) {
         List<SecurityPreCheckinEntity> list = preCheckinJpaRepository.findHistoryPasses(
-                organizationId, branchId
-        );
+                organizationId, branchId);
         if (search != null && !search.isBlank()) {
             String q = search.trim().toLowerCase();
-            list = list.stream().filter(p ->
-                    (p.getToken() != null && p.getToken().toLowerCase().contains(q)) ||
+            list = list.stream().filter(p -> (p.getToken() != null && p.getToken().toLowerCase().contains(q)) ||
                     (p.getGeneratedFolio() != null && p.getGeneratedFolio().toLowerCase().contains(q)) ||
                     (p.getDriverName() != null && p.getDriverName().toLowerCase().contains(q)) ||
                     (p.getDriverPhone() != null && p.getDriverPhone().toLowerCase().contains(q)) ||
                     (p.getTractorPlates() != null && p.getTractorPlates().toLowerCase().contains(q)) ||
                     (p.getBoxPlates() != null && p.getBoxPlates().toLowerCase().contains(q)) ||
                     (p.getClientName() != null && p.getClientName().toLowerCase().contains(q)) ||
-                    (p.getCarrierLine() != null && p.getCarrierLine().toLowerCase().contains(q))
-            ).toList();
+                    (p.getCarrierLine() != null && p.getCarrierLine().toLowerCase().contains(q))).toList();
         }
         return list.stream().map(this::mapToResponseWithWarehouseStatus).toList();
     }
@@ -346,42 +415,58 @@ public class SecurityGateService implements SecurityGateUseCase {
                 : entity.getOperationType();
 
         // Update with guard-provided or overridden fields
-        if (request.getClientCode() != null) entity.setClientCode(request.getClientCode());
-        if (request.getClientName() != null) entity.setClientName(request.getClientName());
+        if (request.getClientCode() != null)
+            entity.setClientCode(request.getClientCode());
+        if (request.getClientName() != null)
+            entity.setClientName(request.getClientName());
         if (entity.getClient() == null && entity.getClientCode() != null) {
             clientRepositoryPort.findByOrganizationId(entity.getOrganization().getId()).stream()
-                    .filter(c -> (c.getExternalId() != null && c.getExternalId().equalsIgnoreCase(entity.getClientCode())) ||
-                                 (c.getId() != null && c.getId().toString().equalsIgnoreCase(entity.getClientCode())) ||
-                                 (c.getName() != null && c.getName().equalsIgnoreCase(entity.getClientCode())))
+                    .filter(c -> (c.getExternalId() != null
+                            && c.getExternalId().equalsIgnoreCase(entity.getClientCode())) ||
+                            (c.getId() != null && c.getId().toString().equalsIgnoreCase(entity.getClientCode())) ||
+                            (c.getName() != null && c.getName().equalsIgnoreCase(entity.getClientCode())))
                     .findFirst()
                     .ifPresent(entity::setClient);
         }
 
-        if (request.getCarrierLineCode() != null) entity.setCarrierLineCode(request.getCarrierLineCode());
-        if (request.getCarrierLine() != null) entity.setCarrierLine(request.getCarrierLine());
+        if (request.getCarrierLineCode() != null)
+            entity.setCarrierLineCode(request.getCarrierLineCode());
+        if (request.getCarrierLine() != null)
+            entity.setCarrierLine(request.getCarrierLine());
         if (entity.getCarrier() == null && entity.getCarrierLineCode() != null) {
             carrierRepositoryPort.findByOrganizationId(entity.getOrganization().getId()).stream()
                     .filter(c -> (c.getTaxId() != null && c.getTaxId().equalsIgnoreCase(entity.getCarrierLineCode())) ||
-                                 (c.getId() != null && c.getId().toString().equalsIgnoreCase(entity.getCarrierLineCode())) ||
-                                 (c.getName() != null && c.getName().equalsIgnoreCase(entity.getCarrierLineCode())))
+                            (c.getId() != null && c.getId().toString().equalsIgnoreCase(entity.getCarrierLineCode())) ||
+                            (c.getName() != null && c.getName().equalsIgnoreCase(entity.getCarrierLineCode())))
                     .findFirst()
                     .ifPresent(entity::setCarrier);
         }
 
-        if (request.getDriverName() != null) entity.setDriverName(request.getDriverName());
-        if (request.getDriverPhone() != null) entity.setDriverPhone(request.getDriverPhone());
-        if (request.getTractorPlates() != null) entity.setTractorPlates(request.getTractorPlates().toUpperCase().trim());
-        if (request.getBoxPlates() != null) entity.setBoxPlates(request.getBoxPlates().toUpperCase().trim());
-        if (request.getNoEcoTractor() != null) entity.setNoEcoTractor(request.getNoEcoTractor());
-        if (request.getTransportType() != null) entity.setTransportType(request.getTransportType());
-        if (request.getBoxDimensions() != null) entity.setBoxDimensions(request.getBoxDimensions());
-        if (request.getDocNumber() != null) entity.setDocNumber(request.getDocNumber());
-        if (request.getDocDate() != null) entity.setDocDate(request.getDocDate());
-        if (request.getReceptionTime() != null) entity.setReceptionTime(request.getReceptionTime());
+        if (request.getDriverName() != null)
+            entity.setDriverName(request.getDriverName());
+        if (request.getDriverPhone() != null)
+            entity.setDriverPhone(request.getDriverPhone());
+        if (request.getTractorPlates() != null)
+            entity.setTractorPlates(request.getTractorPlates().toUpperCase().trim());
+        if (request.getBoxPlates() != null)
+            entity.setBoxPlates(request.getBoxPlates().toUpperCase().trim());
+        if (request.getNoEcoTractor() != null)
+            entity.setNoEcoTractor(request.getNoEcoTractor());
+        if (request.getTransportType() != null)
+            entity.setTransportType(request.getTransportType());
+        if (request.getBoxDimensions() != null)
+            entity.setBoxDimensions(request.getBoxDimensions());
+        if (request.getDocNumber() != null)
+            entity.setDocNumber(request.getDocNumber());
+        if (request.getDocDate() != null)
+            entity.setDocDate(request.getDocDate());
+        if (request.getReceptionTime() != null)
+            entity.setReceptionTime(request.getReceptionTime());
         if (request.getSealNumbers() != null && !request.getSealNumbers().isEmpty()) {
             entity.setSealNumbers(request.getSealNumbers());
         }
-        if (request.getObservations() != null) entity.setObservations(request.getObservations());
+        if (request.getObservations() != null)
+            entity.setObservations(request.getObservations());
         entity.setGuardNotes(request.getGuardNotes());
         entity.setRampNumber(request.getRampNumber());
         entity.setRampCode(request.getRampCode());
@@ -390,7 +475,7 @@ public class SecurityGateService implements SecurityGateUseCase {
 
         List<String> finalSeals = (entity.getSealNumbers() != null && !entity.getSealNumbers().isEmpty())
                 ? entity.getSealNumbers()
-                : List.of("SEAL-4G-001");
+                : ("CARGA".equalsIgnoreCase(opType) ? List.of("PENDIENTE_ANDEN") : List.of("SEAL-4G-001"));
 
         if ("CARGA".equalsIgnoreCase(opType)) {
             // Register Outbound in wms.warehouse_outbounds (Folio SAL-YYYY-XXXXXX)
@@ -415,7 +500,10 @@ public class SecurityGateService implements SecurityGateUseCase {
             outReq.setBoxPlates(entity.getBoxPlates() != null ? entity.getBoxPlates() : "S/P");
             outReq.setEconomicNumber(entity.getNoEcoTractor());
             outReq.setBoxEconomicNumber(entity.getBoxEconomicNumber());
-            outReq.setSealNumber(String.join(", ", finalSeals));
+            String outboundSeal = (entity.getSealNumbers() != null && !entity.getSealNumbers().isEmpty())
+                    ? String.join(", ", entity.getSealNumbers())
+                    : "PENDIENTE_ANDEN";
+            outReq.setSealNumber(outboundSeal);
             outReq.setRemisionNo(entity.getDocNumber() != null ? entity.getDocNumber() : "CP-" + entity.getToken());
             outReq.setObservations(entity.getObservations());
             outReq.setStatus("REGISTERED");
@@ -440,7 +528,9 @@ public class SecurityGateService implements SecurityGateUseCase {
             inReq.setForkliftOperatorId(request.getForkliftOperatorId());
             inReq.setDocNumber(entity.getDocNumber() != null ? entity.getDocNumber() : "REM-" + entity.getToken());
             inReq.setDocDate(entity.getDocDate() != null ? entity.getDocDate() : LocalDate.now());
-            inReq.setReceptionTime(entity.getReceptionTime() != null ? entity.getReceptionTime().truncatedTo(ChronoUnit.SECONDS) : LocalTime.now().truncatedTo(ChronoUnit.SECONDS));
+            inReq.setReceptionTime(
+                    entity.getReceptionTime() != null ? entity.getReceptionTime().truncatedTo(ChronoUnit.SECONDS)
+                            : LocalTime.now().truncatedTo(ChronoUnit.SECONDS));
             inReq.setDriverName(entity.getDriverName() != null ? entity.getDriverName() : "Operador Transportista");
             inReq.setTractorPlates(entity.getTractorPlates() != null ? entity.getTractorPlates() : "S/P");
             inReq.setBoxPlates(entity.getBoxPlates() != null ? entity.getBoxPlates() : "S/P");
@@ -456,7 +546,9 @@ public class SecurityGateService implements SecurityGateUseCase {
         entity.setStatus("COMPLETED");
         entity.setGeneratedFolio(generatedFolio);
         entity.setProcessedAt(OffsetDateTime.now());
-        entity.setProcessedBy(securityAuditHelper.getCurrentUsername() != null ? securityAuditHelper.getCurrentUsername() : "guardia");
+        entity.setProcessedBy(
+                securityAuditHelper.getCurrentUsername() != null ? securityAuditHelper.getCurrentUsername()
+                        : "guardia");
 
         SecurityPreCheckinEntity saved = preCheckinJpaRepository.save(entity);
         return mapToResponseWithWarehouseStatus(saved);
@@ -471,29 +563,119 @@ public class SecurityGateService implements SecurityGateUseCase {
         }
 
         String search = tokenOrFolio.trim().toUpperCase();
-        SecurityPreCheckinEntity entity = preCheckinJpaRepository.findByToken(search)
-                .or(() -> preCheckinJpaRepository.findByGeneratedFolio(tokenOrFolio.trim()))
-                .orElseThrow(() -> new EntityNotFoundException("No se encontró el pase o folio de caseta: " + tokenOrFolio));
+        Optional<SecurityPreCheckinEntity> existingPass = preCheckinJpaRepository.findByToken(search)
+                .or(() -> preCheckinJpaRepository.findByGeneratedFolio(tokenOrFolio.trim()));
 
-        LocalTime exitTime = request.getDepartureTime() != null ? request.getDepartureTime().truncatedTo(ChronoUnit.SECONDS) : LocalTime.now().truncatedTo(ChronoUnit.SECONDS);
-        entity.setDepartureTime(exitTime);
-        if (request.getExitObservations() != null) {
-            entity.setExitObservations(request.getExitObservations());
-        }
-        if (request.getExitSealNumbers() != null && !request.getExitSealNumbers().isEmpty()) {
-            entity.setExitSealNumbers(request.getExitSealNumbers());
-        }
-        if (request.getGuardNotes() != null && !request.getGuardNotes().isBlank()) {
-            entity.setGuardNotes((entity.getGuardNotes() != null ? entity.getGuardNotes() + " | " : "") + request.getGuardNotes());
+        LocalTime exitTime = request.getDepartureTime() != null
+                ? request.getDepartureTime().truncatedTo(ChronoUnit.SECONDS)
+                : LocalTime.now().truncatedTo(ChronoUnit.SECONDS);
+        String currentUser = securityAuditHelper.getCurrentUsername() != null ? securityAuditHelper.getCurrentUsername()
+                : "guardia";
+
+        if (existingPass.isPresent()) {
+            SecurityPreCheckinEntity entity = existingPass.get();
+            entity.setDepartureTime(exitTime);
+            if (request.getExitObservations() != null) {
+                entity.setExitObservations(request.getExitObservations());
+            }
+            if (request.getExitSealNumbers() != null && !request.getExitSealNumbers().isEmpty()) {
+                entity.setExitSealNumbers(request.getExitSealNumbers());
+            }
+            if (request.getGuardNotes() != null && !request.getGuardNotes().isBlank()) {
+                entity.setGuardNotes((entity.getGuardNotes() != null ? entity.getGuardNotes() + " | " : "")
+                        + request.getGuardNotes());
+            }
+
+            entity.setExitedBy(currentUser);
+            entity.setExitedAt(OffsetDateTime.now());
+            entity.setStatus("COMPLETED_EXIT");
+
+            SecurityPreCheckinEntity saved = preCheckinJpaRepository.save(entity);
+            return mapToResponseWithWarehouseStatus(saved);
         }
 
-        String currentUser = securityAuditHelper.getCurrentUsername() != null ? securityAuditHelper.getCurrentUsername() : "guardia";
-        entity.setExitedBy(currentUser);
-        entity.setExitedAt(OffsetDateTime.now());
-        entity.setStatus("COMPLETED_EXIT");
+        // Si no existía pase de pre-checkin, buscar directamente en recepciones o
+        // embarques y registrar la salida
+        Optional<WarehouseReceptionEntity> receptionOpt = warehouseReceptionRepositoryPort
+                .findByFolio(tokenOrFolio.trim());
+        if (receptionOpt.isPresent()) {
+            WarehouseReceptionEntity rec = receptionOpt.get();
+            SecurityPreCheckinEntity newEntity = SecurityPreCheckinEntity.builder()
+                    .token("OUT-" + rec.getFolio())
+                    .organization(rec.getOrganization())
+                    .branch(rec.getBranch())
+                    .status("COMPLETED_EXIT")
+                    .operationType("DESCARGA")
+                    .client(rec.getClient())
+                    .clientCode(rec.getClient() != null ? rec.getClient().getExternalId() : null)
+                    .clientName(rec.getClient() != null ? rec.getClient().getName() : null)
+                    .carrier(rec.getCarrier())
+                    .carrierLine(rec.getCarrier() != null ? rec.getCarrier().getName() : null)
+                    .driverName(rec.getDriverName())
+                    .tractorPlates(rec.getTractorPlates())
+                    .boxPlates(rec.getBoxPlates())
+                    .docNumber(rec.getDocNumber())
+                    .docDate(rec.getDocDate())
+                    .receptionTime(rec.getReceptionTime())
+                    .ramp(rec.getRamp())
+                    .rampNumber(parseRampNumber(rec.getRamp()))
+                    .rampCode(rec.getRamp() != null ? rec.getRamp().getCode() : null)
+                    .generatedFolio(rec.getFolio())
+                    .departureTime(exitTime)
+                    .exitObservations(request.getExitObservations())
+                    .exitSealNumbers(request.getExitSealNumbers())
+                    .guardNotes(request.getGuardNotes())
+                    .exitedBy(currentUser)
+                    .exitedAt(OffsetDateTime.now())
+                    .processedBy(currentUser)
+                    .processedAt(rec.getCreatedAt())
+                    .expiresAt(OffsetDateTime.now().plusDays(1))
+                    .build();
+            SecurityPreCheckinEntity saved = preCheckinJpaRepository.save(newEntity);
+            return mapToResponseWithWarehouseStatus(saved);
+        }
 
-        SecurityPreCheckinEntity saved = preCheckinJpaRepository.save(entity);
-        return mapToResponseWithWarehouseStatus(saved);
+        Optional<WarehouseOutboundEntity> outboundOpt = warehouseOutboundRepositoryPort
+                .findByFolio(tokenOrFolio.trim());
+        if (outboundOpt.isPresent()) {
+            WarehouseOutboundEntity out = outboundOpt.get();
+            SecurityPreCheckinEntity newEntity = SecurityPreCheckinEntity.builder()
+                    .token("OUT-" + out.getFolio())
+                    .organization(out.getOrganization())
+                    .branch(out.getBranch())
+                    .status("COMPLETED_EXIT")
+                    .operationType("CARGA")
+                    .client(out.getClient())
+                    .clientCode(out.getClient() != null ? out.getClient().getExternalId() : null)
+                    .clientName(out.getClient() != null ? out.getClient().getName() : null)
+                    .carrier(out.getCarrier())
+                    .carrierLine(out.getCarrier() != null ? out.getCarrier().getName() : null)
+                    .driverName(out.getDriverName())
+                    .tractorPlates(out.getTractorPlates())
+                    .boxPlates(out.getBoxPlates())
+                    .transportType(out.getTransportType())
+                    .economicNumber(out.getEconomicNumber())
+                    .boxEconomicNumber(out.getBoxEconomicNumber())
+                    .docNumber(out.getRemisionNo())
+                    .ramp(out.getRamp())
+                    .rampNumber(parseRampNumber(out.getRamp()))
+                    .rampCode(out.getRamp() != null ? out.getRamp().getCode() : null)
+                    .generatedFolio(out.getFolio())
+                    .departureTime(exitTime)
+                    .exitObservations(request.getExitObservations())
+                    .exitSealNumbers(request.getExitSealNumbers())
+                    .guardNotes(request.getGuardNotes())
+                    .exitedBy(currentUser)
+                    .exitedAt(OffsetDateTime.now())
+                    .processedBy(currentUser)
+                    .processedAt(out.getCreatedAt())
+                    .expiresAt(OffsetDateTime.now().plusDays(1))
+                    .build();
+            SecurityPreCheckinEntity saved = preCheckinJpaRepository.save(newEntity);
+            return mapToResponseWithWarehouseStatus(saved);
+        }
+
+        throw new EntityNotFoundException("No se encontró el pase o folio de caseta: " + tokenOrFolio);
     }
 
     @Override
@@ -504,10 +686,92 @@ public class SecurityGateService implements SecurityGateUseCase {
                 .orElseThrow(() -> new EntityNotFoundException("Pase de acceso no encontrado con ID: " + passId));
 
         if ("COMPLETED".equalsIgnoreCase(entity.getStatus()) || "COMPLETED_EXIT".equalsIgnoreCase(entity.getStatus())) {
-            throw new ValidationException("No se puede eliminar un pase que ya completó su autorización y registro en planta.");
+            throw new ValidationException(
+                    "No se puede eliminar un pase que ya completó su autorización y registro en planta.");
         }
 
         preCheckinJpaRepository.delete(entity);
+    }
+
+    private PassResponse mapReceptionToPassResponse(WarehouseReceptionEntity rec) {
+        List<String> seals = rec.getSeals() != null
+                ? rec.getSeals().stream().map(WarehouseReceptionSealEntity::getSealNumber).toList()
+                : Collections.emptyList();
+
+        LocalDate docDate = rec.getDocDate() != null ? rec.getDocDate()
+                : (rec.getCreatedAt() != null ? rec.getCreatedAt().toLocalDate() : LocalDate.now());
+        LocalTime receptionTime = rec.getReceptionTime() != null ? rec.getReceptionTime()
+                : (rec.getCreatedAt() != null ? rec.getCreatedAt().toLocalTime() : LocalTime.now());
+
+        return PassResponse.builder()
+                .id(rec.getId())
+                .token(rec.getFolio())
+                .organizationId(rec.getOrganization() != null ? rec.getOrganization().getId() : null)
+                .branchId(rec.getBranch() != null ? rec.getBranch().getId() : null)
+                .status("COMPLETED")
+                .operationType("DESCARGA")
+                .clientId(rec.getClient() != null ? rec.getClient().getId() : null)
+                .clientCode(rec.getClient() != null ? rec.getClient().getExternalId() : null)
+                .clientName(rec.getClient() != null ? rec.getClient().getName() : null)
+                .carrierId(rec.getCarrier() != null ? rec.getCarrier().getId() : null)
+                .carrierLine(rec.getCarrier() != null ? rec.getCarrier().getName() : null)
+                .driverName(rec.getDriverName())
+                .tractorPlates(rec.getTractorPlates())
+                .boxPlates(rec.getBoxPlates())
+                .sealNumbers(seals)
+                .docNumber(rec.getDocNumber())
+                .docDate(docDate)
+                .receptionTime(receptionTime)
+                .rampId(rec.getRamp() != null ? rec.getRamp().getId() : null)
+                .rampNumber(parseRampNumber(rec.getRamp()))
+                .rampCode(rec.getRamp() != null ? rec.getRamp().getCode() : null)
+                .generatedFolio(rec.getFolio())
+                .observations(rec.getObservations())
+                .warehouseStatus(rec.getStatus() != null ? rec.getStatus().name() : "REGISTERED")
+                .isReadyForExit(rec.getStatus() == ReceptionStatus.COMPLETED)
+                .createdAt(rec.getCreatedAt())
+                .build();
+    }
+
+    private PassResponse mapOutboundToPassResponse(WarehouseOutboundEntity out) {
+        List<String> seals = (out.getSealNumber() != null && !out.getSealNumber().isBlank())
+                ? List.of(out.getSealNumber().split("\\s*,\\s*"))
+                : Collections.emptyList();
+
+        LocalDate docDate = out.getCreatedAt() != null ? out.getCreatedAt().toLocalDate() : LocalDate.now();
+        LocalTime receptionTime = out.getCreatedAt() != null ? out.getCreatedAt().toLocalTime() : LocalTime.now();
+
+        return PassResponse.builder()
+                .id(out.getId())
+                .token(out.getFolio())
+                .organizationId(out.getOrganization() != null ? out.getOrganization().getId() : null)
+                .branchId(out.getBranch() != null ? out.getBranch().getId() : null)
+                .status("COMPLETED")
+                .operationType("CARGA")
+                .clientId(out.getClient() != null ? out.getClient().getId() : null)
+                .clientCode(out.getClient() != null ? out.getClient().getExternalId() : null)
+                .clientName(out.getClient() != null ? out.getClient().getName() : null)
+                .carrierId(out.getCarrier() != null ? out.getCarrier().getId() : null)
+                .carrierLine(out.getCarrier() != null ? out.getCarrier().getName() : null)
+                .driverName(out.getDriverName())
+                .tractorPlates(out.getTractorPlates())
+                .boxPlates(out.getBoxPlates())
+                .transportType(out.getTransportType())
+                .economicNumber(out.getEconomicNumber())
+                .boxEconomicNumber(out.getBoxEconomicNumber())
+                .sealNumbers(seals)
+                .docNumber(out.getRemisionNo())
+                .docDate(docDate)
+                .receptionTime(receptionTime)
+                .rampId(out.getRamp() != null ? out.getRamp().getId() : null)
+                .rampNumber(parseRampNumber(out.getRamp()))
+                .rampCode(out.getRamp() != null ? out.getRamp().getCode() : null)
+                .generatedFolio(out.getFolio())
+                .observations(out.getObservations())
+                .warehouseStatus(out.getStatus() != null ? out.getStatus().name() : "REGISTERED")
+                .isReadyForExit(out.getStatus() == OutboundStatus.COMPLETED)
+                .createdAt(out.getCreatedAt())
+                .build();
     }
 
     private PassResponse mapToResponse(SecurityPreCheckinEntity entity) {
@@ -537,6 +801,28 @@ public class SecurityGateService implements SecurityGateUseCase {
             }
         }
 
+        LocalTime recTime = entity.getReceptionTime();
+        if (recTime == null) {
+            if (entity.getProcessedAt() != null) {
+                recTime = entity.getProcessedAt().toLocalTime();
+            } else if (entity.getCreatedAt() != null) {
+                recTime = entity.getCreatedAt().toLocalTime();
+            } else {
+                recTime = LocalTime.now();
+            }
+        }
+
+        LocalDate dDate = entity.getDocDate();
+        if (dDate == null) {
+            if (entity.getProcessedAt() != null) {
+                dDate = entity.getProcessedAt().toLocalDate();
+            } else if (entity.getCreatedAt() != null) {
+                dDate = entity.getCreatedAt().toLocalDate();
+            } else {
+                dDate = LocalDate.now();
+            }
+        }
+
         return PassResponse.builder()
                 .id(entity.getId())
                 .token(entity.getToken())
@@ -554,15 +840,16 @@ public class SecurityGateService implements SecurityGateUseCase {
                 .driverLicense(entity.getDriverLicense())
                 .driverPhone(entity.getDriverPhone())
                 .transportType(entity.getTransportType())
-                .economicNumber(entity.getEconomicNumber() != null ? entity.getEconomicNumber() : entity.getNoEcoTractor())
+                .economicNumber(
+                        entity.getEconomicNumber() != null ? entity.getEconomicNumber() : entity.getNoEcoTractor())
                 .boxEconomicNumber(entity.getBoxEconomicNumber())
                 .tractorPlates(entity.getTractorPlates())
                 .boxPlates(entity.getBoxPlates())
                 .boxDimensions(entity.getBoxDimensions())
                 .sealNumbers(entity.getSealNumbers())
                 .docNumber(entity.getDocNumber())
-                .docDate(entity.getDocDate())
-                .receptionTime(entity.getReceptionTime())
+                .docDate(dDate)
+                .receptionTime(recTime)
                 .departureTime(entity.getDepartureTime())
                 .checklistData(entity.getChecklistData())
                 .observations(entity.getObservations())
@@ -583,6 +870,30 @@ public class SecurityGateService implements SecurityGateUseCase {
                 .expiresAt(entity.getExpiresAt())
                 .createdAt(entity.getCreatedAt())
                 .build();
+    }
+
+    private Integer parseRampNumber(LocationEntity ramp) {
+        if (ramp == null)
+            return null;
+        if (ramp.getCode() != null) {
+            String digits = ramp.getCode().replaceAll("\\D+", "");
+            if (!digits.isBlank()) {
+                try {
+                    return Integer.parseInt(digits);
+                } catch (NumberFormatException ignored) {
+                }
+            }
+        }
+        if (ramp.getName() != null) {
+            String digits = ramp.getName().replaceAll("\\D+", "");
+            if (!digits.isBlank()) {
+                try {
+                    return Integer.parseInt(digits);
+                } catch (NumberFormatException ignored) {
+                }
+            }
+        }
+        return null;
     }
 
     private String generateUniqueToken() {

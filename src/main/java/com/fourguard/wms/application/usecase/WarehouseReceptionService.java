@@ -174,6 +174,16 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
 
         String currentUser = securityAuditHelper.getCurrentUsername();
 
+        long daysRemaining = 0;
+        String shelfLifeStatus = null;
+        if (request.getExpirationDate() != null) {
+            java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneOffset.UTC);
+            daysRemaining = java.time.temporal.ChronoUnit.DAYS.between(today, request.getExpirationDate());
+            shelfLifeStatus = daysRemaining < 365 ? "REJECTED_SHELF_LIFE_POLICY" : "APPROVED";
+        }
+
+        String lotNum = request.getLotNumber() != null && !request.getLotNumber().isBlank() ? request.getLotNumber().trim().toUpperCase() : null;
+
         WarehouseReceptionEntity entity = WarehouseReceptionEntity.builder()
                 .organization(organization)
                 .branch(branch)
@@ -189,9 +199,11 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
                 .driverName(request.getDriverName())
                 .tractorPlates(request.getTractorPlates())
                 .boxPlates(request.getBoxPlates())
-                .lotNumber(request.getLotNumber() != null ? request.getLotNumber().trim() : null)
+                .lotNumber(lotNum)
                 .elaborationDate(request.getElaborationDate())
                 .expirationDate(request.getExpirationDate())
+                .shelfLifeDaysRemaining(request.getExpirationDate() != null ? daysRemaining : null)
+                .shelfLifeStatus(shelfLifeStatus)
                 .storageLocation(autoStorageLocation)
                 .piecesPerPallet(BigDecimal.ZERO)
                 .palletType(null)
@@ -218,14 +230,33 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
 
         WarehouseReceptionEntity saved = receptionRepositoryPort.save(entity);
 
+        // Si se especificó lote inicial en Caseta, sincronizar en la tabla de lotes (wms.warehouse_reception_lots)
+        if (lotNum != null) {
+            try {
+                WarehouseReceptionLotEntity initialLot = WarehouseReceptionLotEntity.builder()
+                        .organization(organization)
+                        .branch(branch)
+                        .reception(saved)
+                        .lotNumber(lotNum)
+                        .elaborationDate(request.getElaborationDate())
+                        .expirationDate(request.getExpirationDate())
+                        .shelfLifeDaysRemaining((int) daysRemaining)
+                        .shelfLifeStatus(shelfLifeStatus != null ? shelfLifeStatus : "APPROVED")
+                        .build();
+                lotRepositoryPort.save(initialLot);
+            } catch (Exception e) {
+                log.warn("Could not pre-populate initial reception lot {}: {}", lotNum, e.getMessage());
+            }
+        }
+
         // Relational Audit Log
         logAudit(saved.getId(), "RECEPCION_CREADA",
                 Map.of(),
                 Map.of("folio", folio,
-                       "docNumber", request.getDocNumber(),
+                       "docNumber", request.getDocNumber() != null ? request.getDocNumber() : "",
                        "client", client.getName(),
-                       "driver", request.getDriverName(),
-                       "plates", request.getTractorPlates() + " / " + request.getBoxPlates(),
+                       "driver", request.getDriverName() != null ? request.getDriverName() : "",
+                       "plates", (request.getTractorPlates() != null ? request.getTractorPlates() : "") + " / " + (request.getBoxPlates() != null ? request.getBoxPlates() : ""),
                        "ramp", ramp != null ? ramp.getCode() : "Sin rampa"));
 
         return receptionMapper.toResponse(saved);
@@ -257,6 +288,7 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
         if (entity.getCarrier() != null) before.put("carrier", entity.getCarrier().getName());
         if (entity.getClient() != null) before.put("client", entity.getClient().getName());
 
+        // SKU resolution (por ID, código o nombre de producto)
         if (request.getSkuId() != null) {
             UUID skuId = request.getSkuId();
             ProductSkuEntity sku = productSkuRepositoryPort.findById(skuId).orElse(null);
@@ -269,8 +301,28 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
             if (sku != null) {
                 entity.setSku(sku);
             }
+        } else if (request.getSkuCode() != null && !request.getSkuCode().isBlank()) {
+            String code = request.getSkuCode().trim();
+            ProductSkuEntity sku = null;
+            if (entity.getClient() != null) {
+                sku = productSkuRepositoryPort.findByClientIdAndCode(entity.getClient().getId(), code).orElse(null);
+            }
+            if (sku == null) {
+                sku = productSkuRepositoryPort.findFirstByCode(code).orElse(null);
+            }
+            if (sku == null && request.getProductName() != null && !request.getProductName().isBlank()) {
+                String pName = request.getProductName().trim().toLowerCase();
+                sku = productSkuRepositoryPort.findAll().stream()
+                        .filter(s -> s.getName() != null && s.getName().toLowerCase().contains(pName))
+                        .findFirst()
+                        .orElse(null);
+            }
+            if (sku != null) {
+                entity.setSku(sku);
+            }
         }
 
+        // Supplier resolution
         if (request.getSupplierId() != null) {
             UUID supId = request.getSupplierId();
             SupplierEntity supplier = supplierRepositoryPort.findById(supId).orElse(null);
@@ -280,6 +332,18 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
                         .findFirst()
                         .orElse(null);
             }
+            if (supplier != null) {
+                entity.setSupplier(supplier);
+            }
+        } else if (request.getSupplierName() != null && !request.getSupplierName().isBlank() && entity.getOrganization() != null) {
+            String sName = request.getSupplierName().trim().toLowerCase();
+            SupplierEntity supplier = supplierRepositoryPort.findByOrganizationId(entity.getOrganization().getId()).stream()
+                    .filter(s -> Boolean.FALSE.equals(s.getIsDeleted()) &&
+                                 ((s.getLegalName() != null && s.getLegalName().toLowerCase().contains(sName)) ||
+                                  (s.getCommercialName() != null && s.getCommercialName().toLowerCase().contains(sName)) ||
+                                  (s.getCode() != null && s.getCode().toLowerCase().contains(sName))))
+                    .findFirst()
+                    .orElse(null);
             if (supplier != null) {
                 entity.setSupplier(supplier);
             }
@@ -337,7 +401,7 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
             entity.setStorageLocation(autoStorage);
         }
 
-        // ── Caseta / Transport Data updates ──
+        // Caseta / Transport Data updates
         if (request.getTractorPlates() != null && !request.getTractorPlates().isBlank()) {
             entity.setTractorPlates(request.getTractorPlates().trim().toUpperCase());
         }
@@ -410,18 +474,19 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
             }
         }
 
-        if (request.getLotNumber() != null) entity.setLotNumber(request.getLotNumber().trim());
+        String targetLot = request.getLotNumber() != null && !request.getLotNumber().isBlank() ? request.getLotNumber().trim().toUpperCase() : entity.getLotNumber();
+        if (request.getLotNumber() != null) entity.setLotNumber(targetLot);
         if (request.getElaborationDate() != null) entity.setElaborationDate(request.getElaborationDate());
         if (request.getExpirationDate() != null) {
             java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneOffset.UTC);
-            long daysRemaining = java.time.temporal.ChronoUnit.DAYS.between(today, request.getExpirationDate());
-            entity.setShelfLifeDaysRemaining(daysRemaining);
+            long daysRemainingUpdate = java.time.temporal.ChronoUnit.DAYS.between(today, request.getExpirationDate());
+            entity.setShelfLifeDaysRemaining(daysRemainingUpdate);
             entity.setExpirationDate(request.getExpirationDate());
 
-            if (daysRemaining < 365) {
+            if (daysRemainingUpdate < 365) {
                 entity.setShelfLifeStatus("REJECTED_SHELF_LIFE_POLICY");
                 receptionRepositoryPort.save(entity);
-                throw new ValidationException("Rechazo por Política de Vida Útil (< 1 año / 365 días): El lote cuenta con sólo " + daysRemaining + " días de vida útil restante. No se permite la descarga física.");
+                throw new ValidationException("Rechazo por Política de Vida Útil (< 1 año / 365 días): El lote cuenta con sólo " + daysRemainingUpdate + " días de vida útil restante. No se permite la descarga física.");
             } else {
                 entity.setShelfLifeStatus("APPROVED");
             }
@@ -439,6 +504,36 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
 
         WarehouseReceptionEntity saved = receptionRepositoryPort.save(entity);
 
+        // Sincronizar o registrar lote en wms.warehouse_reception_lots si no existe
+        if (targetLot != null) {
+            Optional<WarehouseReceptionLotEntity> lotOpt = lotRepositoryPort.findByReceptionIdAndLotNumber(saved.getId(), targetLot);
+            if (lotOpt.isEmpty()) {
+                List<WarehouseReceptionLotEntity> existingLots = lotRepositoryPort.findByReceptionId(saved.getId());
+                if (existingLots.isEmpty()) {
+                    WarehouseReceptionLotEntity newLot = WarehouseReceptionLotEntity.builder()
+                            .organization(saved.getOrganization())
+                            .branch(saved.getBranch())
+                            .reception(saved)
+                            .sku(saved.getSku())
+                            .lotNumber(targetLot)
+                            .elaborationDate(saved.getElaborationDate())
+                            .expirationDate(saved.getExpirationDate())
+                            .shelfLifeDaysRemaining(saved.getShelfLifeDaysRemaining() != null ? saved.getShelfLifeDaysRemaining().intValue() : null)
+                            .shelfLifeStatus(saved.getShelfLifeStatus() != null ? saved.getShelfLifeStatus() : "APPROVED")
+                            .build();
+                    lotRepositoryPort.save(newLot);
+                }
+            } else {
+                WarehouseReceptionLotEntity existingLot = lotOpt.get();
+                if (saved.getExpirationDate() != null) existingLot.setExpirationDate(saved.getExpirationDate());
+                if (saved.getElaborationDate() != null) existingLot.setElaborationDate(saved.getElaborationDate());
+                if (saved.getShelfLifeDaysRemaining() != null) existingLot.setShelfLifeDaysRemaining(saved.getShelfLifeDaysRemaining().intValue());
+                if (saved.getShelfLifeStatus() != null) existingLot.setShelfLifeStatus(saved.getShelfLifeStatus());
+                if (saved.getSku() != null) existingLot.setSku(saved.getSku());
+                lotRepositoryPort.save(existingLot);
+            }
+        }
+
         Map<String, Object> after = new HashMap<>();
         if (saved.getLotNumber() != null) after.put("lotNumber", saved.getLotNumber());
         if (saved.getPiecesPerPallet() != null) after.put("piecesPerPallet", saved.getPiecesPerPallet().stripTrailingZeros().toPlainString());
@@ -451,6 +546,25 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
         if (saved.getDocNumber() != null) after.put("docNumber", saved.getDocNumber());
         if (saved.getCarrier() != null) after.put("carrier", saved.getCarrier().getName());
         if (saved.getClient() != null) after.put("client", saved.getClient().getName());
+
+        // Multi-lot audit refinement:
+        // Si ambos lotes (el anterior y el nuevo) ya se encuentran registrados en warehouse_reception_lots,
+        // o si la recepción tiene múltiples lotes registrados, no registrar un delta de reemplazo destructivo
+        // en la auditoría general (ej. RECEPCION_ASIGNADA o RECEPCION_ACTUALIZADA),
+        // pues cada lote tiene su trazabilidad independiente con el evento 'LOTE_AGREGADO'.
+        List<WarehouseReceptionLotEntity> receptionLots = lotRepositoryPort.findByReceptionId(saved.getId());
+        if (receptionLots != null && !receptionLots.isEmpty()) {
+            String oldLot = before.get("lotNumber") != null ? String.valueOf(before.get("lotNumber")).trim() : null;
+            String newLot = after.get("lotNumber") != null ? String.valueOf(after.get("lotNumber")).trim() : null;
+
+            boolean oldLotExists = oldLot != null && receptionLots.stream().anyMatch(l -> l.getLotNumber().equalsIgnoreCase(oldLot));
+            boolean newLotExists = newLot != null && receptionLots.stream().anyMatch(l -> l.getLotNumber().equalsIgnoreCase(newLot));
+
+            if (receptionLots.size() > 1 || (oldLotExists && newLotExists)) {
+                before.remove("lotNumber");
+                after.remove("lotNumber");
+            }
+        }
 
         String auditAction;
         if (saved.getStatus() == ReceptionStatus.ASSIGNED) {
@@ -528,25 +642,47 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
         }
 
         if (reception.getSku() == null) {
-            throw new ValidationException("Debes asignar un SKU/Producto a la recepción antes de capturar tarimas.");
+            if (reception.getClient() != null) {
+                List<ProductSkuEntity> clientSkus = productSkuRepositoryPort.findByClientId(reception.getClient().getId());
+                if (!clientSkus.isEmpty()) {
+                    reception.setSku(clientSkus.get(0));
+                    receptionRepositoryPort.save(reception);
+                }
+            }
+            if (reception.getSku() == null) {
+                productSkuRepositoryPort.findAll().stream().findFirst().ifPresent(s -> {
+                    reception.setSku(s);
+                    receptionRepositoryPort.save(reception);
+                });
+            }
+        }
+        if (reception.getSupplier() == null && reception.getOrganization() != null) {
+            supplierRepositoryPort.findByOrganizationId(reception.getOrganization().getId()).stream()
+                    .filter(s -> Boolean.FALSE.equals(s.getIsDeleted()))
+                    .findFirst()
+                    .ifPresent(s -> {
+                        reception.setSupplier(s);
+                        receptionRepositoryPort.save(reception);
+                    });
         }
 
         int currentMax = 0;
         if (reception.getOrganization() != null && reception.getBranch() != null) {
             currentMax = palletRepositoryPort.findMaxPalletNumber(reception.getOrganization().getId(), reception.getBranch().getId());
         }
-        if (currentMax == 0) {
-            currentMax = palletRepositoryPort.findMaxPalletNumber();
+        int globalMax = palletRepositoryPort.findMaxPalletNumber();
+        if (globalMax > currentMax) {
+            currentMax = globalMax;
         }
 
         List<WarehouseReceptionPalletEntity> newPallets = new ArrayList<>();
 
         for (AddReceptionPalletsRequest.PalletItemRequest item : request.getPallets()) {
             String code = item.getPalletCode().trim();
-            PalletType pType = reception.getPalletType();
+            PalletType pType = reception.getPalletType() != null ? reception.getPalletType() : PalletType.MADERA_ESTANDAR;
             if (item.getPalletType() != null && !item.getPalletType().isBlank()) {
                 try {
-                    pType = PalletType.valueOf(item.getPalletType());
+                    pType = PalletType.valueOf(item.getPalletType().trim().toUpperCase().replace(" ", "_"));
                 } catch (IllegalArgumentException ignored) {}
             }
 
@@ -563,6 +699,26 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
                 matchedLot = lotRepositoryPort.findByReceptionIdAndLotNumber(receptionId, targetLotNumber).orElse(null);
                 if (matchedLot != null && targetExpDate == null) {
                     targetExpDate = matchedLot.getExpirationDate();
+                } else if (matchedLot == null) {
+                    // Auto-aprovisionar registro de lote en warehouse_reception_lots para evitar referencias nulas
+                    long days = 0;
+                    String sLife = "APPROVED";
+                    if (targetExpDate != null) {
+                        java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneOffset.UTC);
+                        days = java.time.temporal.ChronoUnit.DAYS.between(today, targetExpDate);
+                        if (days < 365) sLife = "REJECTED_SHELF_LIFE_POLICY";
+                    }
+                    WarehouseReceptionLotEntity autoLot = WarehouseReceptionLotEntity.builder()
+                            .organization(reception.getOrganization())
+                            .branch(reception.getBranch())
+                            .reception(reception)
+                            .sku(reception.getSku())
+                            .lotNumber(targetLotNumber)
+                            .expirationDate(targetExpDate)
+                            .shelfLifeDaysRemaining((int) days)
+                            .shelfLifeStatus(sLife)
+                            .build();
+                    matchedLot = lotRepositoryPort.save(autoLot);
                 }
             }
 
@@ -626,7 +782,7 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
                         .reason("Escaneo en andén de recepción")
                         .metadata(Map.of(
                                 "docNumber", reception.getDocNumber() != null ? reception.getDocNumber() : "",
-                                "lotNumber", reception.getLotNumber() != null ? reception.getLotNumber() : "",
+                                "lotNumber", targetLotNumber != null ? targetLotNumber : "",
                                 "pieces", item.getPieces()
                         ))
                         .build());
@@ -641,23 +797,73 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
     @Override
     @Transactional
     public ReceptionPalletResponse updatePallet(UUID receptionId, UUID palletId, UpdatePalletRequest request) {
+        WarehouseReceptionEntity reception = receptionRepositoryPort.findById(receptionId)
+                .orElseThrow(() -> new EntityNotFoundException("Recepción no encontrada: " + receptionId));
+
+        if (reception.getStatus() == ReceptionStatus.CANCELLED) {
+            throw new ValidationException("No se pueden modificar tarimas de una recepción cancelada.");
+        }
+
         WarehouseReceptionPalletEntity pallet = palletRepositoryPort.findByReceptionIdAndId(receptionId, palletId)
                 .orElseThrow(() -> new EntityNotFoundException("Tarima no encontrada con ID: " + palletId));
 
         BigDecimal oldPieces = pallet.getPieces();
-        if (request.getPieces() != null) pallet.setPieces(BigDecimal.valueOf(request.getPieces()));
-        if (request.getPalletType() != null) {
+        if (request.getPieces() != null) {
+            pallet.setPieces(BigDecimal.valueOf(request.getPieces()));
+            if (pallet.getInventoryItem() != null) {
+                InventoryItemEntity item = pallet.getInventoryItem();
+                item.setQuantity(BigDecimal.valueOf(request.getPieces()));
+                item.setUpdatedBy(securityAuditHelper.getCurrentUsername());
+                inventoryItemRepositoryPort.save(item);
+            }
+        }
+        if (request.getPalletType() != null && !request.getPalletType().isBlank()) {
             try {
-                pallet.setPalletType(PalletType.valueOf(request.getPalletType()));
+                pallet.setPalletType(PalletType.valueOf(request.getPalletType().trim().toUpperCase().replace(" ", "_")));
             } catch (IllegalArgumentException ignored) {}
         }
         if (request.getObservations() != null) pallet.setObservations(request.getObservations());
+
+        if (request.getLotNumber() != null && !request.getLotNumber().isBlank()) {
+            String cleanLot = request.getLotNumber().trim().toUpperCase();
+            pallet.setLotNumber(cleanLot);
+            java.time.LocalDate expDate = request.getExpirationDate() != null ? request.getExpirationDate() : pallet.getExpirationDate();
+            WarehouseReceptionLotEntity matchedLot = lotRepositoryPort.findByReceptionIdAndLotNumber(receptionId, cleanLot).orElse(null);
+            if (matchedLot == null && expDate != null) {
+                long days = 0;
+                String sLife = "APPROVED";
+                java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneOffset.UTC);
+                days = java.time.temporal.ChronoUnit.DAYS.between(today, expDate);
+                if (days < 365) sLife = "REJECTED_SHELF_LIFE_POLICY";
+                WarehouseReceptionLotEntity autoLot = WarehouseReceptionLotEntity.builder()
+                        .organization(reception.getOrganization())
+                        .branch(reception.getBranch())
+                        .reception(reception)
+                        .sku(reception.getSku())
+                        .lotNumber(cleanLot)
+                        .expirationDate(expDate)
+                        .shelfLifeDaysRemaining((int) days)
+                        .shelfLifeStatus(sLife)
+                        .build();
+                matchedLot = lotRepositoryPort.save(autoLot);
+            }
+            if (matchedLot != null) {
+                pallet.setReceptionLot(matchedLot);
+                if (expDate == null) expDate = matchedLot.getExpirationDate();
+            }
+            if (expDate != null) {
+                pallet.setExpirationDate(expDate);
+            }
+        } else if (request.getExpirationDate() != null) {
+            pallet.setExpirationDate(request.getExpirationDate());
+        }
 
         WarehouseReceptionPalletEntity saved = palletRepositoryPort.save(pallet);
 
         logAudit(receptionId, "TARIMA_EDITADA",
                 Map.of("palletCode", saved.getPalletCode(), "pieces", oldPieces != null ? oldPieces.toString() : "0"),
-                Map.of("palletCode", saved.getPalletCode(), "pieces", saved.getPieces() != null ? saved.getPieces().toString() : "0"));
+                Map.of("palletCode", saved.getPalletCode(), "pieces", saved.getPieces() != null ? saved.getPieces().toString() : "0",
+                       "lotNumber", saved.getLotNumber() != null ? saved.getLotNumber() : ""));
 
         return receptionMapper.toPalletResponse(saved);
     }
@@ -665,9 +871,21 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
     @Override
     @Transactional
     public void deletePallet(UUID receptionId, UUID palletId) {
+        WarehouseReceptionEntity reception = receptionRepositoryPort.findById(receptionId)
+                .orElseThrow(() -> new EntityNotFoundException("Recepción no encontrada: " + receptionId));
+
+        if (reception.getStatus() == ReceptionStatus.COMPLETED || reception.getStatus() == ReceptionStatus.CANCELLED) {
+            throw new ValidationException("No se pueden eliminar tarimas de una recepción cerrada o cancelada.");
+        }
+
         WarehouseReceptionPalletEntity pallet = palletRepositoryPort.findByReceptionIdAndId(receptionId, palletId)
                 .orElseThrow(() -> new EntityNotFoundException("Tarima no encontrada: " + palletId));
+
         palletRepositoryPort.deleteById(pallet.getId());
+
+        logAudit(receptionId, "TARIMA_ELIMINADA",
+                Map.of("palletCode", pallet.getPalletCode(), "palletNumber", pallet.getPalletNumber() != null ? pallet.getPalletNumber() : 0),
+                Map.of());
     }
 
     @Override
@@ -711,27 +929,35 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
         if (reception.getStorageLocation() != null) {
             LocationEntity stLoc = reception.getStorageLocation();
             int curOcc = stLoc.getCurrentOccupancy() != null ? stLoc.getCurrentOccupancy() : 0;
-            stLoc.setCurrentOccupancy(curOcc + 1);
+            stLoc.setCurrentOccupancy(curOcc + pallets.size());
             stLoc.setUpdatedBy(currentUser);
             locationRepositoryPort.save(stLoc);
         }
 
-        // Generate Inventory Items and Inventory Movements for each UA
+        // Generate Inventory Items and Inventory Movements for each UA with accurate pallet-level batch and dates
         for (WarehouseReceptionPalletEntity pallet : pallets) {
+            String palletLot = pallet.getLotNumber() != null ? pallet.getLotNumber() :
+                    (pallet.getReceptionLot() != null ? pallet.getReceptionLot().getLotNumber() : reception.getLotNumber());
+            java.time.LocalDate palletExp = pallet.getExpirationDate() != null ? pallet.getExpirationDate() :
+                    (pallet.getReceptionLot() != null ? pallet.getReceptionLot().getExpirationDate() : reception.getExpirationDate());
+            java.time.LocalDate palletMfg = pallet.getReceptionLot() != null && pallet.getReceptionLot().getElaborationDate() != null ?
+                    pallet.getReceptionLot().getElaborationDate() : reception.getElaborationDate();
+
             InventoryItemEntity inventoryItem = InventoryItemEntity.builder()
                     .organization(reception.getOrganization())
                     .branch(reception.getBranch())
                     .client(reception.getClient())
                     .sscc(pallet.getPalletCode())
-                    .externalUa(pallet.getPalletCode())
-                    .sku(reception.getSku())
+                    .externalUa(pallet.getSupplierUaCode() != null ? pallet.getSupplierUaCode() : pallet.getPalletCode())
+                    .sku(pallet.getSku() != null ? pallet.getSku() : reception.getSku())
                     .location(reception.getStorageLocation())
                     .state(InventoryState.AVAILABLE)
                     .quantity(pallet.getPieces())
-                    .batchNumber(reception.getLotNumber())
-                    .manufacturingDate(reception.getElaborationDate())
-                    .expirationDate(reception.getExpirationDate())
+                    .batchNumber(palletLot)
+                    .manufacturingDate(palletMfg)
+                    .expirationDate(palletExp)
                     .sapFolio(reception.getDocNumber())
+                    .metadata(pallet.getPalletNumber() != null ? Map.of("palletNumber", pallet.getPalletNumber()) : null)
                     .createdBy(currentUser)
                     .updatedBy(currentUser)
                     .build();
@@ -882,6 +1108,9 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
     @Transactional(readOnly = true)
     public List<MovementAuditResponse> getAuditLogs(UUID id) {
         List<AuditLogEntity> logs = auditLogRepositoryPort.findByEntityTypeAndEntityId("RECEPTION", id);
+        List<WarehouseReceptionLotEntity> receptionLots = lotRepositoryPort.findByReceptionId(id);
+        boolean isMultiLot = receptionLots != null && receptionLots.size() > 1;
+
         return logs.stream()
                 .sorted((a, b) -> {
                     if (a.getCreatedAt() == null && b.getCreatedAt() == null) return 0;
@@ -889,7 +1118,7 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
                     if (b.getCreatedAt() == null) return -1;
                     return b.getCreatedAt().compareTo(a.getCreatedAt()); // Reverse chronological: más reciente arriba
                 })
-                .map(this::mapToAuditResponse)
+                .map(log -> mapToAuditResponse(log, isMultiLot, receptionLots))
                 .collect(Collectors.toList());
     }
 
@@ -977,6 +1206,17 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
         List<WarehouseReceptionLotEntity> lots = lotRepositoryPort.findByReceptionId(entity.getId());
         if (lots != null && !lots.isEmpty()) {
             response.setLots(receptionMapper.toLotResponseList(lots));
+        } else if (entity.getLotNumber() != null && !entity.getLotNumber().isBlank()) {
+            ReceptionLotResponse lotResp = ReceptionLotResponse.builder()
+                    .id(UUID.randomUUID())
+                    .receptionId(entity.getId())
+                    .lotNumber(entity.getLotNumber())
+                    .elaborationDate(entity.getElaborationDate())
+                    .expirationDate(entity.getExpirationDate())
+                    .shelfLifeDaysRemaining(entity.getShelfLifeDaysRemaining() != null ? entity.getShelfLifeDaysRemaining().intValue() : null)
+                    .shelfLifeStatus(entity.getShelfLifeStatus() != null ? entity.getShelfLifeStatus() : "APPROVED")
+                    .build();
+            response.setLots(List.of(lotResp));
         }
         if (pallets != null) {
             response.setPallets(receptionMapper.toPalletResponseList(pallets));
@@ -995,13 +1235,34 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
         return summary;
     }
 
-    private MovementAuditResponse mapToAuditResponse(AuditLogEntity log) {
+    private MovementAuditResponse mapToAuditResponse(AuditLogEntity log, boolean isMultiLot, List<WarehouseReceptionLotEntity> receptionLots) {
         List<MovementAuditResponse.MovementAuditDetailResponse> details = log.getDetails() != null ?
-                log.getDetails().stream().map(d -> MovementAuditResponse.MovementAuditDetailResponse.builder()
-                        .fieldName(translateFieldName(d.getFieldName()))
-                        .oldValue(translateFieldValue(d.getFieldName(), d.getOldValue()))
-                        .newValue(translateFieldValue(d.getFieldName(), d.getNewValue()))
-                        .build()).collect(Collectors.toList()) : List.of();
+                log.getDetails().stream()
+                        .filter(d -> {
+                            if (d.getFieldName() == null) return true;
+                            String fn = d.getFieldName().trim().toLowerCase();
+                            if (fn.equals("lotnumber") || fn.equals("lot_number") || fn.equals("lot") || fn.equals("número de lote")) {
+                                if (isMultiLot) return false;
+                                if ("RECEPCION_ASIGNADA".equals(log.getAction()) ||
+                                    "DESCARGA_INICIADA".equals(log.getAction()) ||
+                                    "DESCARGA_FINALIZADA".equals(log.getAction())) {
+                                    return false;
+                                }
+                                if (receptionLots != null) {
+                                    String oldV = d.getOldValue() != null ? d.getOldValue().trim() : "";
+                                    String newV = d.getNewValue() != null ? d.getNewValue().trim() : "";
+                                    boolean oldExists = receptionLots.stream().anyMatch(l -> l.getLotNumber().equalsIgnoreCase(oldV));
+                                    boolean newExists = receptionLots.stream().anyMatch(l -> l.getLotNumber().equalsIgnoreCase(newV));
+                                    if (oldExists && newExists) return false;
+                                }
+                            }
+                            return true;
+                        })
+                        .map(d -> MovementAuditResponse.MovementAuditDetailResponse.builder()
+                                .fieldName(translateFieldName(d.getFieldName()))
+                                .oldValue(translateFieldValue(d.getFieldName(), d.getOldValue()))
+                                .newValue(translateFieldValue(d.getFieldName(), d.getNewValue()))
+                                .build()).collect(Collectors.toList()) : List.of();
 
         String actionLabel = switch (log.getAction()) {
             case "RECEPCION_CREADA", "CASETA_APROBADA" -> "Aprobación de Caseta y Pase a Rampa de Recepción";
@@ -1010,9 +1271,13 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
             case "DESCARGA_FINALIZADA" -> "Descarga Física Concluida (Notificado a Mesa Administrativa)";
             case "RECEPCION_ACTUALIZADA" -> "Actualización de Parámetros de Recepción";
             case "TARIMA_EDITADA" -> "Ajuste de Tarima Individual";
+            case "TARIMA_ELIMINADA" -> "Eliminación de Tarima";
             case "RECEPCION_COMPLETADA" -> "Descarga Finalizada y Cierre F01";
             case "RECEPCION_CANCELADA" -> "Cancelación Extraordinaria con Autorización";
             case "REMISION_MODIFICADA" -> "Modificación de No. de Remisión";
+            case "LOTE_AGREGADO" -> "Lote Registrado en Recepción";
+            case "LOTE_ELIMINADO" -> "Lote Eliminado de Recepción";
+            case "UAS_RE_ETIQUETADAS" -> "Re-etiquetado de UAs / Generación SSCC";
             default -> log.getAction();
         };
 
@@ -1129,6 +1394,8 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
             case "folio" -> "Folio de Operación";
             case "elaborationDate" -> "Fecha de Elaboración";
             case "expirationDate" -> "Fecha de Caducidad";
+            case "palletCode" -> "Código de Tarima (UA / SSCC)";
+            case "relabelledCount" -> "Cantidad de UAs Re-etiquetadas";
             default -> field;
         };
     }
@@ -1160,8 +1427,9 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
         if (organizationId != null && branchId != null) {
             maxNumber = palletRepositoryPort.findMaxPalletNumber(organizationId, branchId);
         }
-        if (maxNumber == 0) {
-            maxNumber = palletRepositoryPort.findMaxPalletNumber();
+        int globalMax = palletRepositoryPort.findMaxPalletNumber();
+        if (globalMax > maxNumber) {
+            maxNumber = globalMax;
         }
         return Map.of(
                 "lastPalletNumber", maxNumber,
@@ -1194,6 +1462,15 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
                 pallet.setInternalUaCode(generatedSscc);
                 pallet.setIsUaRelabelled(true);
                 pallet.setPalletCode(generatedSscc); // The active pallet code becomes internal SSCC
+
+                // Si ya se generó un item de inventario, actualizar su SSCC
+                if (pallet.getInventoryItem() != null) {
+                    InventoryItemEntity item = pallet.getInventoryItem();
+                    item.setSscc(generatedSscc);
+                    item.setUpdatedBy(currentUser);
+                    inventoryItemRepositoryPort.save(item);
+                }
+
                 palletRepositoryPort.save(pallet);
 
                 // Immutable mapping table record
@@ -1242,6 +1519,33 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
     @Transactional(readOnly = true)
     public List<ReceptionLotResponse> getLotsByReceptionId(UUID receptionId) {
         List<WarehouseReceptionLotEntity> lots = lotRepositoryPort.findByReceptionId(receptionId);
+        if (lots.isEmpty()) {
+            // Auto-heal legacy receptions where lotNumber was only stored on warehouse_receptions header
+            receptionRepositoryPort.findById(receptionId).ifPresent(reception -> {
+                if (reception.getLotNumber() != null && !reception.getLotNumber().isBlank()) {
+                    long days = 0;
+                    String status = "APPROVED";
+                    if (reception.getExpirationDate() != null) {
+                        java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneOffset.UTC);
+                        days = java.time.temporal.ChronoUnit.DAYS.between(today, reception.getExpirationDate());
+                        if (days < 365) status = "REJECTED_SHELF_LIFE_POLICY";
+                    }
+                    WarehouseReceptionLotEntity autoLot = WarehouseReceptionLotEntity.builder()
+                            .organization(reception.getOrganization())
+                            .branch(reception.getBranch())
+                            .reception(reception)
+                            .sku(reception.getSku())
+                            .lotNumber(reception.getLotNumber().trim().toUpperCase())
+                            .elaborationDate(reception.getElaborationDate())
+                            .expirationDate(reception.getExpirationDate())
+                            .shelfLifeDaysRemaining((int) days)
+                            .shelfLifeStatus(status)
+                            .build();
+                    lotRepositoryPort.save(autoLot);
+                }
+            });
+            lots = lotRepositoryPort.findByReceptionId(receptionId);
+        }
         return receptionMapper.toLotResponseList(lots);
     }
 
@@ -1313,6 +1617,13 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
     @Override
     @Transactional
     public void deleteLot(UUID receptionId, UUID lotId) {
+        WarehouseReceptionEntity reception = receptionRepositoryPort.findById(receptionId)
+                .orElseThrow(() -> new EntityNotFoundException("Recepción no encontrada: " + receptionId));
+
+        if (reception.getStatus() == ReceptionStatus.COMPLETED || reception.getStatus() == ReceptionStatus.CANCELLED) {
+            throw new ValidationException("No se pueden eliminar lotes de una recepción cerrada o cancelada.");
+        }
+
         WarehouseReceptionLotEntity lot = lotRepositoryPort.findById(lotId)
                 .orElseThrow(() -> new EntityNotFoundException("Lote no encontrado: " + lotId));
 
@@ -1327,7 +1638,27 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
         }
 
         lotRepositoryPort.deleteById(lotId);
+
+        // Si el lote eliminado era el principal en el encabezado, reasignar al siguiente lote disponible
+        if (lot.getLotNumber().equalsIgnoreCase(reception.getLotNumber())) {
+            List<WarehouseReceptionLotEntity> remaining = lotRepositoryPort.findByReceptionId(receptionId).stream()
+                    .filter(l -> !l.getId().equals(lotId))
+                    .collect(Collectors.toList());
+            if (!remaining.isEmpty()) {
+                WarehouseReceptionLotEntity next = remaining.get(0);
+                reception.setLotNumber(next.getLotNumber());
+                reception.setElaborationDate(next.getElaborationDate());
+                reception.setExpirationDate(next.getExpirationDate());
+                reception.setShelfLifeDaysRemaining(next.getShelfLifeDaysRemaining() != null ? next.getShelfLifeDaysRemaining().longValue() : null);
+                reception.setShelfLifeStatus(next.getShelfLifeStatus());
+            } else {
+                reception.setLotNumber(null);
+                reception.setShelfLifeStatus(null);
+                reception.setShelfLifeDaysRemaining(null);
+            }
+            receptionRepositoryPort.save(reception);
+        }
+
         logAudit(receptionId, "LOTE_ELIMINADO", Map.of("lotNumber", lot.getLotNumber()), Map.of());
     }
 }
-

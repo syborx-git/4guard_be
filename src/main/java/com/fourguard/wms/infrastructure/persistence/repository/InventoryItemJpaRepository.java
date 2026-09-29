@@ -16,6 +16,15 @@ public interface InventoryItemJpaRepository extends JpaRepository<InventoryItemE
 
     Optional<InventoryItemEntity> findBySscc(String sscc);
 
+    @Query("""
+            SELECT i FROM InventoryItemEntity i
+            JOIN FETCH i.sku s
+            LEFT JOIN FETCH i.location l
+            LEFT JOIN FETCH i.client c
+            WHERE (LOWER(i.sscc) = LOWER(:barcode) OR LOWER(i.externalUa) = LOWER(:barcode))
+            """)
+    Optional<InventoryItemEntity> findBySsccOrExternalUa(String barcode);
+
     List<InventoryItemEntity> findByBranchId(UUID branchId);
 
     Page<InventoryItemEntity> findByBranchId(UUID branchId, Pageable pageable);

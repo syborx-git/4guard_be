@@ -69,6 +69,13 @@ public class AuditService {
                 .build();
 
         List<AuditLogDetailEntity> details = buildDetails(logEntry, beforeState, afterState);
+
+        // Avoid creating phantom empty audit entries for update actions
+        boolean isInitialRegistration = action != null && (action.contains("REGISTRAD") || action.contains("CREATED") || action.contains("INICIAD"));
+        if (details.isEmpty() && !isInitialRegistration) {
+            return;
+        }
+
         logEntry.setDetails(details);
 
         auditLogRepositoryPort.log(logEntry);

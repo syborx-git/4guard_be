@@ -50,10 +50,10 @@ public class InventoryAuditLogEntity {
     @JoinColumn(name = "inventory_item_id")
     private InventoryItemEntity inventoryItem;
 
-    @Column(name = "pallet_code", nullable = false, length = 60)
+    @Column(name = "pallet_code", nullable = false, length = 100)
     private String palletCode;
 
-    @Column(name = "remision_folio", length = 60)
+    @Column(name = "remision_folio", length = 100)
     private String remisionFolio;
 
     @Column(name = "event_type", nullable = false, length = 60)
