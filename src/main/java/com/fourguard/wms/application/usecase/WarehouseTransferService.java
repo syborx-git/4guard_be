@@ -150,18 +150,41 @@ public class WarehouseTransferService implements WarehouseTransferUseCase {
 
         if (request.getSelectedItemIds() != null) {
             for (UUID itemId : request.getSelectedItemIds()) {
-                inventoryItemRepositoryPort.findById(itemId).ifPresent(itemsToMove::add);
+                if (itemId != null) {
+                    inventoryItemRepositoryPort.findById(itemId).ifPresent(item -> {
+                        if (!itemsToMove.contains(item)) itemsToMove.add(item);
+                    });
+                }
             }
         }
 
         for (String code : requestedCodes) {
             if (code == null || code.isBlank())
                 continue;
-            inventoryItemRepositoryPort.findBySscc(code.trim()).ifPresent(item -> {
+            String cleanCode = code.trim();
+            // Check if code is a UUID
+            try {
+                UUID uId = UUID.fromString(cleanCode);
+                inventoryItemRepositoryPort.findById(uId).ifPresent(item -> {
+                    if (!itemsToMove.contains(item)) {
+                        itemsToMove.add(item);
+                    }
+                });
+            } catch (IllegalArgumentException ignored) {}
+
+            inventoryItemRepositoryPort.findBySsccOrExternalUa(cleanCode).ifPresent(item -> {
                 if (!itemsToMove.contains(item)) {
                     itemsToMove.add(item);
                 }
             });
+        }
+
+        // Fallback: If no items matched by code/id, match all items currently in origin location
+        if (itemsToMove.isEmpty() && origin != null && origin.getId() != null) {
+            List<InventoryItemEntity> originItems = inventoryItemRepositoryPort.findByLocationId(origin.getId());
+            if (!originItems.isEmpty()) {
+                itemsToMove.addAll(originItems);
+            }
         }
 
         // Validar que se hayan encontrado ítems de inventario existentes

@@ -10,7 +10,9 @@ import java.util.UUID;
 public interface InventoryItemRepositoryPort {
     Optional<InventoryItemEntity> findById(UUID id);
     Optional<InventoryItemEntity> findBySscc(String sscc);
+    Optional<InventoryItemEntity> findBySsccOrExternalUa(String barcode);
     List<InventoryItemEntity>     findByBranchId(UUID branchId);
+    List<InventoryItemEntity>     findByLocationId(UUID locationId);
     List<InventoryItemEntity>     findAvailableBySkuFefo(UUID skuId);
     InventoryItemEntity           save(InventoryItemEntity item);
     boolean                       existsBySscc(String sscc);

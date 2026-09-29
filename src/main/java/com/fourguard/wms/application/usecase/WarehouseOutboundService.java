@@ -219,9 +219,6 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
                 if (item.getBranch() != null && !item.getBranch().getId().equals(branch.getId())) {
                     throw new ValidationException("La tarima " + item.getSscc() + " pertenece a otra sucursal.");
                 }
-                if (item.getClient() != null && !item.getClient().getId().equals(client.getId())) {
-                    throw new ValidationException("La tarima " + item.getSscc() + " pertenece a otro cliente (" + item.getClient().getName() + ").");
-                }
             }
         }
 
@@ -447,35 +444,53 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
             LocationEntity ramp = null;
             if (request.getRampId() != null) {
                 ramp = locationRepositoryPort.findById(request.getRampId()).orElse(null);
-            } else if (request.getRampNumber() != null && outbound.getBranch() != null) {
+            } else if (request.getRampNumber() != null) {
                 String formattedCode = String.format("LOC-RAMP-%02d", request.getRampNumber());
-                ramp = locationRepositoryPort.findByBranchIdAndCode(outbound.getBranch().getId(), formattedCode).orElse(null);
+                if (outbound.getBranch() != null) {
+                    ramp = locationRepositoryPort.findByBranchIdAndCode(outbound.getBranch().getId(), formattedCode).orElse(null);
+                }
                 if (ramp == null) {
                     ramp = locationRepositoryPort.findFirstByCode(formattedCode).orElse(null);
                 }
             }
-            if (ramp != null) {
-                String oldRamp = outbound.getRamp() != null ? (outbound.getRamp().getCode() != null ? outbound.getRamp().getCode() : outbound.getRamp().getName()) : "Sin asignar";
-                String newRamp = ramp.getCode() != null ? ramp.getCode() : (ramp.getName() != null ? ramp.getName() : "Rampa");
-                if (!Objects.equals(oldRamp, newRamp)) {
+            String oldRamp = outbound.getRamp() != null ? (outbound.getRamp().getCode() != null ? outbound.getRamp().getCode() : outbound.getRamp().getName()) : "Sin asignar";
+            String newRamp = ramp != null ? (ramp.getCode() != null ? ramp.getCode() : (ramp.getName() != null ? ramp.getName() : ("Rampa " + request.getRampNumber()))) : (request.getRampNumber() != null ? ("Rampa " + request.getRampNumber()) : null);
+            if (newRamp != null && !Objects.equals(oldRamp, newRamp)) {
+                if (ramp != null) {
                     outbound.setRamp(ramp);
-                    oldValues.put("ramp", oldRamp);
-                    newValues.put("ramp", newRamp);
                 }
+                oldValues.put("ramp", oldRamp);
+                newValues.put("ramp", newRamp);
             }
         }
 
         // 3. Forklift Operator assignment
+        ForkliftOperatorEntity operator = null;
         if (request.getForkliftOperatorId() != null) {
-            ForkliftOperatorEntity operator = forkliftOperatorRepositoryPort.findById(request.getForkliftOperatorId()).orElse(null);
-            if (operator != null) {
-                String oldOp = outbound.getForkliftOperator() != null ? outbound.getForkliftOperator().getFullName() : "Sin asignar";
-                String newOp = operator.getFullName();
-                if (!Objects.equals(oldOp, newOp)) {
-                    outbound.setForkliftOperator(operator);
-                    oldValues.put("forkliftOperator", oldOp);
-                    newValues.put("forkliftOperator", newOp);
-                }
+            operator = forkliftOperatorRepositoryPort.findById(request.getForkliftOperatorId()).orElse(null);
+        }
+        if (operator == null && request.getForkliftOperatorName() != null && !request.getForkliftOperatorName().isBlank()) {
+            String opSearch = request.getForkliftOperatorName().trim();
+            operator = forkliftOperatorRepositoryPort.findAll().stream()
+                    .filter(o -> (o.getFullName() != null && o.getFullName().equalsIgnoreCase(opSearch)) ||
+                                 (o.getCode() != null && o.getCode().equalsIgnoreCase(opSearch)))
+                    .findFirst()
+                    .orElse(null);
+        }
+        if (operator != null) {
+            String oldOp = outbound.getForkliftOperator() != null ? outbound.getForkliftOperator().getFullName() : "Sin asignar";
+            String newOp = operator.getFullName();
+            if (!Objects.equals(oldOp, newOp)) {
+                outbound.setForkliftOperator(operator);
+                oldValues.put("forkliftOperator", oldOp);
+                newValues.put("forkliftOperator", newOp);
+            }
+        } else if (request.getForkliftOperatorName() != null && !request.getForkliftOperatorName().isBlank()) {
+            String oldOp = outbound.getForkliftOperator() != null ? outbound.getForkliftOperator().getFullName() : "Sin asignar";
+            String newOp = request.getForkliftOperatorName().trim();
+            if (!Objects.equals(oldOp, newOp)) {
+                oldValues.put("forkliftOperator", oldOp);
+                newValues.put("forkliftOperator", newOp);
             }
         }
 
@@ -666,7 +681,20 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
         WarehouseOutboundEntity saved = outboundRepositoryPort.save(outbound);
 
         if (!newValues.isEmpty()) {
-            logAudit(saved.getId(), "SALIDA_MODIFICADA", oldValues, newValues);
+            String auditAction = "SALIDA_MODIFICADA";
+            if (newValues.containsKey("status")) {
+                String newSt = String.valueOf(newValues.get("status"));
+                auditAction = switch (newSt) {
+                    case "ASSIGNED" -> "SALIDA_ASIGNADA";
+                    case "IN_PROGRESS" -> "SALIDA_EN_CARGA";
+                    case "LOADED" -> "SALIDA_CARGADA";
+                    case "COMPLETED" -> "SALIDA_DESPACHADA";
+                    default -> "SALIDA_MODIFICADA";
+                };
+            } else if (newValues.containsKey("ramp") || newValues.containsKey("forkliftOperator")) {
+                auditAction = "SALIDA_ASIGNADA";
+            }
+            logAudit(saved.getId(), auditAction, oldValues, newValues);
         }
 
         return outboundMapper.toResponse(saved);
@@ -690,13 +718,18 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
         outbound.setCancellationReason(request.getReason());
         outbound.setCancelledBy(admin.getFirstName() + " " + admin.getLastName());
 
-        // Revert items back to AVAILABLE
+        // Revert items back to AVAILABLE and restore location occupancy
         if (outbound.getItems() != null) {
             for (WarehouseOutboundItemEntity oi : outbound.getItems()) {
                 InventoryItemEntity item = oi.getItem();
-                if (item != null && item.getState() == InventoryState.DISPATCHED) {
+                if (item != null && (item.getState() == InventoryState.DISPATCHED || item.getState() == InventoryState.RESERVED)) {
+                    boolean wasDispatched = (item.getState() == InventoryState.DISPATCHED);
                     item.setState(InventoryState.AVAILABLE);
                     inventoryItemRepositoryPort.save(item);
+
+                    if (wasDispatched && item.getLocation() != null && item.getLocation().getId() != null) {
+                        locationRepositoryPort.incrementOccupancy(item.getLocation().getId(), 1);
+                    }
 
                     InventoryMovementEntity comp = InventoryMovementEntity.builder()
                             .item(item)
@@ -1069,9 +1102,13 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
         String actionLabel = switch (log.getAction()) {
             case "SALIDA_REGISTRADA" -> "Arribo & Registro en Caseta";
             case "SALIDA_MODIFICADA", "SALIDA_ACTUALIZADA" -> "Ficha de Salida Actualizada";
-            case "SALIDA_ASIGNADA" -> "Asignación de Andén";
-            case "SALIDA_DESPACHADA", "OUTBOUND_COMPLETED", "SALIDA_AUTORIZADA" -> "Despacho Outbound Confirmado";
+            case "SALIDA_ASIGNADA" -> "Asignación de Andén & Montacarguista";
+            case "SALIDA_EN_CARGA", "CARGA_INICIADA" -> "Inicio de Carga en Andén (Terminal RF)";
+            case "SALIDA_CARGADA", "CARGA_CONCLUIDA" -> "Carga Física Concluida (Por Auditar)";
+            case "SALIDA_DESPACHADA", "OUTBOUND_COMPLETED", "SALIDA_AUTORIZADA" -> "Despacho Outbound Confirmado (F03)";
             case "SALIDA_CANCELADA" -> "Cancelación Extraordinaria con Autorización";
+            case "TARIMAS_ASIGNADAS" -> "Tarimas de Inventario Asignadas (FEFO)";
+            case "REMISION_MODIFICADA" -> "Modificación de Remisión / Carta Porte";
             default -> log.getAction();
         };
 
