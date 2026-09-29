@@ -12,4 +12,7 @@ import java.util.UUID;
 public interface IncidenceJpaRepository extends JpaRepository<IncidenceEntity, UUID> {
     List<IncidenceEntity> findByItemId(UUID itemId);
     Optional<IncidenceEntity> findByFolio(Integer folio);
+    List<IncidenceEntity> findByItemBranchIdOrderByCreatedAtDesc(UUID branchId);
+    List<IncidenceEntity> findByItemBranchIdAndStatusOrderByCreatedAtDesc(UUID branchId, com.fourguard.wms.domain.enums.IncidenceStatus status);
+    List<IncidenceEntity> findByItemBranchIdAndStageOrderByCreatedAtDesc(UUID branchId, com.fourguard.wms.domain.enums.DetectionStage stage);
 }
