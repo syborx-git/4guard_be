@@ -1,0 +1,108 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "4GuardQualityRulesMatrix",
+  "description": "Matriz consolidada de reglas de negocio, tolerancias numéricas e instructivos de Calidad QM",
+  "version": "1.0.0",
+  "lastUpdated": "2026-09-30",
+  "tolerances": {
+    "product": {
+      "primaryPackagingMaxDamagePerPallet": 1,
+      "secondaryPackagingMaxDamagePerPallet": 2,
+      "maxFilmOpeningCm": 5.0,
+      "maxPalletTiltDegrees": 5.0,
+      "labelsRequiredPercent": 100,
+      "humidityAllowedPercent": 0,
+      "brokenBoardsMaxRepairable": 1,
+      "brokenBoardsRequiresTraspaleo": 2
+    },
+    "transport": {
+      "tarpTearsAllowedMaxCm": 5.0,
+      "tarpMaxTearsCount": 1,
+      "tarpMustBeSealedAndOpaque": true,
+      "maxWallDirtDiameterCm": 10.0,
+      "doorRubberCutMaxCm": 5.0,
+      "pestTolerance": 0,
+      "aromaTolerance": 0,
+      "maxLooseDebrisCountGreaterThan5cm": 3,
+      "clientResponseTimeoutMinutes": 30
+    },
+    "storage": {
+      "maxRelativeHumidityPercent": 65.0,
+      "readingSchedules": ["08:00-09:00", "14:00", "20:00-21:00"],
+      "pestReportRetentionYears": 5
+    },
+    "sampling": {
+      "etiquetasPostetaUnits": 50,
+      "etiquetasBobinaAdheribleMeters": 6,
+      "tapasCulinariosUnits": 20,
+      "tapasCafesUnits": 20,
+      "garrafasUnits": 4,
+      "exhibidoresUnits": 30,
+      "estuchesUnits": 30,
+      "charolasUnits": 30,
+      "cajasUnits": 10,
+      "laminadoPacBobinaMeters": 10,
+      "laminadoEnvasesBobinaMeters": 10,
+      "lataExternaUnits": 5,
+      "cafeVerdeSampleTotalKg": 3.0,
+      "cafeVerdeGramsPerBag": 150,
+      "cafeVerdeAgitationSeconds": 30
+    }
+  },
+  "operationalRules": [
+    {
+      "code": "RN-QM-01",
+      "name": "Bloqueo Atómico de PNC",
+      "description": "Al bloquear un pallet, el WMS cambia su estado a IN_QUALITY (20), asienta movimiento QUARANTINE en Kardex inmutable y genera folio BLQ-YYYY-XXXX.",
+      "severityMapping": {
+        "CRITICAL": "RED",
+        "WARNING": "YELLOW",
+        "INFO": "BLUE"
+      }
+    },
+    {
+      "code": "RN-QM-02",
+      "name": "Blindaje de Despacho Outbound",
+      "description": "Tarimas en estado IN_QUALITY no pueden asociarse a ninguna orden de salida ni cargarse al transporte. Toda consulta filtra state = 30 (AVAILABLE)."
+    },
+    {
+      "code": "RN-QM-03",
+      "name": "Dictamen Formal Obligatorio",
+      "description": "Ningún pallet sale de IN_QUALITY sin un registro formal en quality_releases indicando autorizador (CLIENT / QUALITY_4GUARD), tipo de soporte documental y destino.",
+      "destinations": {
+        "DISTRIBUTION": {
+          "newState": "AVAILABLE (30)",
+          "kardexMovement": "MovementType.RELEASE"
+        },
+        "DESTRUCTION": {
+          "newState": "DAMAGED (60)",
+          "kardexMovement": "MovementType.ADJUSTMENT"
+        },
+        "RETURN": {
+          "newState": "RETURNED (80)",
+          "kardexMovement": "MovementType.RETURN"
+        }
+      }
+    },
+    {
+      "code": "RN-QM-04",
+      "name": "Regla de Diurex en Producto Terminado",
+      "description": "Está estrictamente PROHIBIDO usar Diurex en Producto Terminado (PT). Solo se permite en pallets de frasco de vidrio vacíos con aberturas > 5 cm.",
+      "allowedProductTypes": ["FRASCO_VIDRIO_VACIO"],
+      "forbiddenProductTypes": ["PRODUCTO_TERMINADO", "ALIMENTO", "LAMINADO"]
+    },
+    {
+      "code": "RN-QM-05",
+      "name": "Condicionalidad de Carga F01",
+      "description": "Si palletsLimpios = NO (criterio 4), la verificación F01 se forza a LIMPIEZA_PENDIENTE y exige firma obligatoria del responsable de limpieza bajo IT01.",
+      "instructionCode": "IT01-PO-GC-8.6-01"
+    },
+    {
+      "code": "RN-QM-06",
+      "name": "Acondicionamiento y Vueltas de Playo",
+      "description": "En traspaleo, se aplican mínimo 3 vueltas de playo para Producto Terminado y 5 vueltas de playo para frascos de vidrio.",
+      "ptWraps": 3,
+      "glassWraps": 5
+    }
+  ]
+}

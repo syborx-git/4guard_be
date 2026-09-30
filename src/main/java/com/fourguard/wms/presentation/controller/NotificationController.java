@@ -1,32 +1,34 @@
 package com.fourguard.wms.presentation.controller;
 
 import com.fourguard.wms.application.dto.response.notification.NotificationResponse;
+import com.fourguard.wms.domain.model.quality.QualityAlertEvent;
 import com.fourguard.wms.domain.ports.in.NotificationUseCase;
+import com.fourguard.wms.infrastructure.notification.QualityAlertBroadcaster;
 import com.fourguard.wms.shared.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.security.Principal;
 import java.util.List;
 import java.util.UUID;
 
 /**
- * REST controller for in-app notifications.
- *
- * <p>Each user can only read and acknowledge their own notifications.
- * The authenticated principal is derived from the JWT token.</p>
+ * REST controller for in-app notifications and real-time RF Terminal streaming.
  */
 @RestController
 @RequestMapping("/notifications")
 @RequiredArgsConstructor
-@Tag(name = "Notificaciones", description = "Gestión de notificaciones in-app para el usuario autenticado")
+@Tag(name = "Notificaciones", description = "Gestión de notificaciones in-app y canal de eventos SSE para Terminales RF")
 public class NotificationController {
 
     private final NotificationUseCase notificationUseCase;
+    private final QualityAlertBroadcaster alertBroadcaster;
 
     @GetMapping
     @Operation(
@@ -64,4 +66,21 @@ public class NotificationController {
         notificationUseCase.markAsRead(id, principal.getName());
         return ResponseEntity.ok(ApiResponse.ok("Notificación marcada como leída"));
     }
+
+    @GetMapping(value = "/rf-stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @Operation(summary = "Canal SSE de Alertas en Tiempo Real para Terminal RF",
+               description = "Establece conexión Server-Sent Events (SSE) persistente para recibir alertas de bloqueos QM, acondicionamiento y contingencias ambientales.")
+    public SseEmitter subscribeRfStream(
+            @RequestParam(defaultValue = "RF-TERMINAL-GENERIC") String terminalId) {
+
+        return alertBroadcaster.subscribe(terminalId);
+    }
+
+    @GetMapping("/rf-alerts/recent")
+    @Operation(summary = "Obtener alertas recientes para Terminal RF",
+               description = "Retorna el buffer de alertas prioritarias activas para sincronización offline.")
+    public ResponseEntity<ApiResponse<List<QualityAlertEvent>>> getRecentRfAlerts() {
+        return ResponseEntity.ok(ApiResponse.ok("Alertas recientes obtenidas", alertBroadcaster.getRecentAlerts()));
+    }
 }
+
