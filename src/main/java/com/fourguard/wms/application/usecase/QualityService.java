@@ -8,8 +8,10 @@ import com.fourguard.wms.application.dto.response.quality.*;
 import com.fourguard.wms.domain.enums.*;
 import com.fourguard.wms.domain.exception.EntityNotFoundException;
 import com.fourguard.wms.domain.exception.ValidationException;
+import com.fourguard.wms.domain.model.quality.QualityAlertEvent;
 import com.fourguard.wms.domain.ports.in.QualityUseCase;
 import com.fourguard.wms.domain.ports.out.*;
+import com.fourguard.wms.infrastructure.notification.QualityAlertBroadcaster;
 import com.fourguard.wms.infrastructure.persistence.entity.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.*;
 
 @Service
@@ -35,6 +38,7 @@ public class QualityService implements QualityUseCase {
     private final OrganizationRepositoryPort organizationRepository;
     private final BranchRepositoryPort branchRepository;
     private final ObjectMapper objectMapper;
+    private final QualityAlertBroadcaster qualityAlertBroadcaster;
 
     // ══════════════════════════════════════════════════════════════════════════
     // 1. SUBMÓDULO: BLOQUEOS Y PRODUCTO NO CONFORME (PNC)
@@ -117,6 +121,26 @@ public class QualityService implements QualityUseCase {
                 .reason(request.getNotes())
                 .build();
         inventoryAuditLogRepository.save(audit);
+
+        // 6. Transmitir alerta reactiva en tiempo real a Terminales RF
+        try {
+            qualityAlertBroadcaster.broadcast(QualityAlertEvent.builder()
+                    .eventId(UUID.randomUUID())
+                    .eventType("QM_BLOCK_ALERT")
+                    .severity(savedIncidence.getSeverity() != null ? savedIncidence.getSeverity().name() : "CRITICAL")
+                    .sscc(item.getSscc() != null ? item.getSscc() : item.getId().toString())
+                    .palletFolio("BLQ-" + savedIncidence.getId().toString().substring(0, 8).toUpperCase())
+                    .sku(item.getProduct() != null ? item.getProduct().getSku() : "N/A")
+                    .productName(item.getProduct() != null ? item.getProduct().getName() : "N/A")
+                    .locationCode(item.getLocation() != null ? item.getLocation().getCode() : "N/A")
+                    .reason(request.getNotes() != null ? request.getNotes() : "Retención por no conformidad de Calidad")
+                    .recommendedAction("NO MOVER ni despachar. Traslado exclusivo a Bahía QM.")
+                    .requiredInstruction("IT01-PO-GC-8.6-01")
+                    .timestamp(OffsetDateTime.now())
+                    .build());
+        } catch (Exception e) {
+            log.error("Error transmitiendo alerta RF de bloqueo: {}", e.getMessage());
+        }
 
         return mapToBlockResponse(savedIncidence);
     }
@@ -232,6 +256,26 @@ public class QualityService implements QualityUseCase {
                 .build();
         inventoryAuditLogRepository.save(audit);
 
+        // 7. Transmitir evento reactivo de liberación a Terminales RF
+        try {
+            qualityAlertBroadcaster.broadcast(QualityAlertEvent.builder()
+                    .eventId(UUID.randomUUID())
+                    .eventType("QM_RELEASE_AUTHORIZED")
+                    .severity("INFO")
+                    .sscc(item.getSscc() != null ? item.getSscc() : item.getId().toString())
+                    .palletFolio(savedRelease.getFolio())
+                    .sku(item.getProduct() != null ? item.getProduct().getSku() : "N/A")
+                    .productName(item.getProduct() != null ? item.getProduct().getName() : "N/A")
+                    .locationCode(item.getLocation() != null ? item.getLocation().getCode() : "N/A")
+                    .reason("Liberación autorizada por " + savedRelease.getAuthorizedByName() + " (" + savedRelease.getDestination() + ")")
+                    .recommendedAction("Tarima habilitada para operaciones de " + savedRelease.getDestination())
+                    .requiredInstruction("PO-GC-8.6-03")
+                    .timestamp(OffsetDateTime.now())
+                    .build());
+        } catch (Exception e) {
+            log.error("Error transmitiendo alerta RF de liberación: {}", e.getMessage());
+        }
+
         return mapToReleaseResponse(savedRelease);
     }
 
@@ -298,6 +342,28 @@ public class QualityService implements QualityUseCase {
         entity.setEvidenceMetadata(toJson(request.getEvidencePhotos()));
 
         LoadVerificationEntity saved = qualityRepository.saveVerification(entity);
+
+        // 8. Transmitir alerta si la verificación requiere acondicionamiento o rechazo
+        if (saved.getStatus() == LoadVerificationStatus.LIMPIEZA_PENDIENTE ||
+            saved.getStatus() == LoadVerificationStatus.ACONDICIONAMIENTO_PENDIENTE ||
+            saved.getStatus() == LoadVerificationStatus.RECHAZADO) {
+            try {
+                qualityAlertBroadcaster.broadcast(QualityAlertEvent.builder()
+                        .eventId(UUID.randomUUID())
+                        .eventType("QM_CONDITIONING_REQUIRED")
+                        .severity(saved.getStatus() == LoadVerificationStatus.RECHAZADO ? "CRITICAL" : "WARNING")
+                        .palletFolio(saved.getFolio())
+                        .locationCode(saved.getRampCode())
+                        .reason("Verificación de Carga " + saved.getFolio() + " no autorizada (" + saved.getStatus().name() + ")")
+                        .recommendedAction("Detener maniobras en Rampa " + saved.getRampCode() + ". Aplicar acondicionamiento/limpieza inmediata.")
+                        .requiredInstruction("IT02-PO-GC-8.6-02")
+                        .timestamp(OffsetDateTime.now())
+                        .build());
+            } catch (Exception e) {
+                log.error("Error transmitiendo alerta RF de verificación: {}", e.getMessage());
+            }
+        }
+
         return mapToVerificationResponse(saved);
     }
 
