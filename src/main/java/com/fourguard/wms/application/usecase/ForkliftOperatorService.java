@@ -40,13 +40,16 @@ import java.util.stream.Collectors;
 /**
  * Application service implementing {@link ForkliftOperatorUseCase} (HU-142).
  *
- * <p>Business rules enforced:
+ * <p>
+ * Business rules enforced:
  * <ul>
- *   <li>Code (MC-XXX) is auto-generated per organization and is immutable.</li>
- *   <li>{@code fullName} is always derived from firstName + lastNamePaternal + lastNameMaternal.</li>
- *   <li>{@code licenseStatus} is always recomputed from {@code licenseExpirationDate}.</li>
- *   <li>DC-3 license number must be unique within the organization.</li>
- *   <li>Every write operation is recorded in {@code wms.audit_logs} with field-level deltas.</li>
+ * <li>{@code fullName} is always derived from firstName + lastNamePaternal +
+ * lastNameMaternal.</li>
+ * <li>{@code licenseStatus} is always recomputed from
+ * {@code licenseExpirationDate}.</li>
+ * <li>DC-3 license number must be unique within the organization.</li>
+ * <li>Every write operation is recorded in {@code wms.audit_logs} with
+ * field-level deltas.</li>
  * </ul>
  */
 @Service
@@ -57,14 +60,14 @@ public class ForkliftOperatorService implements ForkliftOperatorUseCase {
     private static final String ENTITY_TYPE = "FORKLIFT_OPERATOR";
 
     private final ForkliftOperatorRepositoryPort operatorRepositoryPort;
-    private final OrganizationRepositoryPort     organizationRepositoryPort;
-    private final UserRepositoryPort             userRepositoryPort;
-    private final AuditLogRepositoryPort         auditLogRepositoryPort;
-    private final ShiftRepositoryPort            shiftRepositoryPort;
-    private final BranchRepositoryPort           branchRepositoryPort;
-    private final ForkliftOperatorMapper         mapper;
-    private final SecurityAuditHelper            securityAuditHelper;
-    private final AuditService                   auditService;
+    private final OrganizationRepositoryPort organizationRepositoryPort;
+    private final UserRepositoryPort userRepositoryPort;
+    private final AuditLogRepositoryPort auditLogRepositoryPort;
+    private final ShiftRepositoryPort shiftRepositoryPort;
+    private final BranchRepositoryPort branchRepositoryPort;
+    private final ForkliftOperatorMapper mapper;
+    private final SecurityAuditHelper securityAuditHelper;
+    private final AuditService auditService;
 
     // ─── CREATE ─────────────────────────────────────────────────────────────────
 
@@ -82,13 +85,14 @@ public class ForkliftOperatorService implements ForkliftOperatorUseCase {
                 request.getOrganizationId(), request.getLicenseNumberDc3())) {
             throw new ValidationException(
                     "Ya existe un montacarguista con la licencia DC-3 '" + request.getLicenseNumberDc3()
-                    + "' en esta organización.");
+                            + "' en esta organización.");
         }
 
         ForkliftOperatorEntity entity = mapper.toEntity(request);
         entity.setOrganization(organization);
 
-        // Auto-generate code: find the next available unique code (MC-001, MC-002, etc.)
+        // Auto-generate code: find the next available unique code (MC-001, MC-002,
+        // etc.)
         int seq = 1;
         String generatedCode;
         do {
@@ -97,7 +101,8 @@ public class ForkliftOperatorService implements ForkliftOperatorUseCase {
         entity.setCode(generatedCode);
 
         // Computed fields
-        entity.setFullName(buildFullName(request.getFirstName(), request.getLastNamePaternal(), request.getLastNameMaternal()));
+        entity.setFullName(
+                buildFullName(request.getFirstName(), request.getLastNamePaternal(), request.getLastNameMaternal()));
         entity.setLicenseStatus(computeLicenseStatus(request.getLicenseExpirationDate()));
         entity.setStatus(ForkliftOperatorStatus.ACTIVO);
 
@@ -134,7 +139,7 @@ public class ForkliftOperatorService implements ForkliftOperatorUseCase {
                     request.getOrganizationId(), request.getLicenseNumberDc3(), request.getId())) {
                 throw new ValidationException(
                         "Ya existe otro montacarguista con la licencia DC-3 '" + request.getLicenseNumberDc3()
-                        + "' en esta organización.");
+                                + "' en esta organización.");
             }
         }
 
@@ -143,7 +148,8 @@ public class ForkliftOperatorService implements ForkliftOperatorUseCase {
         mapper.updateEntityFromDto(request, existing);
 
         // Recompute derived fields
-        existing.setFullName(buildFullName(request.getFirstName(), request.getLastNamePaternal(), request.getLastNameMaternal()));
+        existing.setFullName(
+                buildFullName(request.getFirstName(), request.getLastNamePaternal(), request.getLastNameMaternal()));
         existing.setLicenseStatus(computeLicenseStatus(request.getLicenseExpirationDate()));
 
         // Optional associations
@@ -191,7 +197,8 @@ public class ForkliftOperatorService implements ForkliftOperatorUseCase {
                 .filter(op -> licenseStatus == null || licenseStatus.isBlank()
                         || op.getLicenseStatus().name().equalsIgnoreCase(licenseStatus))
                 .filter(op -> {
-                    if (search == null || search.isBlank()) return true;
+                    if (search == null || search.isBlank())
+                        return true;
                     String q = search.toLowerCase();
                     return op.getFullName().toLowerCase().contains(q)
                             || op.getCode().toLowerCase().contains(q)
@@ -248,7 +255,7 @@ public class ForkliftOperatorService implements ForkliftOperatorUseCase {
         ForkliftOperatorEntity saved = operatorRepositoryPort.save(existing);
 
         Map<String, Object> beforeState = buildAuditState(snapshot);
-        Map<String, Object> afterState  = buildAuditState(saved);
+        Map<String, Object> afterState = buildAuditState(saved);
         if (request.getReason() != null && !request.getReason().isBlank()) {
             afterState.put("reason", request.getReason());
         }
@@ -305,10 +312,13 @@ public class ForkliftOperatorService implements ForkliftOperatorUseCase {
 
     /** Computes the license status from the expiration date. */
     private LicenseStatus computeLicenseStatus(LocalDate expirationDate) {
-        if (expirationDate == null) return LicenseStatus.VENCIDA;
-        long daysRemaining = LocalDate.now().until(expirationDate).getDays();
-        if (daysRemaining < 0)  return LicenseStatus.VENCIDA;
-        if (daysRemaining <= 30) return LicenseStatus.POR_VENCER;
+        if (expirationDate == null)
+            return LicenseStatus.VENCIDA;
+        long daysRemaining = java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(), expirationDate);
+        if (daysRemaining < 0)
+            return LicenseStatus.VENCIDA;
+        if (daysRemaining <= 30)
+            return LicenseStatus.POR_VENCER;
         return LicenseStatus.VIGENTE;
     }
 
@@ -317,7 +327,10 @@ public class ForkliftOperatorService implements ForkliftOperatorUseCase {
         return (firstName.trim() + " " + lastNamePaternal.trim() + " " + lastNameMaternal.trim()).trim();
     }
 
-    /** Resolves and sets the shift from its UUID, also updating the denormalized shiftName. */
+    /**
+     * Resolves and sets the shift from its UUID, also updating the denormalized
+     * shiftName.
+     */
     private void resolveShift(UUID shiftId, ForkliftOperatorEntity entity) {
         if (shiftId == null) {
             entity.setShift(null);
@@ -367,7 +380,7 @@ public class ForkliftOperatorService implements ForkliftOperatorUseCase {
 
     /** Logs an audit entry using entity states (before/after). */
     private void logAudit(String username, String action, UUID entityId,
-                           ForkliftOperatorEntity before, ForkliftOperatorEntity after) {
+            ForkliftOperatorEntity before, ForkliftOperatorEntity after) {
         try {
             UserEntity actor = userRepositoryPort.findByUsername(username).orElse(null);
             if (actor != null) {
@@ -379,9 +392,12 @@ public class ForkliftOperatorService implements ForkliftOperatorUseCase {
         }
     }
 
-    /** Logs an audit entry with pre-built state maps (used when extra fields are appended). */
+    /**
+     * Logs an audit entry with pre-built state maps (used when extra fields are
+     * appended).
+     */
     private void logAuditWithState(String username, String action, UUID entityId,
-                                    Map<String, Object> before, Map<String, Object> after) {
+            Map<String, Object> before, Map<String, Object> after) {
         try {
             UserEntity actor = userRepositoryPort.findByUsername(username).orElse(null);
             if (actor != null) {
@@ -392,25 +408,40 @@ public class ForkliftOperatorService implements ForkliftOperatorUseCase {
         }
     }
 
-    /** Builds a field-value map representing the state of an entity for audit delta comparison. */
+    /**
+     * Builds a field-value map representing the state of an entity for audit delta
+     * comparison.
+     */
     private Map<String, Object> buildAuditState(ForkliftOperatorEntity entity) {
-        if (entity == null) return null;
+        if (entity == null)
+            return null;
         Map<String, Object> state = new HashMap<>();
-        state.put("id",                    entity.getId() != null ? entity.getId().toString() : null);
-        state.put("code",                  entity.getCode());
-        state.put("jobTitle",              entity.getJobTitle());
-        state.put("fullName",              entity.getFullName());
-        state.put("firstName",             entity.getFirstName());
-        state.put("lastNamePaternal",      entity.getLastNamePaternal());
-        state.put("lastNameMaternal",      entity.getLastNameMaternal());
-        state.put("licenseNumberDc3",      entity.getLicenseNumberDc3());
-        state.put("licenseExpirationDate", entity.getLicenseExpirationDate() != null ? entity.getLicenseExpirationDate().toString() : null);
-        state.put("licenseStatus",         entity.getLicenseStatus() != null ? entity.getLicenseStatus().name() : null);
-        state.put("status",                entity.getStatus() != null ? entity.getStatus().name() : null);
-        state.put("shiftId",               entity.getShift() != null ? entity.getShift().getId().toString() : null);
-        state.put("shiftName",             entity.getShiftName());
-        state.put("organizationId",        entity.getOrganization() != null ? entity.getOrganization().getId().toString() : null);
-        state.put("branchId",              entity.getBranch() != null ? entity.getBranch().getId().toString() : null);
+        state.put("id", entity.getId() != null ? entity.getId().toString() : null);
+        state.put("code", entity.getCode());
+        state.put("jobTitle", entity.getJobTitle());
+        state.put("fullName", entity.getFullName());
+        state.put("firstName", entity.getFirstName());
+        state.put("lastNamePaternal", entity.getLastNamePaternal());
+        state.put("lastNameMaternal", entity.getLastNameMaternal());
+        state.put("licenseNumberDc3", entity.getLicenseNumberDc3());
+        state.put("licenseExpirationDate",
+                entity.getLicenseExpirationDate() != null ? entity.getLicenseExpirationDate().toString() : null);
+        state.put("licenseStatus", entity.getLicenseStatus() != null ? entity.getLicenseStatus().name() : null);
+        state.put("status", entity.getStatus() != null ? entity.getStatus().name() : null);
+        try {
+            state.put("shiftId", entity.getShift() != null ? entity.getShift().getId().toString() : null);
+        } catch (Exception ignored) {
+        }
+        state.put("shiftName", entity.getShiftName());
+        try {
+            state.put("organizationId",
+                    entity.getOrganization() != null ? entity.getOrganization().getId().toString() : null);
+        } catch (Exception ignored) {
+        }
+        try {
+            state.put("branchId", entity.getBranch() != null ? entity.getBranch().getId().toString() : null);
+        } catch (Exception ignored) {
+        }
         return state;
     }
 }

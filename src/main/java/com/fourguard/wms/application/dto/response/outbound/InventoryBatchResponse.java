@@ -40,6 +40,7 @@ public class InventoryBatchResponse {
     @AllArgsConstructor
     public static class BatchPalletItemResponse {
         private UUID itemId;
+        private Integer palletNumber;
         private String palletCode;
         private String skuCode;
         private String description;

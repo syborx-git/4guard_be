@@ -185,4 +185,18 @@ public class LocationController {
         List<LocationAuditResponse> response = locationUseCase.getLocationAuditLogs(id);
         return ResponseEntity.ok(ApiResponse.ok("Historial de auditoría recuperado con éxito", response));
     }
+
+    // =========================================================================
+    // BAY OCCUPANCY & SUGGESTION (22-PALLET STANDARD)
+    // =========================================================================
+
+    @GetMapping("/bays/occupancy")
+    @PreAuthorize("hasAuthority('LOCATIONS_READ') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('WAREHOUSE_SUPERVISOR')")
+    @Operation(summary = "Matriz de ocupación y semáforo de bahías",
+               description = "Calcula el porcentaje de ocupación con estándar de 22 pallets y semáforo verde/ámbar/rojo.")
+    public ResponseEntity<ApiResponse<List<com.fourguard.wms.application.dto.response.BayOccupancyResponse>>> getBayOccupancy(
+            @RequestParam(required = false) UUID branchId) {
+        List<com.fourguard.wms.application.dto.response.BayOccupancyResponse> response = locationUseCase.getBayOccupancyList(branchId);
+        return ResponseEntity.ok(ApiResponse.ok("Matriz de ocupación de bahías recuperada con éxito", response));
+    }
 }

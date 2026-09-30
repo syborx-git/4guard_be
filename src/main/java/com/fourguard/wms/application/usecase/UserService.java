@@ -268,9 +268,15 @@ public class UserService implements CreateUserUseCase, GetUserUseCase, UpdateUse
         state.put("status", entity.getStatus() != null ? entity.getStatus().name() : null);
         state.put("isEnabled", entity.getIsEnabled());
         state.put("changePasswordRequired", entity.getChangePasswordRequired());
-        state.put("organizationId", entity.getOrganization() != null ? entity.getOrganization().getId().toString() : null);
-        state.put("branchId", entity.getBranch() != null ? entity.getBranch().getId().toString() : null);
-        state.put("roleId", entity.getRole() != null ? entity.getRole().getId().toString() : null);
+        try {
+            state.put("organizationId", entity.getOrganization() != null ? entity.getOrganization().getId().toString() : null);
+        } catch (Exception ignored) {}
+        try {
+            state.put("branchId", entity.getBranch() != null ? entity.getBranch().getId().toString() : null);
+        } catch (Exception ignored) {}
+        try {
+            state.put("roleId", entity.getRole() != null ? entity.getRole().getId().toString() : null);
+        } catch (Exception ignored) {}
         return state;
     }
 

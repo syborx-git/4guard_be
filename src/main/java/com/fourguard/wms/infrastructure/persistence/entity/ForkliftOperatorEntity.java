@@ -16,14 +16,10 @@ import java.util.UUID;
  * Extends {@link BaseVersionedEntity} for optimistic locking and audit fields.
  */
 @Entity
-@Table(
-    name = "forklift_operators",
-    schema = "wms",
-    uniqueConstraints = {
-        @UniqueConstraint(name = "uk_forklift_operator_code", columnNames = {"organization_id", "code"}),
-        @UniqueConstraint(name = "uk_forklift_operator_dc3",  columnNames = {"organization_id", "license_number_dc3"})
-    }
-)
+@Table(name = "forklift_operators", schema = "wms", uniqueConstraints = {
+        @UniqueConstraint(name = "uk_forklift_operator_code", columnNames = { "organization_id", "code" }),
+        @UniqueConstraint(name = "uk_forklift_operator_dc3", columnNames = { "organization_id", "license_number_dc3" })
+})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -43,11 +39,14 @@ public class ForkliftOperatorEntity extends BaseVersionedEntity {
     @JoinColumn(name = "branch_id")
     private BranchEntity branch;
 
-    /** Operational code, auto-generated as MC-XXX per organization. */
+    /** Operational code, auto-generated */
     @Column(nullable = false, length = 30)
     private String code;
 
-    /** Job title / position (e.g. Almacenista Montacargista, Líder de Turno, Mesa de Control). */
+    /**
+     * Job title / position (e.g. Almacenista Montacargista, Líder de Turno, Mesa de
+     * Control).
+     */
     @Column(name = "job_title", length = 100)
     private String jobTitle;
 
@@ -60,7 +59,10 @@ public class ForkliftOperatorEntity extends BaseVersionedEntity {
     @Column(name = "last_name_maternal", nullable = false, length = 100)
     private String lastNameMaternal;
 
-    /** Denormalized concatenation: firstName + lastNamePaternal + lastNameMaternal. Maintained by the service. */
+    /**
+     * Denormalized concatenation: firstName + lastNamePaternal + lastNameMaternal.
+     * Maintained by the service.
+     */
     @Column(name = "full_name", nullable = false, length = 310)
     private String fullName;
 
@@ -72,19 +74,25 @@ public class ForkliftOperatorEntity extends BaseVersionedEntity {
     private LocalDate licenseExpirationDate;
 
     /**
-     * Computed license validity status. Recalculated on every save by {@code ForkliftOperatorService}.
+     * Computed license validity status. Recalculated on every save by
+     * {@code ForkliftOperatorService}.
      */
     @Enumerated(EnumType.STRING)
     @Column(name = "license_status", nullable = false, length = 20)
     @Builder.Default
     private LicenseStatus licenseStatus = LicenseStatus.VIGENTE;
 
-    /** FK to wms.wms_shifts. Nullable — operator may not have an assigned shift yet. */
+    /**
+     * FK to wms.wms_shifts. Nullable — operator may not have an assigned shift yet.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "shift_id")
     private ShiftEntity shift;
 
-    /** Denormalized shift display name for quick rendering (avoids join on read-heavy queries). */
+    /**
+     * Denormalized shift display name for quick rendering (avoids join on
+     * read-heavy queries).
+     */
     @Column(name = "shift_name", length = 150)
     private String shiftName;
 
@@ -96,4 +104,20 @@ public class ForkliftOperatorEntity extends BaseVersionedEntity {
     @Column(name = "is_deleted", nullable = false)
     @Builder.Default
     private boolean isDeleted = false;
+
+    public boolean isDeleted() {
+        return this.isDeleted;
+    }
+
+    public boolean getIsDeleted() {
+        return this.isDeleted;
+    }
+
+    public void setDeleted(boolean isDeleted) {
+        this.isDeleted = isDeleted;
+    }
+
+    public void setIsDeleted(boolean isDeleted) {
+        this.isDeleted = isDeleted;
+    }
 }

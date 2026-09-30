@@ -45,8 +45,8 @@ public class GlobalExceptionHandler {
 
     // ── Domain Exceptions ─────────────────────────────────────────────────────
 
-    @ExceptionHandler({EntityNotFoundException.class, CurrencyNotFoundException.class, ExchangeRateNotFoundException.class})
-    public ResponseEntity<ApiResponse<Void>> handleNotFound(RuntimeException ex) {
+    @ExceptionHandler(EntityNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleNotFound(EntityNotFoundException ex) {
         log.warn("[NOT_FOUND] {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(ApiResponse.error(ex.getMessage()));

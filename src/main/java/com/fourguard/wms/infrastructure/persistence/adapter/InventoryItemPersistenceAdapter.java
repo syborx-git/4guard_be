@@ -18,7 +18,9 @@ public class InventoryItemPersistenceAdapter implements InventoryItemRepositoryP
 
     @Override public Optional<InventoryItemEntity> findById(UUID id)                  { return repository.findById(id); }
     @Override public Optional<InventoryItemEntity> findBySscc(String sscc)            { return repository.findBySscc(sscc); }
+    @Override public Optional<InventoryItemEntity> findBySsccOrExternalUa(String barcode) { return repository.findBySsccOrExternalUa(barcode); }
     @Override public List<InventoryItemEntity>     findByBranchId(UUID branchId)      { return repository.findByBranchId(branchId); }
+    @Override public List<InventoryItemEntity>     findByLocationId(UUID locationId)  { return repository.findByLocationId(locationId); }
     @Override public List<InventoryItemEntity>     findAvailableBySkuFefo(UUID skuId) { return repository.findAvailableBySkuOrderedByFefo(skuId); }
     @Override public InventoryItemEntity           save(InventoryItemEntity item)     { return repository.save(item); }
     @Override public boolean                       existsBySscc(String sscc)         { return repository.existsBySscc(sscc); }

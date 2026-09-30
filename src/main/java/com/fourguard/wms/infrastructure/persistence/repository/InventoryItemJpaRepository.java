@@ -16,6 +16,15 @@ public interface InventoryItemJpaRepository extends JpaRepository<InventoryItemE
 
     Optional<InventoryItemEntity> findBySscc(String sscc);
 
+    @Query("""
+            SELECT i FROM InventoryItemEntity i
+            JOIN FETCH i.sku s
+            LEFT JOIN FETCH i.location l
+            LEFT JOIN FETCH i.client c
+            WHERE (LOWER(i.sscc) = LOWER(:barcode) OR LOWER(i.externalUa) = LOWER(:barcode))
+            """)
+    Optional<InventoryItemEntity> findBySsccOrExternalUa(String barcode);
+
     List<InventoryItemEntity> findByBranchId(UUID branchId);
 
     Page<InventoryItemEntity> findByBranchId(UUID branchId, Pageable pageable);
@@ -106,6 +115,22 @@ public interface InventoryItemJpaRepository extends JpaRepository<InventoryItemE
             List<String> barcodes,
             UUID organizationId,
             UUID branchId);
+
+    /** Tenant-aware FEFO query filtered by SKU and Branch. */
+    @Query("""
+            SELECT i FROM InventoryItemEntity i
+            WHERE i.sku.id = :skuId AND i.branch.id = :branchId AND i.state = com.fourguard.wms.domain.enums.InventoryState.AVAILABLE
+            ORDER BY i.expirationDate ASC NULLS LAST
+            """)
+    List<InventoryItemEntity> findAvailableBySkuAndBranchOrderedByFefo(UUID skuId, UUID branchId);
+
+    /** Tenant-aware FEFO query filtered by Branch. */
+    @Query("""
+            SELECT i FROM InventoryItemEntity i
+            WHERE i.branch.id = :branchId AND i.state = com.fourguard.wms.domain.enums.InventoryState.AVAILABLE
+            ORDER BY i.expirationDate ASC NULLS LAST
+            """)
+    List<InventoryItemEntity> findAvailableByBranchOrderedByFefo(UUID branchId);
 
     boolean existsBySscc(String sscc);
 

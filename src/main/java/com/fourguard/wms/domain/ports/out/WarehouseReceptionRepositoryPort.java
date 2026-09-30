@@ -26,6 +26,8 @@ public interface WarehouseReceptionRepositoryPort {
 
     WarehouseReceptionEntity save(WarehouseReceptionEntity entity);
 
+    List<WarehouseReceptionEntity> findAll(org.springframework.data.jpa.domain.Specification<WarehouseReceptionEntity> spec);
+
     /** Gets the next folio number from the PostgreSQL sequence. */
     long nextFolioSequenceValue();
 }

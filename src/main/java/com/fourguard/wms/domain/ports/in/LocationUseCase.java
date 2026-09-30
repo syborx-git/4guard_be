@@ -35,5 +35,11 @@ public interface LocationUseCase {
      * @return list of audit log entries for the location
      */
     List<LocationAuditResponse> getLocationAuditLogs(UUID id);
+
+    /**
+     * Returns the occupancy calculation and traffic-light status for all bays in a branch
+     * using the standard 22-pallet capacity threshold.
+     */
+    List<com.fourguard.wms.application.dto.response.BayOccupancyResponse> getBayOccupancyList(UUID branchId);
 }
 

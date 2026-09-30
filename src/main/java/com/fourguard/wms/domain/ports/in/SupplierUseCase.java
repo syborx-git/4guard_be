@@ -4,7 +4,6 @@ import com.fourguard.wms.application.dto.request.CreateSupplierRequest;
 import com.fourguard.wms.application.dto.request.SupplierFilterRequest;
 import com.fourguard.wms.application.dto.request.UpdateSupplierRequest;
 import com.fourguard.wms.application.dto.request.UpdateSupplierStatusRequest;
-import com.fourguard.wms.application.dto.response.CurrencyResponse;
 import com.fourguard.wms.application.dto.response.SupplierAuditResponse;
 import com.fourguard.wms.application.dto.response.SupplierResponse;
 import com.fourguard.wms.application.dto.response.SupplierSummaryResponse;
@@ -33,6 +32,4 @@ public interface SupplierUseCase {
     List<SupplierAuditResponse> getSupplierAuditLogs(UUID id);
 
     List<SupplierTypeResponse> getSupplierTypes();
-
-    List<CurrencyResponse> getCurrencies();
 }

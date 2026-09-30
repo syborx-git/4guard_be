@@ -29,4 +29,9 @@ public class ReceptionPalletResponse {
     private String palletTypeLabel;
     private String observations;
     private UUID inventoryItemId;
+    private String supplierUaCode;
+    private String internalUaCode;
+    private Boolean isUaRelabelled;
+    private String lotNumber;
+    private java.time.LocalDate expirationDate;
 }

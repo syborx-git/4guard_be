@@ -9,6 +9,7 @@ import java.util.UUID;
 /** Puerto de salida — Repositorio de Destinos Físicos de Clientes. */
 public interface ClientDestinationRepositoryPort {
     List<ClientDestinationEntity>    findByClientId(UUID clientId);
+    List<ClientDestinationEntity>    findAll();
     Optional<ClientDestinationEntity> findById(UUID id);
     ClientDestinationEntity          save(ClientDestinationEntity destination);
     void                             deleteById(UUID id);

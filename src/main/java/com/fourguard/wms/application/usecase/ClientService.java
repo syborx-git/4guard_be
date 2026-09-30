@@ -362,33 +362,35 @@ public class ClientService implements ClientUseCase {
 
         // IDs recibidos del FE
         Set<UUID> incomingIds = incoming.stream()
-                .filter(dto -> dto.getId() != null)
-                .map(ClientContactDto::getId)
+                .filter(dto -> dto != null && dto.getId() != null)
+                .map(dto -> dto.getId())
                 .collect(Collectors.toSet());
 
         // Eliminar los que ya no vienen (orphanRemoval los borrará en BD)
         entity.getContacts().removeIf(existing ->
-                existing.getId() != null && !incomingIds.contains(existing.getId()));
+                existing != null && existing.getId() != null && !incomingIds.contains(existing.getId()));
 
         // Construir mapa de existentes por ID
         Map<UUID, ClientContactEntity> existingById = entity.getContacts().stream()
-                .filter(c -> c.getId() != null)
-                .collect(Collectors.toMap(ClientContactEntity::getId, c -> c));
+                .filter(c -> c != null && c.getId() != null)
+                .collect(Collectors.toMap(c -> c.getId(), c -> c));
 
         incoming.forEach(dto -> {
-            if (dto.getId() != null && existingById.containsKey(dto.getId())) {
-                // Actualizar campos del contacto existente
-                ClientContactEntity existing = existingById.get(dto.getId());
-                existing.setName(dto.getName());
-                existing.setDepartment(dto.getDepartment());
-                existing.setPhone(dto.getPhone());
-                existing.setEmail(dto.getEmail());
-                existing.setIsPrimary(Boolean.TRUE.equals(dto.getIsPrimary()));
-            } else {
-                // Agregar nuevo contacto (asegurar id nulo para auto-generación de UUID)
-                ClientContactEntity newContact = clientMapper.toContactEntity(dto);
-                newContact.setId(null);
-                entity.addContact(newContact);
+            if (dto != null) {
+                if (dto.getId() != null && existingById.containsKey(dto.getId())) {
+                    // Actualizar campos del contacto existente
+                    ClientContactEntity existing = existingById.get(dto.getId());
+                    existing.setName(dto.getName());
+                    existing.setDepartment(dto.getDepartment());
+                    existing.setPhone(dto.getPhone());
+                    existing.setEmail(dto.getEmail());
+                    existing.setIsPrimary(Boolean.TRUE.equals(dto.getIsPrimary()));
+                } else {
+                    // Agregar nuevo contacto (asegurar id nulo para auto-generación de UUID)
+                    ClientContactEntity newContact = clientMapper.toContactEntity(dto);
+                    newContact.setId(null);
+                    entity.addContact(newContact);
+                }
             }
         });
     }
@@ -401,36 +403,38 @@ public class ClientService implements ClientUseCase {
         if (incoming == null) return;
 
         Set<UUID> incomingIds = incoming.stream()
-                .filter(dto -> dto.getId() != null)
-                .map(PhysicalDestinationDto::getId)
+                .filter(dto -> dto != null && dto.getId() != null)
+                .map(dto -> dto.getId())
                 .collect(Collectors.toSet());
 
         entity.getDestinations().removeIf(existing ->
-                existing.getId() != null && !incomingIds.contains(existing.getId()));
+                existing != null && existing.getId() != null && !incomingIds.contains(existing.getId()));
 
         Map<UUID, ClientDestinationEntity> existingById = entity.getDestinations().stream()
-                .filter(d -> d.getId() != null)
-                .collect(Collectors.toMap(ClientDestinationEntity::getId, d -> d));
+                .filter(d -> d != null && d.getId() != null)
+                .collect(Collectors.toMap(d -> d.getId(), d -> d));
 
         incoming.forEach(dto -> {
-            if (dto.getId() != null && existingById.containsKey(dto.getId())) {
-                ClientDestinationEntity existing = existingById.get(dto.getId());
-                existing.setDestinationCode(dto.getDestinationCode());
-                existing.setPlantName(dto.getPlantName());
-                existing.setFullAddress(dto.getFullAddress());
-                existing.setContactPerson(dto.getContactPerson());
-                existing.setPhone(dto.getPhone());
-                if (dto.getStatus() != null && !dto.getStatus().isBlank()) {
-                    existing.setStatus(dto.getStatus());
+            if (dto != null) {
+                if (dto.getId() != null && existingById.containsKey(dto.getId())) {
+                    ClientDestinationEntity existing = existingById.get(dto.getId());
+                    existing.setDestinationCode(dto.getDestinationCode());
+                    existing.setPlantName(dto.getPlantName());
+                    existing.setFullAddress(dto.getFullAddress());
+                    existing.setContactPerson(dto.getContactPerson());
+                    existing.setPhone(dto.getPhone());
+                    if (dto.getStatus() != null && !dto.getStatus().isBlank()) {
+                        existing.setStatus(dto.getStatus());
+                    }
+                    existing.setNotes(dto.getNotes());
+                } else {
+                    ClientDestinationEntity newDest = clientMapper.toDestinationEntity(dto);
+                    newDest.setId(null);
+                    if (newDest.getStatus() == null || newDest.getStatus().isBlank()) {
+                        newDest.setStatus("ACTIVO");
+                    }
+                    entity.addDestination(newDest);
                 }
-                existing.setNotes(dto.getNotes());
-            } else {
-                ClientDestinationEntity newDest = clientMapper.toDestinationEntity(dto);
-                newDest.setId(null);
-                if (newDest.getStatus() == null || newDest.getStatus().isBlank()) {
-                    newDest.setStatus("ACTIVO");
-                }
-                entity.addDestination(newDest);
             }
         });
     }
@@ -444,12 +448,20 @@ public class ClientService implements ClientUseCase {
         state.put("address", entity.getAddress());
         state.put("phone", entity.getPhone());
         state.put("status", entity.getStatus());
-        state.put("contactsCount", entity.getContacts() != null ? entity.getContacts().size() : 0);
-        state.put("destinationsCount", entity.getDestinations() != null ? entity.getDestinations().size() : 0);
-        if (entity.getOrganization() != null) {
-            state.put("organizationId", entity.getOrganization().getId());
-            state.put("organizationName", entity.getOrganization().getName());
-        }
+        try {
+            state.put("contactsCount", entity.getContacts() != null ? entity.getContacts().size() : 0);
+        } catch (Exception ignored) {}
+        try {
+            state.put("destinationsCount", entity.getDestinations() != null ? entity.getDestinations().size() : 0);
+        } catch (Exception ignored) {}
+        try {
+            if (entity.getOrganization() != null) {
+                state.put("organizationId", entity.getOrganization().getId());
+                try {
+                    state.put("organizationName", entity.getOrganization().getName());
+                } catch (Exception ignored) {}
+            }
+        } catch (Exception ignored) {}
         return state;
     }
 

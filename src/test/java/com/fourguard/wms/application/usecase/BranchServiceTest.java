@@ -39,7 +39,7 @@ class BranchServiceTest {
     @Mock
     private OrganizationRepositoryPort organizationRepositoryPort;
     @Mock
-    private UserRepositoryPort userRepositoryPort;
+    private UserRepositoryPort  userRepositoryPort;
     @Mock
     private AuditLogRepositoryPort auditLogRepositoryPort;
     @Mock

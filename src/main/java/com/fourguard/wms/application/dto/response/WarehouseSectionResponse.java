@@ -16,6 +16,12 @@ public class WarehouseSectionResponse {
     private final String code;
     private final String name;
     private final String status;
+    private final String category;
+    private final Integer posFijas;
+    private final Integer capacidadTarimas;
+    private final String factorEstiba;
+    private final String notes;
+    private final String polygonPoints;
     private final Long version;
     private final OffsetDateTime createdAt;
     private final OffsetDateTime updatedAt;

@@ -31,6 +31,7 @@ public class PassResponse {
 
     private String driverName;
     private String driverLicense;
+    private String driverPhone;
     private String transportType;
     private String economicNumber;
     private String boxEconomicNumber;

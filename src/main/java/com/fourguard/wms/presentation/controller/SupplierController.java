@@ -212,17 +212,4 @@ public class SupplierController {
         List<SupplierTypeResponse> types = supplierUseCase.getSupplierTypes();
         return ResponseEntity.ok(ApiResponse.ok("Tipos de proveedor recuperados con éxito", types));
     }
-
-    // =========================================================================
-    // GET /suppliers/catalogs/currencies — Currency Catalog
-    // =========================================================================
-
-    @GetMapping("/catalogs/currencies")
-    @PreAuthorize("hasAuthority('SUPPLIERS_READ') or hasRole('OPERATIONS_MANAGER')")
-    @Operation(summary = "Catálogo de monedas",
-               description = "Retorna las monedas disponibles para condiciones comerciales (cat_currencies).")
-    public ResponseEntity<ApiResponse<List<CurrencyResponse>>> getCurrencies() {
-        List<CurrencyResponse> currencies = supplierUseCase.getCurrencies();
-        return ResponseEntity.ok(ApiResponse.ok("Monedas recuperadas con éxito", currencies));
-    }
 }

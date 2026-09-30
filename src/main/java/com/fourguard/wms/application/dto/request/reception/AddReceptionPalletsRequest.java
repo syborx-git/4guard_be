@@ -31,6 +31,12 @@ public class AddReceptionPalletsRequest {
         /** Optional override — falls back to reception-level pallet_type */
         private String palletType;
 
+        /** Optional lot number specific to this pallet / active scanning lot */
+        private String lotNumber;
+
+        /** Optional expiration date for the pallet's lot */
+        private java.time.LocalDate expirationDate;
+
         private String observations;
     }
 }

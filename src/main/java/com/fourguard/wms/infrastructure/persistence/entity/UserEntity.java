@@ -89,4 +89,9 @@ public class UserEntity extends BaseVersionedEntity {
         if (failedAttempts == null) failedAttempts = 0;
         if (permanentlyLocked == null) permanentlyLocked = false;
     }
+
+    public String getFullName() {
+        if (firstName == null && lastName == null) return username != null ? username : "";
+        return ((firstName != null ? firstName : "") + " " + (lastName != null ? lastName : "")).trim();
+    }
 }

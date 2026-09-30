@@ -23,6 +23,11 @@ public class ClientDestinationPersistenceAdapter implements ClientDestinationRep
     }
 
     @Override
+    public List<ClientDestinationEntity> findAll() {
+        return repository.findAll();
+    }
+
+    @Override
     public Optional<ClientDestinationEntity> findById(UUID id) {
         return repository.findById(id);
     }

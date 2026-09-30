@@ -199,6 +199,7 @@
                         <!-- Spring bean injection for all mappers by default -->
                         <arg>-Amapstruct.defaultComponentModel=spring</arg>
                         <arg>-Amapstruct.suppressGeneratorTimestamp=true</arg>
+                        <arg>-Xlint:-processing</arg>
                     </compilerArgs>
                 </configuration>
             </plugin>

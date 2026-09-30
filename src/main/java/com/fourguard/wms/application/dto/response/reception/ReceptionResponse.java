@@ -55,6 +55,8 @@ public class ReceptionResponse {
     private String lotNumber;
     private LocalDate elaborationDate;
     private LocalDate expirationDate;
+    private Long shelfLifeDaysRemaining;
+    private String shelfLifeStatus;
     private Double piecesPerPallet;
     private String palletType;
     private String palletTypeLabel;
@@ -66,7 +68,8 @@ public class ReceptionResponse {
     private Integer totalPallets;
     private Double totalPieces;
 
-    // Detalle de tarimas (UAs)
+    // Detalle de lotes y tarimas (UAs)
+    private List<ReceptionLotResponse> lots;
     private List<ReceptionPalletResponse> pallets;
 
     // Cierre y Cancelación

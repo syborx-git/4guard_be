@@ -127,12 +127,15 @@ public class UserController {
     }
 
     @PutMapping("/{id}/reset-password-temp")
+    @PreAuthorize("hasAuthority('USERS_UPDATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     @Operation(
             summary = "Restablecer contraseña a temporal por ID de usuario",
-            description = "Genera una contraseña temporal para el usuario identificado por su UUID."
+            description = "Genera una contraseña temporal para el usuario identificado por su UUID. Requiere permisos de administración de usuarios."
     )
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Contraseña temporal generada con éxito"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "No autorizado"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Permisos insuficientes"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Usuario no encontrado con el ID proporcionado")
     })
     public ResponseEntity<ApiResponse<String>> resetToTempById(@PathVariable UUID id, java.security.Principal principal) {
@@ -142,13 +145,16 @@ public class UserController {
     }
 
     @PutMapping("/reset-password-temp")
+    @PreAuthorize("hasAuthority('USERS_UPDATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     @Operation(
             summary = "Restablecer contraseña a temporal por username o email",
-            description = "Endpoint público (sin autenticación). Genera una contraseña temporal para el usuario identificado por su nombre de usuario o correo electrónico, y activa la bandera de cambio de clave obligatorio."
+            description = "Genera una contraseña temporal para el usuario identificado por su nombre de usuario o correo electrónico. Requiere permisos de administración de usuarios."
     )
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Contraseña temporal generada con éxito"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Parámetro usernameOrEmail no proporcionado"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "No autorizado"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Permisos insuficientes"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Usuario no encontrado con el nombre de usuario o correo proporcionado")
     })
     public ResponseEntity<ApiResponse<String>> resetToTemp(@RequestParam String usernameOrEmail, java.security.Principal principal) {

@@ -175,10 +175,14 @@ public class ProductSkuService implements ProductSkuUseCase {
         state.put("category", entity.getCategory());
         state.put("weight", entity.getWeight());
         state.put("unit", entity.getUnit());
-        if (entity.getClient() != null) {
-            state.put("clientId", entity.getClient().getId());
-            state.put("clientName", entity.getClient().getName());
-        }
+        try {
+            if (entity.getClient() != null) {
+                state.put("clientId", entity.getClient().getId());
+                try {
+                    state.put("clientName", entity.getClient().getName());
+                } catch (Exception ignored) {}
+            }
+        } catch (Exception ignored) {}
         return state;
     }
 

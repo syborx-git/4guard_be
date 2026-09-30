@@ -39,10 +39,10 @@ public class InventoryItemEntity extends BaseVersionedEntity {
     @JoinColumn(name = "client_id", nullable = false)
     private ClientEntity client;
 
-    @Column(unique = true, nullable = false, length = 20)
+    @Column(unique = true, nullable = false, length = 100)
     private String sscc;
 
-    @Column(name = "external_ua", length = 20)
+    @Column(name = "external_ua", length = 100)
     private String externalUa;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -60,7 +60,7 @@ public class InventoryItemEntity extends BaseVersionedEntity {
     @Builder.Default
     private BigDecimal quantity = BigDecimal.ZERO;
 
-    @Column(name = "batch_number", length = 50)
+    @Column(name = "batch_number", length = 100)
     private String batchNumber;
 
     @Column(name = "manufacturing_date")
@@ -69,7 +69,7 @@ public class InventoryItemEntity extends BaseVersionedEntity {
     @Column(name = "expiration_date")
     private LocalDate expirationDate;
 
-    @Column(name = "sap_folio", length = 50)
+    @Column(name = "sap_folio", length = 100)
     private String sapFolio;
 
     @Column(name = "quarantine_reason", columnDefinition = "TEXT")

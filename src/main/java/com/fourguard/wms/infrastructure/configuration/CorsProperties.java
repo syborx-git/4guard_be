@@ -17,9 +17,20 @@ import java.util.List;
 @Setter
 public class CorsProperties {
 
-    private List<String> allowedOrigins = new ArrayList<>();
+    private List<String> allowedOrigins = new ArrayList<>(List.of(
+            "http://localhost:4200",
+            "http://localhost:4201",
+            "http://localhost:8080",
+            "http://127.0.0.1:4200",
+            "http://127.0.0.1:4201"
+    ));
 
-    private List<String> allowedOriginPatterns = new ArrayList<>();
+    private List<String> allowedOriginPatterns = new ArrayList<>(List.of(
+            "http://localhost:*",
+            "http://127.0.0.1:*",
+            "https://*.ngrok-free.dev",
+            "https://*.onrender.com"
+    ));
 
     private List<String> allowedMethods = new ArrayList<>(
             List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH")

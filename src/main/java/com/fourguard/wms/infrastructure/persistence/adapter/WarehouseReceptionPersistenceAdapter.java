@@ -54,6 +54,11 @@ public class WarehouseReceptionPersistenceAdapter implements WarehouseReceptionR
     }
 
     @Override
+    public List<WarehouseReceptionEntity> findAll(org.springframework.data.jpa.domain.Specification<WarehouseReceptionEntity> spec) {
+        return repository.findAll(spec);
+    }
+
+    @Override
     public long nextFolioSequenceValue() {
         return repository.getNextFolioSequenceValue();
     }

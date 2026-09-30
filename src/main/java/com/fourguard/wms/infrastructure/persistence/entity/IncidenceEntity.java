@@ -60,6 +60,39 @@ public class IncidenceEntity {
     @Builder.Default
     private IncidenceStatus status = IncidenceStatus.OPEN;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "stage", length = 30)
+    private com.fourguard.wms.domain.enums.DetectionStage stage;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "defect_category", length = 40)
+    private com.fourguard.wms.domain.enums.DefectCategory defectCategory;
+
+    @Column(name = "damaged_qty", precision = 12, scale = 2)
+    @Builder.Default
+    private java.math.BigDecimal damagedQty = java.math.BigDecimal.ZERO;
+
+    @Column(name = "lost_qty", precision = 12, scale = 2)
+    @Builder.Default
+    private java.math.BigDecimal lostQty = java.math.BigDecimal.ZERO;
+
+    @Column(name = "associated_cost", precision = 12, scale = 2)
+    @Builder.Default
+    private java.math.BigDecimal associatedCost = java.math.BigDecimal.ZERO;
+
+    @Column(name = "currency", length = 10)
+    @Builder.Default
+    private String currency = "MXN";
+
+    @Column(name = "observations", columnDefinition = "TEXT")
+    private String observations;
+
+    @Column(name = "criteria_metadata", columnDefinition = "jsonb")
+    private String criteriaMetadata;
+
+    @Column(name = "evidence_metadata", columnDefinition = "jsonb")
+    private String evidenceMetadata;
+
     @Column(name = "created_at", updatable = false)
     private OffsetDateTime createdAt;
 
