@@ -76,7 +76,7 @@ public class ClientController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAuthority('CLIENTS_READ') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('CLIENTS_READ') or hasRole('OPERATIONS_MANAGER') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('FORKLIFT_OPERATOR')")
     @Operation(summary = "Listar clientes", description = "Recupera la lista de clientes, opcionalmente filtrada por organización.")
     public ResponseEntity<ApiResponse<List<ClientResponse>>> getClients(
             @RequestParam(required = false) UUID organizationId) {

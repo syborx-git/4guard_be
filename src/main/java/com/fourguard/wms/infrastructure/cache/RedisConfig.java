@@ -16,6 +16,7 @@ import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 import java.time.Duration;
+import java.util.Objects;
 
 /**
  * Decoupled cache configuration — supports both in-memory and Redis.
@@ -81,7 +82,7 @@ public class RedisConfig {
     @ConditionalOnProperty(name = "cache.redis.enabled", havingValue = "true")
     public LettuceConnectionFactory redisConnectionFactory() {
         log.info("[Cache] Connecting to Redis at {}:{}", redisHost, redisPort);
-        return new LettuceConnectionFactory(redisHost, redisPort);
+        return new LettuceConnectionFactory(Objects.requireNonNull(redisHost), redisPort);
     }
 
     /**
@@ -101,7 +102,7 @@ public class RedisConfig {
                 .serializeValuesWith(RedisSerializationContext.SerializationPair
                         .fromSerializer(new GenericJackson2JsonRedisSerializer()));
 
-        return RedisCacheManager.builder(connectionFactory)
+        return RedisCacheManager.builder(Objects.requireNonNull(connectionFactory))
                 .cacheDefaults(base)
                 .withCacheConfiguration("roles",       base.entryTtl(Duration.ofHours(1)))
                 .withCacheConfiguration("permissions",  base.entryTtl(Duration.ofHours(1)))

@@ -130,8 +130,8 @@ public class QualityService implements QualityUseCase {
                     .severity(savedIncidence.getSeverity() != null ? savedIncidence.getSeverity().name() : "CRITICAL")
                     .sscc(item.getSscc() != null ? item.getSscc() : item.getId().toString())
                     .palletFolio("BLQ-" + savedIncidence.getId().toString().substring(0, 8).toUpperCase())
-                    .sku(item.getProduct() != null ? item.getProduct().getSku() : "N/A")
-                    .productName(item.getProduct() != null ? item.getProduct().getName() : "N/A")
+                    .sku(item.getSku() != null ? item.getSku().getCode() : "N/A")
+                    .productName(item.getSku() != null ? item.getSku().getName() : "N/A")
                     .locationCode(item.getLocation() != null ? item.getLocation().getCode() : "N/A")
                     .reason(request.getNotes() != null ? request.getNotes() : "Retención por no conformidad de Calidad")
                     .recommendedAction("NO MOVER ni despachar. Traslado exclusivo a Bahía QM.")
@@ -264,8 +264,8 @@ public class QualityService implements QualityUseCase {
                     .severity("INFO")
                     .sscc(item.getSscc() != null ? item.getSscc() : item.getId().toString())
                     .palletFolio(savedRelease.getFolio())
-                    .sku(item.getProduct() != null ? item.getProduct().getSku() : "N/A")
-                    .productName(item.getProduct() != null ? item.getProduct().getName() : "N/A")
+                    .sku(item.getSku() != null ? item.getSku().getCode() : "N/A")
+                    .productName(item.getSku() != null ? item.getSku().getName() : "N/A")
                     .locationCode(item.getLocation() != null ? item.getLocation().getCode() : "N/A")
                     .reason("Liberación autorizada por " + savedRelease.getAuthorizedByName() + " (" + savedRelease.getDestination() + ")")
                     .recommendedAction("Tarima habilitada para operaciones de " + savedRelease.getDestination())
@@ -452,15 +452,15 @@ public class QualityService implements QualityUseCase {
 
         BigDecimal totalDamaged = blocks.stream()
                 .map(i -> i.getDamagedQty() != null ? i.getDamagedQty() : BigDecimal.ZERO)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+                .reduce(BigDecimal.ZERO, (acc, val) -> acc.add(val));
 
         BigDecimal totalLost = blocks.stream()
                 .map(i -> i.getLostQty() != null ? i.getLostQty() : BigDecimal.ZERO)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+                .reduce(BigDecimal.ZERO, (acc, val) -> acc.add(val));
 
         BigDecimal totalCost = blocks.stream()
                 .map(i -> i.getAssociatedCost() != null ? i.getAssociatedCost() : BigDecimal.ZERO)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+                .reduce(BigDecimal.ZERO, (acc, val) -> acc.add(val));
 
         return QualityDashboardKpisResponse.builder()
                 .totalActiveBlocks(totalActiveBlocks)
