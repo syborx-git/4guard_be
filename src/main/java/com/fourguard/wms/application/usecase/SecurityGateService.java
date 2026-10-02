@@ -57,10 +57,16 @@ public class SecurityGateService implements SecurityGateUseCase {
         List<ClientEntity> clientEntities = organizationId != null
                 ? clientRepositoryPort.findByOrganizationId(organizationId)
                 : clientRepositoryPort.findAll();
+        if ((clientEntities == null || clientEntities.isEmpty()) && organizationId != null) {
+            clientEntities = clientRepositoryPort.findAll();
+        }
 
         List<CarrierEntity> carrierEntities = organizationId != null
                 ? carrierRepositoryPort.findByOrganizationId(organizationId)
                 : carrierRepositoryPort.findAll();
+        if ((carrierEntities == null || carrierEntities.isEmpty()) && organizationId != null) {
+            carrierEntities = carrierRepositoryPort.findAll();
+        }
 
         List<SecurityGatePublicCatalogsResponse.CatalogItemDto> clientDtos = (clientEntities != null ? clientEntities
                 : Collections.<ClientEntity>emptyList()).stream()
@@ -73,7 +79,7 @@ public class SecurityGateService implements SecurityGateUseCase {
                         .name(c.getName())
                         .tradeName(c.getName())
                         .build())
-                .sorted(Comparator.comparing(SecurityGatePublicCatalogsResponse.CatalogItemDto::getName))
+                .sorted(Comparator.comparing(c -> c.getName() != null ? c.getName() : "", String.CASE_INSENSITIVE_ORDER))
                 .toList();
 
         List<SecurityGatePublicCatalogsResponse.CatalogItemDto> carrierDtos = (carrierEntities != null ? carrierEntities
@@ -87,7 +93,7 @@ public class SecurityGateService implements SecurityGateUseCase {
                         .tradeName(c.getTradeName() != null && !c.getTradeName().isBlank() ? c.getTradeName()
                                 : c.getName())
                         .build())
-                .sorted(Comparator.comparing(SecurityGatePublicCatalogsResponse.CatalogItemDto::getTradeName))
+                .sorted(Comparator.comparing(c -> c.getTradeName() != null ? c.getTradeName() : "", String.CASE_INSENSITIVE_ORDER))
                 .toList();
 
         List<String> transportTypes = List.of(
@@ -183,7 +189,7 @@ public class SecurityGateService implements SecurityGateUseCase {
                 .expiresAt(OffsetDateTime.now().plusHours(24))
                 .build();
 
-        SecurityPreCheckinEntity saved = preCheckinJpaRepository.save(entity);
+        SecurityPreCheckinEntity saved = preCheckinJpaRepository.save(Objects.requireNonNull(entity));
         return mapToResponse(saved);
     }
 
@@ -302,7 +308,7 @@ public class SecurityGateService implements SecurityGateUseCase {
         entity.setDriverSignedAt(OffsetDateTime.now());
         entity.setStatus("SUBMITTED");
 
-        SecurityPreCheckinEntity saved = preCheckinJpaRepository.save(entity);
+        SecurityPreCheckinEntity saved = preCheckinJpaRepository.save(Objects.requireNonNull(entity));
         return mapToResponse(saved);
     }
 
@@ -550,7 +556,7 @@ public class SecurityGateService implements SecurityGateUseCase {
                 securityAuditHelper.getCurrentUsername() != null ? securityAuditHelper.getCurrentUsername()
                         : "guardia");
 
-        SecurityPreCheckinEntity saved = preCheckinJpaRepository.save(entity);
+        SecurityPreCheckinEntity saved = preCheckinJpaRepository.save(Objects.requireNonNull(entity));
         return mapToResponseWithWarehouseStatus(saved);
     }
 
@@ -590,7 +596,7 @@ public class SecurityGateService implements SecurityGateUseCase {
             entity.setExitedAt(OffsetDateTime.now());
             entity.setStatus("COMPLETED_EXIT");
 
-            SecurityPreCheckinEntity saved = preCheckinJpaRepository.save(entity);
+            SecurityPreCheckinEntity saved = preCheckinJpaRepository.save(Objects.requireNonNull(entity));
             return mapToResponseWithWarehouseStatus(saved);
         }
 
@@ -631,7 +637,7 @@ public class SecurityGateService implements SecurityGateUseCase {
                     .processedAt(rec.getCreatedAt())
                     .expiresAt(OffsetDateTime.now().plusDays(1))
                     .build();
-            SecurityPreCheckinEntity saved = preCheckinJpaRepository.save(newEntity);
+            SecurityPreCheckinEntity saved = preCheckinJpaRepository.save(Objects.requireNonNull(newEntity));
             return mapToResponseWithWarehouseStatus(saved);
         }
 
@@ -671,7 +677,7 @@ public class SecurityGateService implements SecurityGateUseCase {
                     .processedAt(out.getCreatedAt())
                     .expiresAt(OffsetDateTime.now().plusDays(1))
                     .build();
-            SecurityPreCheckinEntity saved = preCheckinJpaRepository.save(newEntity);
+            SecurityPreCheckinEntity saved = preCheckinJpaRepository.save(Objects.requireNonNull(newEntity));
             return mapToResponseWithWarehouseStatus(saved);
         }
 
@@ -682,7 +688,7 @@ public class SecurityGateService implements SecurityGateUseCase {
     @Transactional
     public void cancelPass(UUID passId) {
         log.info("Cancelling / discarding pass with ID: {}", passId);
-        SecurityPreCheckinEntity entity = preCheckinJpaRepository.findById(passId)
+        SecurityPreCheckinEntity entity = preCheckinJpaRepository.findById(Objects.requireNonNull(passId))
                 .orElseThrow(() -> new EntityNotFoundException("Pase de acceso no encontrado con ID: " + passId));
 
         if ("COMPLETED".equalsIgnoreCase(entity.getStatus()) || "COMPLETED_EXIT".equalsIgnoreCase(entity.getStatus())) {
@@ -690,12 +696,15 @@ public class SecurityGateService implements SecurityGateUseCase {
                     "No se puede eliminar un pase que ya completó su autorización y registro en planta.");
         }
 
-        preCheckinJpaRepository.delete(entity);
+        preCheckinJpaRepository.delete(Objects.requireNonNull(entity));
     }
 
     private PassResponse mapReceptionToPassResponse(WarehouseReceptionEntity rec) {
         List<String> seals = rec.getSeals() != null
-                ? rec.getSeals().stream().map(WarehouseReceptionSealEntity::getSealNumber).toList()
+                ? rec.getSeals().stream()
+                        .filter(Objects::nonNull)
+                        .map(s -> Objects.requireNonNull(s).getSealNumber())
+                        .toList()
                 : Collections.emptyList();
 
         LocalDate docDate = rec.getDocDate() != null ? rec.getDocDate()

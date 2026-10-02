@@ -144,7 +144,12 @@ public class ClientService implements ClientUseCase {
     @Transactional(readOnly = true)
     public List<ClientResponse> getClientsByOrganizationId(UUID organizationId) {
         log.debug("Fetching clients by org: [{}]", organizationId);
-        return clientRepositoryPort.findByOrganizationId(organizationId).stream()
+        List<ClientEntity> list = clientRepositoryPort.findByOrganizationId(organizationId);
+        if (list == null || list.isEmpty()) {
+            log.info("No clients found specifically for org [{}]. Falling back to all available active clients.", organizationId);
+            list = clientRepositoryPort.findAll();
+        }
+        return list.stream()
                 .map(clientMapper::toResponse)
                 .collect(Collectors.toList());
     }

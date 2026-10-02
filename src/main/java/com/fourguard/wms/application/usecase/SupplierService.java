@@ -52,7 +52,7 @@ public class SupplierService implements SupplierUseCase {
     public SupplierResponse createSupplier(CreateSupplierRequest request) {
         log.info("Creating supplier '{}' under org: {}", request.getLegalName(), request.getOrganizationId());
 
-        OrganizationEntity organization = organizationJpaRepository.findById(request.getOrganizationId())
+        OrganizationEntity organization = organizationJpaRepository.findById(Objects.requireNonNull(request.getOrganizationId()))
                 .orElseThrow(() -> new EntityNotFoundException("Organización no encontrada: " + request.getOrganizationId()));
 
         // Validate unique tax_id per organization
@@ -434,7 +434,7 @@ public class SupplierService implements SupplierUseCase {
 
     private String resolveUsername(UUID userId) {
         if (userId == null) return "SYSTEM";
-        return userJpaRepository.findById(userId)
+        return userJpaRepository.findById(Objects.requireNonNull(userId))
                 .map(u -> u.getUsername())
                 .orElse("UNKNOWN");
     }
@@ -443,7 +443,7 @@ public class SupplierService implements SupplierUseCase {
         if (warehouseIdStr == null || warehouseIdStr.isBlank()) return null;
         try {
             UUID branchId = UUID.fromString(warehouseIdStr.trim());
-            return branchJpaRepository.findById(branchId).orElse(null);
+            return branchJpaRepository.findById(Objects.requireNonNull(branchId)).orElse(null);
         } catch (IllegalArgumentException e) {
             Optional<BranchEntity> branchOpt = branchJpaRepository.findByOrganizationIdAndCode(orgId, warehouseIdStr.trim());
             if (branchOpt.isPresent()) {
@@ -454,7 +454,7 @@ public class SupplierService implements SupplierUseCase {
             String name = (warehouseName != null && !warehouseName.isBlank()) ? warehouseName : "Branch " + warehouseIdStr;
             log.info("Branch with code '{}' not found. Auto-creating branch '{}' for demo/integration compatibility.", warehouseIdStr, name);
             
-            OrganizationEntity org = organizationJpaRepository.findById(orgId)
+            OrganizationEntity org = organizationJpaRepository.findById(Objects.requireNonNull(orgId))
                     .orElseThrow(() -> new EntityNotFoundException("Organización no encontrada: " + orgId));
 
             BranchEntity newBranch = BranchEntity.builder()
@@ -470,7 +470,7 @@ public class SupplierService implements SupplierUseCase {
         if (clientIdStr == null || clientIdStr.isBlank()) return null;
         try {
             UUID clientId = UUID.fromString(clientIdStr.trim());
-            return clientJpaRepository.findById(clientId).orElse(null);
+            return clientJpaRepository.findById(Objects.requireNonNull(clientId)).orElse(null);
         } catch (IllegalArgumentException e) {
             Optional<ClientEntity> clientOpt = clientJpaRepository.findByOrganizationIdAndExternalId(orgId, clientIdStr.trim());
             if (clientOpt.isPresent()) {
@@ -481,7 +481,7 @@ public class SupplierService implements SupplierUseCase {
             String name = (clientName != null && !clientName.isBlank()) ? clientName : "Cliente " + clientIdStr;
             log.info("Client with code '{}' not found. Auto-creating client '{}' for demo/integration compatibility.", clientIdStr, name);
 
-            OrganizationEntity org = organizationJpaRepository.findById(orgId)
+            OrganizationEntity org = organizationJpaRepository.findById(Objects.requireNonNull(orgId))
                     .orElseThrow(() -> new EntityNotFoundException("Organización no encontrada: " + orgId));
 
             ClientEntity newClient = ClientEntity.builder()

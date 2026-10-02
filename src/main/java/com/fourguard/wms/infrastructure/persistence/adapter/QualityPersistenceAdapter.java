@@ -17,6 +17,7 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDate;
 import java.time.Year;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -32,13 +33,13 @@ public class QualityPersistenceAdapter implements QualityRepositoryPort {
 
     @Override
     public IncidenceEntity saveIncidence(IncidenceEntity entity) {
-        IncidenceEntity saved = incidenceRepository.saveAndFlush(entity);
-        return incidenceRepository.findById(saved.getId()).orElse(saved);
+        IncidenceEntity saved = incidenceRepository.saveAndFlush(Objects.requireNonNull(entity));
+        return incidenceRepository.findById(Objects.requireNonNull(saved.getId())).orElse(saved);
     }
 
     @Override
     public Optional<IncidenceEntity> findIncidenceById(UUID id) {
-        return incidenceRepository.findById(id);
+        return incidenceRepository.findById(Objects.requireNonNull(id));
     }
 
     @Override
@@ -74,12 +75,12 @@ public class QualityPersistenceAdapter implements QualityRepositoryPort {
 
     @Override
     public QualityReleaseEntity saveRelease(QualityReleaseEntity entity) {
-        return releaseRepository.saveAndFlush(entity);
+        return releaseRepository.saveAndFlush(Objects.requireNonNull(entity));
     }
 
     @Override
     public Optional<QualityReleaseEntity> findReleaseById(UUID id) {
-        return releaseRepository.findById(id);
+        return releaseRepository.findById(Objects.requireNonNull(id));
     }
 
     @Override
@@ -111,12 +112,12 @@ public class QualityPersistenceAdapter implements QualityRepositoryPort {
 
     @Override
     public LoadVerificationEntity saveVerification(LoadVerificationEntity entity) {
-        return verificationRepository.saveAndFlush(entity);
+        return verificationRepository.saveAndFlush(Objects.requireNonNull(entity));
     }
 
     @Override
     public Optional<LoadVerificationEntity> findVerificationById(UUID id) {
-        return verificationRepository.findById(id);
+        return verificationRepository.findById(Objects.requireNonNull(id));
     }
 
     @Override
