@@ -1,6 +1,5 @@
 package com.fourguard.wms.application.dto.request.quality.ai;
 
-import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
 import java.util.UUID;

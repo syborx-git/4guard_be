@@ -35,4 +35,15 @@ public interface QualityUseCase {
     List<QualityClaimResponse> getClaims(UUID organizationId, UUID branchId, String stage);
 
     QualityDashboardKpisResponse getDashboardKpis(UUID organizationId, UUID branchId);
+
+    // ── Submódulo 5: Desviaciones Nativas y Tablero Mensual de 10 KPIs ──
+    QualityDeviationResponse createDeviation(UUID organizationId, UUID branchId, UUID userId, CreateQualityDeviationRequest request);
+
+    List<QualityDeviationResponse> getDeviations(UUID organizationId, UUID branchId, String materialType, String rootCause, String month);
+
+    QualityDeviationResponse getDeviationById(UUID deviationId);
+
+    QualityMonthlyBoardResponse getMonthlyBoard(UUID organizationId, UUID branchId, Integer year, Integer month);
+
+    byte[] exportDeviationsExcel(UUID organizationId, UUID branchId, Integer year, Integer month);
 }

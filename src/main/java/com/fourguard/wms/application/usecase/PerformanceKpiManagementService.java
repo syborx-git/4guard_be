@@ -12,6 +12,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -83,7 +84,7 @@ public class PerformanceKpiManagementService {
                                 .updatedByUser(username != null ? username : "admin")
                                 .build();
 
-                PerformanceKpiEntity saved = kpiRepository.save(entity);
+                PerformanceKpiEntity saved = kpiRepository.save(Objects.requireNonNull(entity));
                 return mapToDto(saved);
         }
 
@@ -116,7 +117,7 @@ public class PerformanceKpiManagementService {
 
                 entity.setUpdatedByUser(username != null ? username : "admin");
 
-                PerformanceKpiEntity saved = kpiRepository.save(entity);
+                PerformanceKpiEntity saved = kpiRepository.save(Objects.requireNonNull(entity));
                 return mapToDto(saved);
         }
 
@@ -126,7 +127,7 @@ public class PerformanceKpiManagementService {
                                 .orElseThrow(() -> new IllegalArgumentException("KPI no encontrado con ID: " + id));
                 entity.setIsEnabled(false);
                 entity.setUpdatedByUser(username != null ? username : "admin");
-                kpiRepository.save(entity);
+                kpiRepository.save(Objects.requireNonNull(entity));
         }
 
         private void seedInitialKpis() {
@@ -253,7 +254,7 @@ public class PerformanceKpiManagementService {
                                 .isEnabled(true)
                                 .build());
 
-                kpiRepository.saveAll(defaults);
+                kpiRepository.saveAll(Objects.requireNonNull(defaults));
         }
 
         private KpiResponseDto mapToDto(PerformanceKpiEntity entity) {
