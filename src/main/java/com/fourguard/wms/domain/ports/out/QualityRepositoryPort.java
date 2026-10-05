@@ -59,4 +59,17 @@ public interface QualityRepositoryPort {
 
     // ── 4. Reclamos e Incidencias ─────────────────────────────────────────────
     List<IncidenceEntity> findClaimsByBranch(UUID branchId, DetectionStage stage, LocalDate startDate, LocalDate endDate);
+
+    // ── 5. Desviaciones de Calidad (Nativas & KPIs) ───────────────────────────
+    com.fourguard.wms.infrastructure.persistence.entity.QualityDeviationEntity saveDeviation(
+            com.fourguard.wms.infrastructure.persistence.entity.QualityDeviationEntity entity);
+
+    Optional<com.fourguard.wms.infrastructure.persistence.entity.QualityDeviationEntity> findDeviationById(UUID id);
+
+    Optional<com.fourguard.wms.infrastructure.persistence.entity.QualityDeviationEntity> findDeviationByFolio(String folio);
+
+    List<com.fourguard.wms.infrastructure.persistence.entity.QualityDeviationEntity> findDeviationsByBranch(
+            UUID branchId, String materialType, String rootCause, LocalDate startDate, LocalDate endDate);
+
+    String generateNextDeviationFolio(UUID organizationId);
 }

@@ -77,28 +77,48 @@ public class QualityAiController {
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    // RESOLUTORES AUXILIARES
+    // RESOLUTORES AUXILIARES CON CONTROL DE ACCESO (DEFENSA BOLA/IDOR Y AUTENTICACIÓN)
     // ══════════════════════════════════════════════════════════════════════════
 
     private UserEntity resolveCurrentUser() {
         String username = securityAuditHelper.getCurrentUsername();
+        if (username == null || username.isBlank() || "anonymousUser".equalsIgnoreCase(username) || "SYSTEM".equalsIgnoreCase(username)) {
+            throw new org.springframework.security.access.AccessDeniedException("Sesión no válida o no autenticada");
+        }
         return userRepositoryPort.findByUsername(username)
                 .or(() -> userRepositoryPort.findByEmail(username))
-                .orElseGet(() -> userRepositoryPort.findAll().stream().findFirst()
-                        .orElseThrow(() -> new IllegalStateException("No hay usuarios activos en el sistema")));
+                .orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("Usuario no encontrado en el sistema: " + username));
     }
 
     private UUID resolveOrgId(UUID header, UUID param, UserEntity user) {
-        if (header != null) return header;
-        if (param != null) return param;
-        if (user != null && user.getOrganization() != null) return user.getOrganization().getId();
-        return null;
+        UUID targetOrg = header != null ? header : (param != null ? param : (user != null && user.getOrganization() != null ? user.getOrganization().getId() : null));
+        if (user != null && user.getRole() != null && "SUPER_ADMIN".equalsIgnoreCase(user.getRole().getName())) {
+            return targetOrg;
+        }
+        if (user != null && user.getOrganization() != null) {
+            UUID userOrgId = user.getOrganization().getId();
+            if (targetOrg != null && !targetOrg.equals(userOrgId)) {
+                log.warn("Security Alert: User {} attempted cross-tenant access to org {}", user.getUsername(), targetOrg);
+                throw new org.springframework.security.access.AccessDeniedException("No tiene permisos para acceder a una organización ajena");
+            }
+            return userOrgId;
+        }
+        return targetOrg;
     }
 
     private UUID resolveBranchId(UUID header, UUID param, UserEntity user) {
-        if (header != null) return header;
-        if (param != null) return param;
-        if (user != null && user.getBranch() != null) return user.getBranch().getId();
-        return DEFAULT_BRANCH_ID;
+        UUID targetBranch = header != null ? header : (param != null ? param : (user != null && user.getBranch() != null ? user.getBranch().getId() : DEFAULT_BRANCH_ID));
+        if (user != null && user.getRole() != null && ("SUPER_ADMIN".equalsIgnoreCase(user.getRole().getName()) || "ADMIN".equalsIgnoreCase(user.getRole().getName()))) {
+            return targetBranch;
+        }
+        if (user != null && user.getBranch() != null) {
+            UUID userBranchId = user.getBranch().getId();
+            if (targetBranch != null && !targetBranch.equals(userBranchId)) {
+                log.warn("Security Alert: User {} attempted cross-branch access to branch {}", user.getUsername(), targetBranch);
+                throw new org.springframework.security.access.AccessDeniedException("No tiene permisos para operar en una sucursal no asignada");
+            }
+            return userBranchId;
+        }
+        return targetBranch != null ? targetBranch : DEFAULT_BRANCH_ID;
     }
 }

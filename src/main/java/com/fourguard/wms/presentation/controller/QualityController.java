@@ -257,28 +257,142 @@ public class QualityController {
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    // RESOLUTORES AUXILIARES
+    // 5. SUBMÓDULO: DESVIACIONES NATIVAS Y TABLERO MENSUAL DE 10 KPIS
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @PostMapping("/deviations")
+    @PreAuthorize("hasAuthority('QUALITY_UPDATE') or hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('QUALITY_AUDITOR') or hasRole('WAREHOUSE_SUPERVISOR')")
+    @Operation(summary = "Registrar nueva desviación de calidad",
+               description = "Captura una desviación física u operativa en almacenamiento, recepción o transporte, sustituyendo los Google Forms externos.")
+    public ResponseEntity<ApiResponse<QualityDeviationResponse>> createDeviation(
+            @RequestHeader(value = "X-Organization-Id", required = false) UUID orgHeader,
+            @RequestHeader(value = "X-Branch-Id", required = false) UUID branchHeader,
+            @RequestParam(value = "organizationId", required = false) UUID orgParam,
+            @RequestParam(value = "branchId", required = false) UUID branchParam,
+            @Valid @RequestBody CreateQualityDeviationRequest request) {
+
+        UserEntity currentUser = resolveCurrentUser();
+        UUID orgId = resolveOrgId(orgHeader, orgParam, currentUser);
+        UUID branchId = resolveBranchId(branchHeader, branchParam, currentUser);
+
+        QualityDeviationResponse response = qualityUseCase.createDeviation(orgId, branchId, currentUser.getId(), request);
+        return ResponseEntity.ok(ApiResponse.ok("Desviación de calidad registrada exitosamente", response));
+    }
+
+    @GetMapping("/deviations")
+    @PreAuthorize("hasAuthority('QUALITY_READ') or hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('QUALITY_AUDITOR') or hasRole('WAREHOUSE_SUPERVISOR')")
+    @Operation(summary = "Listar desviaciones de calidad registradas",
+               description = "Retorna el concentrado de desviaciones con filtros opcionales por tipo de material, causa raíz o mes (YYYY-MM).")
+    public ResponseEntity<ApiResponse<List<QualityDeviationResponse>>> getDeviations(
+            @RequestHeader(value = "X-Organization-Id", required = false) UUID orgHeader,
+            @RequestHeader(value = "X-Branch-Id", required = false) UUID branchHeader,
+            @RequestParam(value = "organizationId", required = false) UUID orgParam,
+            @RequestParam(value = "branchId", required = false) UUID branchParam,
+            @RequestParam(value = "materialType", required = false) String materialType,
+            @RequestParam(value = "rootCause", required = false) String rootCause,
+            @RequestParam(value = "month", required = false) String month) {
+
+        UserEntity currentUser = resolveCurrentUser();
+        UUID orgId = resolveOrgId(orgHeader, orgParam, currentUser);
+        UUID branchId = resolveBranchId(branchHeader, branchParam, currentUser);
+
+        List<QualityDeviationResponse> response = qualityUseCase.getDeviations(orgId, branchId, materialType, rootCause, month);
+        return ResponseEntity.ok(ApiResponse.ok("Desviaciones de calidad obtenidas con éxito", response));
+    }
+
+    @GetMapping("/deviations/{id}")
+    @PreAuthorize("hasAuthority('QUALITY_READ') or hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('QUALITY_AUDITOR') or hasRole('WAREHOUSE_SUPERVISOR')")
+    @Operation(summary = "Obtener detalle de desviación por ID", description = "Retorna el detalle completo de una desviación de calidad.")
+    public ResponseEntity<ApiResponse<QualityDeviationResponse>> getDeviationById(@PathVariable UUID id) {
+        QualityDeviationResponse response = qualityUseCase.getDeviationById(id);
+        return ResponseEntity.ok(ApiResponse.ok("Desviación obtenida con éxito", response));
+    }
+
+    @GetMapping("/kpis/monthly-board")
+    @PreAuthorize("hasAuthority('QUALITY_READ') or hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('QUALITY_AUDITOR') or hasRole('WAREHOUSE_SUPERVISOR')")
+    @Operation(summary = "Obtener Tablero Mensual de los 10 KPIs de Calidad",
+               description = "Retorna el Bento Grid consolidado de los 10 KPIs de calidad, comparativa contra metas, causas raíz y desgloses por colaborador.")
+    public ResponseEntity<ApiResponse<QualityMonthlyBoardResponse>> getMonthlyBoard(
+            @RequestHeader(value = "X-Organization-Id", required = false) UUID orgHeader,
+            @RequestHeader(value = "X-Branch-Id", required = false) UUID branchHeader,
+            @RequestParam(value = "organizationId", required = false) UUID orgParam,
+            @RequestParam(value = "branchId", required = false) UUID branchParam,
+            @RequestParam(value = "year", required = false) Integer year,
+            @RequestParam(value = "month", required = false) Integer month) {
+
+        UserEntity currentUser = resolveCurrentUser();
+        UUID orgId = resolveOrgId(orgHeader, orgParam, currentUser);
+        UUID branchId = resolveBranchId(branchHeader, branchParam, currentUser);
+
+        QualityMonthlyBoardResponse response = qualityUseCase.getMonthlyBoard(orgId, branchId, year, month);
+        return ResponseEntity.ok(ApiResponse.ok("Tablero mensual de KPIs obtenido con éxito", response));
+    }
+
+    @GetMapping(value = "/deviations/export-excel", produces = "text/csv")
+    @PreAuthorize("hasAuthority('QUALITY_READ') or hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('QUALITY_AUDITOR')")
+    @Operation(summary = "Exportar concentrado mensual de desviaciones y KPIs",
+               description = "Genera el reporte tabular exportable que sustituye las hojas mensuales de Excel.")
+    public ResponseEntity<byte[]> exportDeviationsExcel(
+            @RequestHeader(value = "X-Organization-Id", required = false) UUID orgHeader,
+            @RequestHeader(value = "X-Branch-Id", required = false) UUID branchHeader,
+            @RequestParam(value = "organizationId", required = false) UUID orgParam,
+            @RequestParam(value = "branchId", required = false) UUID branchParam,
+            @RequestParam(value = "year", required = false) Integer year,
+            @RequestParam(value = "month", required = false) Integer month) {
+
+        UserEntity currentUser = resolveCurrentUser();
+        UUID orgId = resolveOrgId(orgHeader, orgParam, currentUser);
+        UUID branchId = resolveBranchId(branchHeader, branchParam, currentUser);
+
+        byte[] csvData = qualityUseCase.exportDeviationsExcel(orgId, branchId, year, month);
+        return ResponseEntity.ok()
+                .header("Content-Disposition", "attachment; filename=\"reporte-calidad-" + (year != null ? year : 2026) + "-" + (month != null ? month : 10) + ".csv\"")
+                .body(csvData);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // RESOLUTORES AUXILIARES CON CONTROL DE ACCESO (DEFENSA BOLA/IDOR Y AUTENTICACIÓN)
     // ══════════════════════════════════════════════════════════════════════════
 
     private UserEntity resolveCurrentUser() {
         String username = securityAuditHelper.getCurrentUsername();
+        if (username == null || username.isBlank() || "anonymousUser".equalsIgnoreCase(username) || "SYSTEM".equalsIgnoreCase(username)) {
+            throw new org.springframework.security.access.AccessDeniedException("Sesión no válida o no autenticada");
+        }
         return userRepositoryPort.findByUsername(username)
                 .or(() -> userRepositoryPort.findByEmail(username))
-                .orElseGet(() -> userRepositoryPort.findAll().stream().findFirst()
-                        .orElseThrow(() -> new IllegalStateException("No hay usuarios activos en el sistema")));
+                .orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("Usuario no encontrado en el sistema: " + username));
     }
 
     private UUID resolveOrgId(UUID header, UUID param, UserEntity user) {
-        if (header != null) return header;
-        if (param != null) return param;
-        if (user != null && user.getOrganization() != null) return user.getOrganization().getId();
-        return null;
+        UUID targetOrg = header != null ? header : (param != null ? param : (user != null && user.getOrganization() != null ? user.getOrganization().getId() : null));
+        if (user != null && user.getRole() != null && "SUPER_ADMIN".equalsIgnoreCase(user.getRole().getName())) {
+            return targetOrg;
+        }
+        if (user != null && user.getOrganization() != null) {
+            UUID userOrgId = user.getOrganization().getId();
+            if (targetOrg != null && !targetOrg.equals(userOrgId)) {
+                log.warn("Security Alert: User {} attempted cross-tenant access to org {}", user.getUsername(), targetOrg);
+                throw new org.springframework.security.access.AccessDeniedException("No tiene permisos para acceder a una organización ajena");
+            }
+            return userOrgId;
+        }
+        return targetOrg;
     }
 
     private UUID resolveBranchId(UUID header, UUID param, UserEntity user) {
-        if (header != null) return header;
-        if (param != null) return param;
-        if (user != null && user.getBranch() != null) return user.getBranch().getId();
-        return DEFAULT_BRANCH_ID;
+        UUID targetBranch = header != null ? header : (param != null ? param : (user != null && user.getBranch() != null ? user.getBranch().getId() : DEFAULT_BRANCH_ID));
+        if (user != null && user.getRole() != null && ("SUPER_ADMIN".equalsIgnoreCase(user.getRole().getName()) || "ADMIN".equalsIgnoreCase(user.getRole().getName()))) {
+            return targetBranch;
+        }
+        if (user != null && user.getBranch() != null) {
+            UUID userBranchId = user.getBranch().getId();
+            if (targetBranch != null && !targetBranch.equals(userBranchId)) {
+                log.warn("Security Alert: User {} attempted cross-branch access to branch {}", user.getUsername(), targetBranch);
+                throw new org.springframework.security.access.AccessDeniedException("No tiene permisos para operar en una sucursal no asignada");
+            }
+            return userBranchId;
+        }
+        return targetBranch != null ? targetBranch : DEFAULT_BRANCH_ID;
     }
 }
