@@ -55,6 +55,10 @@ public class WarehouseReceptionEntity extends BaseVersionedEntity {
 
     // ── CheckIn Caseta ──────────────────────────────────────────────────────
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "pre_checkin_id")
+    private SecurityPreCheckinEntity preCheckin;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "carrier_id")
     private CarrierEntity carrier;
 

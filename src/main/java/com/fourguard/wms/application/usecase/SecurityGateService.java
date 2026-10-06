@@ -146,22 +146,12 @@ public class SecurityGateService implements SecurityGateUseCase {
 
         ClientEntity client = null;
         if (request.getClientCode() != null && !request.getClientCode().isBlank()) {
-            client = clientRepositoryPort.findByOrganizationId(organization.getId()).stream()
-                    .filter(c -> (c.getExternalId() != null
-                            && c.getExternalId().equalsIgnoreCase(request.getClientCode())) ||
-                            (c.getName() != null && c.getName().equalsIgnoreCase(request.getClientCode())))
-                    .findFirst()
-                    .orElse(null);
+            client = clientRepositoryPort.findByOrganizationIdAndSearch(organization.getId(), request.getClientCode()).orElse(null);
         }
 
         CarrierEntity carrier = null;
         if (request.getCarrierLineCode() != null && !request.getCarrierLineCode().isBlank()) {
-            carrier = carrierRepositoryPort.findByOrganizationId(organization.getId()).stream()
-                    .filter(c -> (c.getTaxId() != null && c.getTaxId().equalsIgnoreCase(request.getCarrierLineCode()))
-                            ||
-                            (c.getName() != null && c.getName().equalsIgnoreCase(request.getCarrierLineCode())))
-                    .findFirst()
-                    .orElse(null);
+            carrier = carrierRepositoryPort.findByOrganizationIdAndSearch(organization.getId(), request.getCarrierLineCode()).orElse(null);
         }
 
         String opType = (request.getOperationType() != null && !request.getOperationType().isBlank())
@@ -243,42 +233,25 @@ public class SecurityGateService implements SecurityGateUseCase {
 
         if (request.getClientCode() != null && !request.getClientCode().isBlank()) {
             entity.setClientCode(request.getClientCode());
-            clientRepositoryPort.findByOrganizationId(entity.getOrganization().getId()).stream()
-                    .filter(c -> (c.getExternalId() != null
-                            && c.getExternalId().equalsIgnoreCase(request.getClientCode())) ||
-                            (c.getId() != null && c.getId().toString().equalsIgnoreCase(request.getClientCode())) ||
-                            (c.getName() != null && c.getName().equalsIgnoreCase(request.getClientCode())))
-                    .findFirst()
+            clientRepositoryPort.findByOrganizationIdAndSearch(entity.getOrganization().getId(), request.getClientCode())
                     .ifPresent(entity::setClient);
         }
         if (request.getClientName() != null && !request.getClientName().isBlank()) {
             entity.setClientName(request.getClientName());
             if (entity.getClient() == null) {
-                clientRepositoryPort.findByOrganizationId(entity.getOrganization().getId()).stream()
-                        .filter(c -> c.getName() != null && c.getName().equalsIgnoreCase(request.getClientName()))
-                        .findFirst()
+                clientRepositoryPort.findByOrganizationIdAndSearch(entity.getOrganization().getId(), request.getClientName())
                         .ifPresent(entity::setClient);
             }
         }
         if (request.getCarrierLineCode() != null && !request.getCarrierLineCode().isBlank()) {
             entity.setCarrierLineCode(request.getCarrierLineCode());
-            carrierRepositoryPort.findByOrganizationId(entity.getOrganization().getId()).stream()
-                    .filter(c -> (c.getTaxId() != null && c.getTaxId().equalsIgnoreCase(request.getCarrierLineCode()))
-                            ||
-                            (c.getId() != null && c.getId().toString().equalsIgnoreCase(request.getCarrierLineCode()))
-                            ||
-                            (c.getName() != null && c.getName().equalsIgnoreCase(request.getCarrierLineCode())))
-                    .findFirst()
+            carrierRepositoryPort.findByOrganizationIdAndSearch(entity.getOrganization().getId(), request.getCarrierLineCode())
                     .ifPresent(entity::setCarrier);
         }
         if (request.getCarrierLine() != null && !request.getCarrierLine().isBlank()) {
             entity.setCarrierLine(request.getCarrierLine());
             if (entity.getCarrier() == null) {
-                carrierRepositoryPort.findByOrganizationId(entity.getOrganization().getId()).stream()
-                        .filter(c -> (c.getName() != null && c.getName().equalsIgnoreCase(request.getCarrierLine())) ||
-                                (c.getTradeName() != null
-                                        && c.getTradeName().equalsIgnoreCase(request.getCarrierLine())))
-                        .findFirst()
+                carrierRepositoryPort.findByOrganizationIdAndSearch(entity.getOrganization().getId(), request.getCarrierLine())
                         .ifPresent(entity::setCarrier);
             }
         }
@@ -426,12 +399,7 @@ public class SecurityGateService implements SecurityGateUseCase {
         if (request.getClientName() != null)
             entity.setClientName(request.getClientName());
         if (entity.getClient() == null && entity.getClientCode() != null) {
-            clientRepositoryPort.findByOrganizationId(entity.getOrganization().getId()).stream()
-                    .filter(c -> (c.getExternalId() != null
-                            && c.getExternalId().equalsIgnoreCase(entity.getClientCode())) ||
-                            (c.getId() != null && c.getId().toString().equalsIgnoreCase(entity.getClientCode())) ||
-                            (c.getName() != null && c.getName().equalsIgnoreCase(entity.getClientCode())))
-                    .findFirst()
+            clientRepositoryPort.findByOrganizationIdAndSearch(entity.getOrganization().getId(), entity.getClientCode())
                     .ifPresent(entity::setClient);
         }
 
@@ -440,11 +408,7 @@ public class SecurityGateService implements SecurityGateUseCase {
         if (request.getCarrierLine() != null)
             entity.setCarrierLine(request.getCarrierLine());
         if (entity.getCarrier() == null && entity.getCarrierLineCode() != null) {
-            carrierRepositoryPort.findByOrganizationId(entity.getOrganization().getId()).stream()
-                    .filter(c -> (c.getTaxId() != null && c.getTaxId().equalsIgnoreCase(entity.getCarrierLineCode())) ||
-                            (c.getId() != null && c.getId().toString().equalsIgnoreCase(entity.getCarrierLineCode())) ||
-                            (c.getName() != null && c.getName().equalsIgnoreCase(entity.getCarrierLineCode())))
-                    .findFirst()
+            carrierRepositoryPort.findByOrganizationIdAndSearch(entity.getOrganization().getId(), entity.getCarrierLineCode())
                     .ifPresent(entity::setCarrier);
         }
 
@@ -514,6 +478,7 @@ public class SecurityGateService implements SecurityGateUseCase {
             outReq.setObservations(entity.getObservations());
             outReq.setStatus("REGISTERED");
             outReq.setSelectedItemIds(Collections.emptyList());
+            outReq.setPreCheckinId(entity.getId());
 
             OutboundResponse outRes = warehouseOutboundUseCase.createOutbound(outReq);
             generatedFolio = outRes.getFolio();
@@ -544,6 +509,7 @@ public class SecurityGateService implements SecurityGateUseCase {
             inReq.setObservations(entity.getObservations());
             inReq.setTransportType(entity.getTransportType());
             inReq.setNoEcoTractor(entity.getNoEcoTractor());
+            inReq.setPreCheckinId(entity.getId());
 
             ReceptionResponse inRes = warehouseReceptionUseCase.createCheckIn(inReq);
             generatedFolio = inRes.getFolio();
@@ -790,6 +756,9 @@ public class SecurityGateService implements SecurityGateUseCase {
     private PassResponse mapToResponseWithWarehouseStatus(SecurityPreCheckinEntity entity) {
         String whStatus = "REGISTRADO";
         boolean readyForExit = false;
+        UUID dynamicRampId = entity.getRamp() != null ? entity.getRamp().getId() : null;
+        Integer dynamicRampNumber = entity.getRampNumber();
+        String dynamicRampCode = entity.getRampCode();
 
         if (entity.getGeneratedFolio() != null && !entity.getGeneratedFolio().isBlank()) {
             String folio = entity.getGeneratedFolio().trim();
@@ -799,6 +768,11 @@ public class SecurityGateService implements SecurityGateUseCase {
                     WarehouseOutboundEntity out = outbound.get();
                     whStatus = out.getStatus() != null ? out.getStatus().name() : "REGISTERED";
                     readyForExit = (out.getStatus() == OutboundStatus.COMPLETED);
+                    if (out.getRamp() != null) {
+                        dynamicRampId = out.getRamp().getId();
+                        dynamicRampCode = out.getRamp().getCode();
+                        dynamicRampNumber = parseRampNumber(out.getRamp());
+                    }
                 }
             } else {
                 Optional<WarehouseReceptionEntity> reception = warehouseReceptionRepositoryPort.findByFolio(folio);
@@ -806,6 +780,11 @@ public class SecurityGateService implements SecurityGateUseCase {
                     WarehouseReceptionEntity rec = reception.get();
                     whStatus = rec.getStatus() != null ? rec.getStatus().name() : "REGISTERED";
                     readyForExit = (rec.getStatus() == ReceptionStatus.COMPLETED);
+                    if (rec.getRamp() != null) {
+                        dynamicRampId = rec.getRamp().getId();
+                        dynamicRampCode = rec.getRamp().getCode();
+                        dynamicRampNumber = parseRampNumber(rec.getRamp());
+                    }
                 }
             }
         }
@@ -864,9 +843,9 @@ public class SecurityGateService implements SecurityGateUseCase {
                 .observations(entity.getObservations())
                 .driverSignature(entity.getDriverSignature())
                 .driverSignedAt(entity.getDriverSignedAt())
-                .rampId(entity.getRamp() != null ? entity.getRamp().getId() : null)
-                .rampNumber(entity.getRampNumber())
-                .rampCode(entity.getRampCode())
+                .rampId(dynamicRampId)
+                .rampNumber(dynamicRampNumber)
+                .rampCode(dynamicRampCode)
                 .generatedFolio(entity.getGeneratedFolio())
                 .processedBy(entity.getProcessedBy())
                 .processedAt(entity.getProcessedAt())

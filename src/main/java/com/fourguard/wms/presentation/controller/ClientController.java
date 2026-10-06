@@ -34,7 +34,7 @@ public class ClientController {
     // ── CRUD Principal del Cliente ───────────────────────────────────────────
 
     @PostMapping
-    @PreAuthorize("hasAuthority('CLIENTS_CREATE') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('CLIENTS_CREATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR')")
     @Operation(summary = "Crear cliente", description = "Registra un nuevo cliente depositante con sus contactos y destinos físicos.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Cliente creado con éxito"),
@@ -50,7 +50,7 @@ public class ClientController {
     }
 
     @PutMapping
-    @PreAuthorize("hasAuthority('CLIENTS_UPDATE') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('CLIENTS_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR')")
     @Operation(summary = "Actualizar cliente", description = "Actualiza los datos del cliente y sincroniza inteligentemente contactos y destinos.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Cliente actualizado con éxito"),
@@ -65,7 +65,7 @@ public class ClientController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('CLIENTS_READ') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('CLIENTS_READ') or hasAuthority('SECURITY_GATE_READ') or hasAuthority('RECEIVING_READ') or hasAuthority('SHIPPING_READ') or hasRole('OPERATIONS_MANAGER') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('CONTROL_DESK') or hasRole('CEO') or hasRole('FORKLIFT_OPERATOR')")
     @Operation(summary = "Obtener cliente por ID", description = "Recupera un cliente con sus contactos y destinos por su UUID.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Cliente encontrado"),
@@ -76,7 +76,7 @@ public class ClientController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAuthority('CLIENTS_READ') or hasRole('OPERATIONS_MANAGER') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('FORKLIFT_OPERATOR')")
+    @PreAuthorize("hasAuthority('CLIENTS_READ') or hasAuthority('SECURITY_GATE_READ') or hasAuthority('RECEIVING_READ') or hasAuthority('SHIPPING_READ') or hasRole('OPERATIONS_MANAGER') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('CONTROL_DESK') or hasRole('CEO') or hasRole('FORKLIFT_OPERATOR')")
     @Operation(summary = "Listar clientes", description = "Recupera la lista de clientes, opcionalmente filtrada por organización.")
     public ResponseEntity<ApiResponse<List<ClientResponse>>> getClients(
             @RequestParam(required = false) UUID organizationId) {
@@ -87,7 +87,7 @@ public class ClientController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('CLIENTS_DELETE') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('CLIENTS_DELETE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     @Operation(summary = "Eliminar cliente", description = "Elimina físicamente un cliente y sus registros relacionados (CASCADE). Usar solo si no tiene historial de movimientos.")
     public ResponseEntity<ApiResponse<Void>> deleteClient(@PathVariable UUID id) {
         clientUseCase.deleteClient(id);
@@ -95,14 +95,14 @@ public class ClientController {
     }
 
     @PatchMapping("/{id}/status")
-    @PreAuthorize("hasAuthority('CLIENTS_UPDATE') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('CLIENTS_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     @Operation(summary = "Alternar estado del cliente", description = "Cambia el estado del cliente entre ACTIVE e INACTIVE (baja lógica - RN-CLI-006).")
     public ResponseEntity<ApiResponse<ClientResponse>> toggleClientStatus(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.ok("Estado del cliente actualizado", clientUseCase.toggleClientStatus(id)));
     }
 
     @GetMapping("/{id}/audit")
-    @PreAuthorize("hasAuthority('CLIENTS_READ') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('CLIENTS_READ') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR')")
     @Operation(summary = "Historial de auditoría del cliente", description = "Recupera la bitácora de cambios para un cliente específico.")
     public ResponseEntity<ApiResponse<List<ClientAuditResponse>>> getClientAuditLogs(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.ok("Historial recuperado con éxito", clientUseCase.getClientAuditLogs(id)));
@@ -111,7 +111,7 @@ public class ClientController {
     // ── Endpoints Granulares de Destinos Físicos (Ship-to Locations) ──────────
 
     @GetMapping("/{id}/destinations")
-    @PreAuthorize("hasAuthority('CLIENTS_READ') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('CLIENTS_READ') or hasAuthority('SECURITY_GATE_READ') or hasAuthority('RECEIVING_READ') or hasAuthority('SHIPPING_READ') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('CONTROL_DESK') or hasRole('CEO') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA')")
     @Operation(summary = "Listar destinos del cliente", description = "Recupera todas las bodegas/plantas registradas para un cliente.")
     public ResponseEntity<ApiResponse<List<PhysicalDestinationDto>>> getClientDestinations(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.ok("Destinos recuperados con éxito", clientUseCase.getClientDestinations(id)));

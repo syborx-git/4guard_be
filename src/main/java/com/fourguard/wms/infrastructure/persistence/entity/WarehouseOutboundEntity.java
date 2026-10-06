@@ -67,6 +67,10 @@ public class WarehouseOutboundEntity extends BaseVersionedEntity {
 
     // ── Transporte y Chofer ─────────────────────────────────────────────────
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "pre_checkin_id")
+    private SecurityPreCheckinEntity preCheckin;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "ramp_id")
     private LocationEntity ramp;
 

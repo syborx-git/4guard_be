@@ -33,7 +33,7 @@ public class WarehouseOutboundController {
     // ─── CREATE OUTBOUND ────────────────────────────────────────────────────────
 
     @PostMapping
-    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_CREATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('WAREHOUSE_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_CREATE') or hasAuthority('SHIPPING_WRITE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR')")
     @Operation(summary = "Registrar salida de almacén / despacho",
                description = "Registra la salida física y lógica de mercancía. Descuenta las UAs del inventario y genera folio SAL-YYYY-XXXXXX.")
     public ResponseEntity<ApiResponse<OutboundResponse>> createOutbound(
@@ -45,7 +45,7 @@ public class WarehouseOutboundController {
     // ─── GET BY ID ─────────────────────────────────────────────────────────────
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('FORKLIFT_OPERATOR')")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasAuthority('SHIPPING_READ') or hasAuthority('SECURITY_GATE_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('FORKLIFT_OPERATOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Obtener salida por ID",
                description = "Retorna el detalle completo de la salida y las tarimas despachadas.")
     public ResponseEntity<ApiResponse<OutboundResponse>> getOutboundById(@PathVariable UUID id) {
@@ -56,7 +56,7 @@ public class WarehouseOutboundController {
     // ─── UPDATE OUTBOUND ───────────────────────────────────────────────────────
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('FORKLIFT_OPERATOR')")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasAuthority('SHIPPING_WRITE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('FORKLIFT_OPERATOR') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA')")
     @Operation(summary = "Actualizar salida de almacén / transicionar fase",
                description = "Actualiza el estatus del ciclo operativo (REGISTERED -> ASSIGNED -> IN_PROGRESS -> LOADED -> COMPLETED), rampa, montacarguista o datos de caseta.")
     public ResponseEntity<ApiResponse<OutboundResponse>> updateOutbound(
@@ -69,7 +69,7 @@ public class WarehouseOutboundController {
     // ─── GET LIST ──────────────────────────────────────────────────────────────
 
     @GetMapping
-    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('WAREHOUSE_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasAuthority('SHIPPING_READ') or hasAuthority('SECURITY_GATE_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('FORKLIFT_OPERATOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Listar salidas de almacén",
                description = "Retorna el historial de salidas filtrado por organización, sucursal, estatus y búsqueda.")
     public ResponseEntity<ApiResponse<List<OutboundSummaryResponse>>> getOutbounds(
@@ -97,7 +97,7 @@ public class WarehouseOutboundController {
     // ─── CHANGE REMISIÓN / CARTA PORTE ─────────────────────────────────────────
 
     @PutMapping({"/{id}/change-shipping-note", "/{id}/change-document", "/{id}/change-waybill", "/{id}/change-remision"})
-    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR')")
     @Operation(summary = "Modificar número de remisión / carta porte de salida",
                description = "Actualiza el número de remisión / carta porte de la salida con justificación y registro en auditoría.")
     public ResponseEntity<ApiResponse<OutboundResponse>> changeRemision(
@@ -110,7 +110,7 @@ public class WarehouseOutboundController {
     // ─── INVENTORY BATCHES (FIFO / FEFO) ───────────────────────────────────────
 
     @GetMapping("/inventory-batches")
-    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('WAREHOUSE_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasAuthority('SHIPPING_READ') or hasAuthority('INVENTORY_READ') or hasAuthority('SECURITY_GATE_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('FORKLIFT_OPERATOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Consultar lotes disponibles con sugerencia FIFO/FEFO",
                description = "Retorna los lotes de inventario agrupados con ordenamiento FEFO indexado y búsqueda rápida.")
     public ResponseEntity<ApiResponse<List<InventoryBatchResponse>>> getInventoryBatches(
@@ -126,7 +126,7 @@ public class WarehouseOutboundController {
     // ─── SCAN PALLET (FAST RF BARCODE LOOKUP) ──────────────────────────────────
 
     @GetMapping("/scan-pallet")
-    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('FORKLIFT_OPERATOR')")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasAuthority('SHIPPING_READ') or hasAuthority('INVENTORY_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('FORKLIFT_OPERATOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Escanear / Consultar tarima o UA por código de barras",
                description = "Búsqueda rápida en sub-10ms por SSCC o código de barras de tarima para escaneo masivo con pistola RF o tablet.")
     public ResponseEntity<ApiResponse<ScanPalletResponse>> scanPallet(
@@ -140,7 +140,7 @@ public class WarehouseOutboundController {
     // ─── VALIDATE PALLETS (BATCH LOOKUP) ───────────────────────────────────────
 
     @PostMapping("/validate-pallets")
-    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('FORKLIFT_OPERATOR')")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasAuthority('SHIPPING_READ') or hasAuthority('INVENTORY_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('FORKLIFT_OPERATOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Validar lote de tarimas escaneadas",
                description = "Valida y retorna metadatos de un listado de códigos de barras / SSCCs escaneados.")
     public ResponseEntity<ApiResponse<List<ScanPalletResponse>>> validatePallets(
@@ -152,7 +152,7 @@ public class WarehouseOutboundController {
     // ─── AUDIT LOGS ───────────────────────────────────────────────────────────
 
     @GetMapping("/{id}/audit")
-    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('WAREHOUSE_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR')")
     @Operation(summary = "Consultar auditoría de la salida",
                description = "Retorna la línea de tiempo de auditoría del despacho.")
     public ResponseEntity<ApiResponse<List<MovementAuditResponse>>> getAuditLogs(@PathVariable UUID id) {

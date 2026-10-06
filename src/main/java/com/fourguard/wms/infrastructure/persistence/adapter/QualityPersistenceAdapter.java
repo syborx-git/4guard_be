@@ -11,7 +11,6 @@ import com.fourguard.wms.infrastructure.persistence.entity.QualityDeviationEntit
 import com.fourguard.wms.infrastructure.persistence.entity.QualityReleaseEntity;
 import com.fourguard.wms.infrastructure.persistence.repository.IncidenceJpaRepository;
 import com.fourguard.wms.infrastructure.persistence.repository.LoadVerificationJpaRepository;
-import com.fourguard.wms.infrastructure.persistence.repository.QualityDeviationJpaRepository;
 import com.fourguard.wms.infrastructure.persistence.repository.QualityReleaseJpaRepository;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;

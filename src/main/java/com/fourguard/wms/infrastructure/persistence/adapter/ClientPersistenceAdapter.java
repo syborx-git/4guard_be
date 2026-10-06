@@ -45,4 +45,13 @@ public class ClientPersistenceAdapter implements ClientRepositoryPort {
     public boolean existsByOrganizationIdAndExternalIdAndIdNot(UUID organizationId, String externalId, UUID id) {
         return repository.existsByOrganizationIdAndExternalIdIgnoreCaseAndIdNot(organizationId, externalId, id);
     }
+
+    @Override
+    public Optional<ClientEntity> findByOrganizationIdAndSearch(UUID organizationId, String search) {
+        if (organizationId == null || search == null || search.isBlank()) {
+            return Optional.empty();
+        }
+        List<ClientEntity> matches = repository.findByOrganizationIdAndSearchQuery(organizationId, search.trim());
+        return matches.isEmpty() ? Optional.empty() : Optional.of(matches.get(0));
+    }
 }
