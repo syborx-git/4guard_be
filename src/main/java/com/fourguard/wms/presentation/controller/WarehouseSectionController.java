@@ -31,7 +31,7 @@ public class WarehouseSectionController {
     private final WarehouseSectionUseCase sectionUseCase;
 
     @PostMapping
-    @PreAuthorize("hasAuthority('SECTIONS_CREATE') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('SECTIONS_CREATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR')")
     @Operation(summary = "Crear sección de almacén", description = "Crea una nueva sección física o lógica dentro de una sucursal.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Sección creada con éxito"),
@@ -45,7 +45,7 @@ public class WarehouseSectionController {
     }
 
     @PutMapping
-    @PreAuthorize("hasAuthority('SECTIONS_UPDATE') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('SECTIONS_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR')")
     @Operation(summary = "Actualizar sección de almacén", description = "Actualiza los datos de una sección existente.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Sección actualizada con éxito"),
@@ -60,7 +60,7 @@ public class WarehouseSectionController {
     }
 
     @PatchMapping("/{id}/status")
-    @PreAuthorize("hasAuthority('SECTIONS_UPDATE') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('SECTIONS_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     @Operation(summary = "Cambiar estado de la sección", description = "Cambia el estado operativo de una sección de almacén (ACTIVE, INACTIVE).")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Estado de la sección actualizado con éxito"),
@@ -77,7 +77,7 @@ public class WarehouseSectionController {
     }
 
     @PostMapping("/{id}/initialize")
-    @PreAuthorize("hasAuthority('SECTIONS_UPDATE') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('SECTIONS_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR')")
     @Operation(summary = "Inicializar y activar nave de almacén", description = "Configura métricas de estiba, categoría y genera cuadrícula de ubicaciones operativas.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Nave inicializada y activada con éxito"),
@@ -97,7 +97,7 @@ public class WarehouseSectionController {
 
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('SECTIONS_READ') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('SECTIONS_READ') or hasAuthority('LAYOUT_READ') or hasAuthority('RECEIVING_READ') or hasAuthority('INVENTORY_READ') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('FORKLIFT_OPERATOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Obtener sección por ID", description = "Recupera los detalles de una sección específica por su UUID.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Sección encontrada con éxito"),
@@ -111,7 +111,7 @@ public class WarehouseSectionController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAuthority('SECTIONS_READ') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('SECTIONS_READ') or hasAuthority('LAYOUT_READ') or hasAuthority('RECEIVING_READ') or hasAuthority('INVENTORY_READ') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('FORKLIFT_OPERATOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Obtener secciones", description = "Recupera la lista de secciones, opcionalmente filtrada por sucursal.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Lista de secciones recuperada con éxito"),
@@ -129,7 +129,7 @@ public class WarehouseSectionController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('SECTIONS_DELETE') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('SECTIONS_DELETE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     @Operation(summary = "Eliminar sección de almacén", description = "Elimina físicamente una sección del sistema por su ID.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Sección eliminada con éxito"),
@@ -143,7 +143,7 @@ public class WarehouseSectionController {
     }
 
     @GetMapping("/{id}/audit")
-    @PreAuthorize("hasAuthority('SECTIONS_READ') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('SECTIONS_READ') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR')")
     @Operation(summary = "Historial de auditoría de la sección", description = "Devuelve el historial cronológico de cambios de una sección de almacén.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Historial recuperado con éxito"),

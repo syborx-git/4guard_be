@@ -12,6 +12,7 @@ spring:
       connection-timeout: 20000
       idle-timeout: 600000
       max-lifetime: 1800000
+      leak-detection-threshold: 2000
       auto-commit: false
       data-source-properties:
         reWriteBatchedInserts: true       # Agrupa inserciones en un solo round-trip JDBC

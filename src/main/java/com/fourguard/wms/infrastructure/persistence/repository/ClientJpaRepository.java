@@ -21,4 +21,9 @@ public interface ClientJpaRepository extends JpaRepository<ClientEntity, UUID> {
     // Unicidad por External ID
     boolean existsByOrganizationIdAndExternalIdIgnoreCase(UUID organizationId, String externalId);
     boolean existsByOrganizationIdAndExternalIdIgnoreCaseAndIdNot(UUID organizationId, String externalId, UUID id);
+
+    @org.springframework.data.jpa.repository.Query("SELECT c FROM ClientEntity c WHERE c.organization.id = :orgId AND " +
+           "(LOWER(c.externalId) = LOWER(:search) OR LOWER(c.taxId) = LOWER(:search) OR LOWER(c.name) = LOWER(:search))")
+    List<ClientEntity> findByOrganizationIdAndSearchQuery(@org.springframework.data.repository.query.Param("orgId") UUID orgId,
+                                                          @org.springframework.data.repository.query.Param("search") String search);
 }

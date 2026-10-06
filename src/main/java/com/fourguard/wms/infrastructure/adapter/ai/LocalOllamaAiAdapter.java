@@ -37,8 +37,8 @@ public class LocalOllamaAiAdapter implements AiLlmPort {
             @Value("${ai.ollama.enabled:true}") boolean isEnabled) {
 
         this.restTemplate = restTemplateBuilder
-                .setConnectTimeout(Duration.ofSeconds(2))
-                .setReadTimeout(Duration.ofSeconds(10))
+                .connectTimeout(Duration.ofSeconds(2))
+                .readTimeout(Duration.ofSeconds(10))
                 .build();
         this.objectMapper = objectMapper;
         this.ollamaBaseUrl = ollamaBaseUrl;

@@ -40,4 +40,13 @@ public class CarrierPersistenceAdapter implements CarrierRepositoryPort {
     public boolean existsByOrganizationIdAndTaxIdAndIdNot(UUID organizationId, String taxId, UUID excludeId) {
         return repository.existsByOrganizationIdAndTaxIdIgnoreCaseAndIdNot(organizationId, taxId, excludeId);
     }
+
+    @Override
+    public Optional<CarrierEntity> findByOrganizationIdAndSearch(UUID organizationId, String search) {
+        if (organizationId == null || search == null || search.isBlank()) {
+            return Optional.empty();
+        }
+        List<CarrierEntity> matches = repository.findByOrganizationIdAndSearchQuery(organizationId, search.trim());
+        return matches.isEmpty() ? Optional.empty() : Optional.of(matches.get(0));
+    }
 }

@@ -85,4 +85,6 @@ public class CreateCheckInRequest {
     private String transportType;
     private String noEcoTractor;
     private String noCartaPorte;
+    /** Optional: Linked security pre-checkin pass UUID */
+    private UUID preCheckinId;
 }

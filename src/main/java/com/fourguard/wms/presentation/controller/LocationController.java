@@ -33,7 +33,7 @@ public class LocationController {
     // =========================================================================
 
     @PostMapping
-    @PreAuthorize("hasAuthority('LOCATIONS_CREATE') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('LOCATIONS_CREATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     @Operation(summary = "Crear ubicación", description = "Registra una nueva posición de almacenamiento física con estado inicial ACTIVE.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Ubicación creada con éxito"),
@@ -51,7 +51,7 @@ public class LocationController {
     // =========================================================================
 
     @PutMapping
-    @PreAuthorize("hasAuthority('LOCATIONS_UPDATE') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('LOCATIONS_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     @Operation(
         summary = "Actualizar ubicación",
         description = "Actualiza los datos de una ubicación. Para cambiar el estado operativo usa PATCH /{id}/status."
@@ -74,7 +74,7 @@ public class LocationController {
     // =========================================================================
 
     @PatchMapping("/{id}/status")
-    @PreAuthorize("hasAuthority('LOCATIONS_UPDATE') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('LOCATIONS_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     @Operation(
         summary = "Cambiar estado de la ubicación",
         description = """
@@ -110,7 +110,7 @@ public class LocationController {
     // =========================================================================
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('LOCATIONS_READ') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('LOCATIONS_READ') or hasAuthority('LAYOUT_READ') or hasAuthority('RECEIVING_READ') or hasAuthority('INVENTORY_READ') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Obtener ubicación por ID", description = "Recupera los detalles de una ubicación específica por su UUID.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Ubicación encontrada con éxito"),
@@ -124,7 +124,7 @@ public class LocationController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAuthority('LOCATIONS_READ') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('LOCATIONS_READ') or hasAuthority('LAYOUT_READ') or hasAuthority('RECEIVING_READ') or hasAuthority('INVENTORY_READ') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(
         summary = "Obtener ubicaciones",
         description = "Recupera la lista de ubicaciones, opcionalmente filtrando por sucursal y estado de disponibilidad."
@@ -155,7 +155,7 @@ public class LocationController {
     // =========================================================================
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('LOCATIONS_DELETE') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('LOCATIONS_DELETE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     @Operation(summary = "Eliminar ubicación", description = "Elimina físicamente una ubicación del sistema por su ID.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Ubicación eliminada con éxito"),
@@ -173,7 +173,7 @@ public class LocationController {
     // =========================================================================
 
     @GetMapping("/{id}/audit")
-    @PreAuthorize("hasAuthority('LOCATIONS_READ') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('LOCATIONS_READ') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR')")
     @Operation(summary = "Historial de auditoría de la ubicación", description = "Devuelve el historial cronológico de cambios de una ubicación específica.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Historial de auditoría recuperado con éxito"),
@@ -191,7 +191,7 @@ public class LocationController {
     // =========================================================================
 
     @GetMapping("/bays/occupancy")
-    @PreAuthorize("hasAuthority('LOCATIONS_READ') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('WAREHOUSE_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('LOCATIONS_READ') or hasAuthority('LAYOUT_READ') or hasAuthority('RECEIVING_READ') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Matriz de ocupación y semáforo de bahías",
                description = "Calcula el porcentaje de ocupación con estándar de 22 pallets y semáforo verde/ámbar/rojo.")
     public ResponseEntity<ApiResponse<List<com.fourguard.wms.application.dto.response.BayOccupancyResponse>>> getBayOccupancy(

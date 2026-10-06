@@ -17,4 +17,7 @@ public interface CarrierRepositoryPort {
     boolean                 existsByTaxIdAndIdNot(String taxId, UUID excludeId);
     boolean                 existsByOrganizationIdAndTaxId(UUID organizationId, String taxId);
     boolean                 existsByOrganizationIdAndTaxIdAndIdNot(UUID organizationId, String taxId, UUID excludeId);
+
+    // Búsqueda directa indexada por RFC, nombre o razón social
+    Optional<CarrierEntity> findByOrganizationIdAndSearch(UUID organizationId, String search);
 }

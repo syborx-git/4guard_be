@@ -1017,8 +1017,10 @@ public class QualityService implements QualityUseCase {
     public byte[] exportDeviationsExcel(UUID organizationId, UUID branchId, Integer year, Integer month) {
         QualityMonthlyBoardResponse board = getMonthlyBoard(organizationId, branchId, year, month);
         StringBuilder csv = new StringBuilder();
+        // UTF-8 BOM (Byte Order Mark) para compatibilidad nativa con Microsoft Excel en Windows
+        csv.append('\uFEFF');
         csv.append("4GUARD WMS — CONCENTRADO DE KPIS DE CALIDAD Y DESVIACIONES\n");
-        csv.append(String.format("Periodo: %s %d | Almacén: %s\n\n", escapeCsvCell(board.getMonthName()), board.getYear(), escapeCsvCell(board.getBranchName())));
+        csv.append(String.format("Periodo: %s %d | Almacén: %s\n\n", board.getMonthName(), board.getYear(), board.getBranchName()));
         csv.append("MATRIZ DE 10 KPIS:\n");
         csv.append("No,KPI,Valor,Meta,Estatus\n");
         for (MonthlyKpiCardDto card : board.getKpiCards()) {
