@@ -278,14 +278,19 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
         WarehouseReceptionEntity entity = receptionRepositoryPort.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Recepción no encontrada: " + id));
 
+        boolean isCompletedStorageReallocation = entity.getStatus() == ReceptionStatus.COMPLETED &&
+                (request.getStorageLocationId() != null || (request.getStorageLocationCode() != null && !request.getStorageLocationCode().isBlank()));
+
         if (entity.getStatus() != ReceptionStatus.REGISTERED &&
             entity.getStatus() != ReceptionStatus.ASSIGNED &&
             entity.getStatus() != ReceptionStatus.IN_PROGRESS &&
-            entity.getStatus() != ReceptionStatus.DISCHARGED) {
+            entity.getStatus() != ReceptionStatus.DISCHARGED &&
+            !isCompletedStorageReallocation) {
             throw new ValidationException("No se pueden editar parámetros de una recepción en estado: " + entity.getStatus());
         }
 
         Map<String, Object> before = new HashMap<>();
+        if (entity.getStorageLocation() != null) before.put("storageLocation", entity.getStorageLocation().getCode() != null ? entity.getStorageLocation().getCode() : entity.getStorageLocation().getName());
         if (entity.getLotNumber() != null) before.put("lotNumber", entity.getLotNumber());
         if (entity.getPiecesPerPallet() != null) before.put("piecesPerPallet", entity.getPiecesPerPallet().stripTrailingZeros().toPlainString());
         if (entity.getForkliftOperator() != null) before.put("forkliftOperator", entity.getForkliftOperator().getFullName());
@@ -563,6 +568,7 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
         }
 
         Map<String, Object> after = new HashMap<>();
+        if (saved.getStorageLocation() != null) after.put("storageLocation", saved.getStorageLocation().getCode() != null ? saved.getStorageLocation().getCode() : saved.getStorageLocation().getName());
         if (saved.getLotNumber() != null) after.put("lotNumber", saved.getLotNumber());
         if (saved.getPiecesPerPallet() != null) after.put("piecesPerPallet", saved.getPiecesPerPallet().stripTrailingZeros().toPlainString());
         if (saved.getForkliftOperator() != null) after.put("forkliftOperator", saved.getForkliftOperator().getFullName());
@@ -594,8 +600,26 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
             }
         }
 
+        // Si la bahía cambió, sincronizar la ubicación física de los items de inventario asociados
+        boolean locationChanged = !java.util.Objects.equals(before.get("storageLocation"), after.get("storageLocation")) && saved.getStorageLocation() != null;
+        if (locationChanged) {
+            List<WarehouseReceptionPalletEntity> existingPallets = palletRepositoryPort.findByReceptionId(saved.getId());
+            for (WarehouseReceptionPalletEntity p : existingPallets) {
+                if (p.getInventoryItem() != null) {
+                    InventoryItemEntity it = p.getInventoryItem();
+                    it.setLocation(saved.getStorageLocation());
+                    inventoryItemRepositoryPort.save(it);
+                }
+            }
+        }
+
         String auditAction;
-        if (saved.getStatus() == ReceptionStatus.ASSIGNED) {
+        boolean isBayChangeOnly = locationChanged && (after.size() <= 2 || isCompletedStorageReallocation);
+        if (isCompletedStorageReallocation || (locationChanged && saved.getStatus() == ReceptionStatus.COMPLETED)) {
+            auditAction = "BAHIA_REUBICADA";
+        } else if (isBayChangeOnly) {
+            auditAction = "BAHIA_MODIFICADA";
+        } else if (saved.getStatus() == ReceptionStatus.ASSIGNED) {
             auditAction = "RECEPCION_ASIGNADA";
         } else if (saved.getStatus() == ReceptionStatus.IN_PROGRESS) {
             auditAction = "DESCARGA_INICIADA";
@@ -793,7 +817,7 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
             if (existing.isPresent()) {
                 WarehouseReceptionPalletEntity p = existing.get();
                 if (p.getPalletNumber() == null || p.getPalletNumber() <= 0) {
-                    p.setPalletNumber(item.getPalletNumber() != null && item.getPalletNumber() > 0 ? item.getPalletNumber() : ++currentMax);
+                    p.setPalletNumber(++currentMax);
                 }
                 p.setPieces(BigDecimal.valueOf(item.getPieces()));
                 p.setPalletType(pType);
@@ -808,12 +832,12 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
                 continue;
             }
 
-            int pNum = (item.getPalletNumber() != null && item.getPalletNumber() > 0)
-                    ? item.getPalletNumber()
-                    : ++currentMax;
-
-            if (pNum > currentMax) {
+            int pNum;
+            if (item.getPalletNumber() != null && item.getPalletNumber() > currentMax) {
+                pNum = item.getPalletNumber();
                 currentMax = pNum;
+            } else {
+                pNum = ++currentMax;
             }
 
             WarehouseReceptionPalletEntity palletEntity = WarehouseReceptionPalletEntity.builder()
@@ -1219,6 +1243,42 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
 
     @Override
     @Transactional
+    public ReceptionResponse reopenReception(UUID id, ReopenReceptionRequest request) {
+        WarehouseReceptionEntity reception = receptionRepositoryPort.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Recepción no encontrada: " + id));
+
+        if (reception.getStatus() != ReceptionStatus.COMPLETED) {
+            throw new ValidationException("Solo se pueden reabrir recepciones que se encuentren en estado Finalizado (COMPLETED). Estado actual: " + reception.getStatus());
+        }
+
+        if (request.getReason() == null || request.getReason().trim().isBlank()) {
+            throw new ValidationException("El motivo o justificación de reapertura es obligatorio.");
+        }
+
+        // Validate Supervisor / Admin Credentials
+        UserEntity authorizedUser = validateUserCredentials(request.getAdminUsername(), request.getAdminPassword(), "Supervisor / Administrador");
+        String authorizedByName = authorizedUser.getFirstName() + " " + authorizedUser.getLastName() + " (" + authorizedUser.getUsername() + ")";
+
+        String currentUser = securityAuditHelper.getCurrentUsername();
+        String oldStatus = reception.getStatus().name();
+
+        reception.setStatus(ReceptionStatus.IN_PROGRESS);
+        reception.setUpdatedBy(currentUser);
+
+        WarehouseReceptionEntity saved = receptionRepositoryPort.save(reception);
+
+        logAudit(saved.getId(), "RECEPCION_REABIERTA", authorizedUser,
+                Map.of("status", oldStatus),
+                Map.of("status", "IN_PROGRESS",
+                       "reopenedBy", authorizedByName,
+                       "reason", request.getReason().trim()));
+
+        List<WarehouseReceptionPalletEntity> pallets = palletRepositoryPort.findByReceptionId(saved.getId());
+        return buildReceptionResponse(saved, pallets);
+    }
+
+    @Override
+    @Transactional
     public ReceptionResponse changeRemision(UUID id, ChangeRemisionRequest request) {
         WarehouseReceptionEntity reception = receptionRepositoryPort.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Recepción no encontrada: " + id));
@@ -1447,7 +1507,11 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
             case "TARIMA_ELIMINADA" -> "Eliminación de Tarima";
             case "RECEPCION_COMPLETADA" -> "Descarga Finalizada y Cierre F01";
             case "RECEPCION_CANCELADA" -> "Cancelación Extraordinaria con Autorización";
+            case "RECEPCION_REABIERTA" -> "Reapertura Extraordinaria con Autorización";
+            case "BAHIA_REUBICADA" -> "Reubicación a Posición Fija Definitiva";
+            case "BAHIA_MODIFICADA" -> "Cambio de Bahía de Almacenamiento";
             case "REMISION_MODIFICADA" -> "Modificación de No. de Remisión";
+            case "FICHA_CASETA_MODIFICADA" -> "Modificación de Ficha Operativa de Arribo";
             case "LOTE_AGREGADO" -> "Lote Registrado en Recepción";
             case "LOTE_ELIMINADO" -> "Lote Eliminado de Recepción";
             case "UAS_RE_ETIQUETADAS" -> "Re-etiquetado de UAs / Generación SSCC";
@@ -1547,13 +1611,15 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
             case "status" -> "Estado Operativo";
             case "reason", "cancellationReason" -> "Motivo / Justificación";
             case "authorizedBy", "authorized_by" -> "Autorizado Por (Supervisor)";
+            case "reopenedBy", "reopened_by" -> "Reabierto Por (Supervisor)";
+            case "reopenReason", "reopen_reason" -> "Motivo de Reapertura";
             case "cancelledBy", "cancelled_by" -> "Cancelado Por";
             case "client", "clientId", "clientName" -> "Cliente / Propietario";
             case "supplier", "supplierId", "supplierName" -> "Proveedor";
             case "driver", "driverName" -> "Operador del Transporte";
             case "plates", "tractorPlates", "boxPlates" -> "Placas (Tractor / Caja)";
             case "carrier", "carrierId", "carrierName" -> "Línea Transportista";
-            case "storageLocation", "storageLocationId", "locationCode" -> "Bahía Asignada de Almacenaje";
+            case "storageLocation", "storageLocationId", "locationCode", "storageLocationCode" -> "Bahía Asignada de Almacenaje";
             case "lotNumber", "lot_number", "lot" -> "Número de Lote";
             case "piecesPerPallet", "pieces_per_pallet" -> "Piezas por Tarima";
             case "totalPallets", "pallets" -> "Tarimas Totales (UAs)";
@@ -2042,9 +2108,12 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
                     }
                 }
 
-                int nextPalletNum = existingPallets.stream()
-                        .mapToInt(p -> p.getPalletNumber() != null ? p.getPalletNumber() : 0)
-                        .max().orElse(0) + 1;
+                int maxNumber = palletRepositoryPort.findMaxPalletNumber();
+                if (reception.getOrganization() != null && reception.getBranch() != null) {
+                    int branchMax = palletRepositoryPort.findMaxPalletNumber(reception.getOrganization().getId(), reception.getBranch().getId());
+                    if (branchMax > maxNumber) maxNumber = branchMax;
+                }
+                int nextPalletNum = maxNumber + 1;
 
                 WarehouseReceptionPalletEntity newPallet = WarehouseReceptionPalletEntity.builder()
                         .reception(reception)
@@ -2120,10 +2189,13 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
                     .build();
         }
 
-        // Agregar tarima directa
-        int nextNum = existingPallets.stream()
-                .mapToInt(p -> p.getPalletNumber() != null ? p.getPalletNumber() : 0)
-                .max().orElse(0) + 1;
+        // Agregar tarima directa con consecutivo global
+        int maxGlobal = palletRepositoryPort.findMaxPalletNumber();
+        if (reception.getOrganization() != null && reception.getBranch() != null) {
+            int branchMax = palletRepositoryPort.findMaxPalletNumber(reception.getOrganization().getId(), reception.getBranch().getId());
+            if (branchMax > maxGlobal) maxGlobal = branchMax;
+        }
+        int nextNum = maxGlobal + 1;
 
         WarehouseReceptionPalletEntity stdPallet = WarehouseReceptionPalletEntity.builder()
                 .reception(reception)

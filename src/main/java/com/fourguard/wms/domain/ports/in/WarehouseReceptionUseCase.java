@@ -5,6 +5,7 @@ import com.fourguard.wms.application.dto.request.reception.CancelReceptionReques
 import com.fourguard.wms.application.dto.request.reception.ChangeRemisionRequest;
 import com.fourguard.wms.application.dto.request.reception.CompleteReceptionRequest;
 import com.fourguard.wms.application.dto.request.reception.CreateCheckInRequest;
+import com.fourguard.wms.application.dto.request.reception.ReopenReceptionRequest;
 import com.fourguard.wms.application.dto.request.reception.UpdatePalletRequest;
 import com.fourguard.wms.application.dto.request.reception.UpdateReceptionParametersRequest;
 import com.fourguard.wms.application.dto.response.reception.MovementAuditResponse;
@@ -80,6 +81,12 @@ public interface WarehouseReceptionUseCase {
      * Validates admin credentials against wms.users.
      */
     ReceptionResponse cancelReception(UUID id, CancelReceptionRequest request);
+
+    /**
+     * Reopens a completed reception with supervisor/admin authorization and reason,
+     * allowing forklift operators to scan and register omitted pallets.
+     */
+    ReceptionResponse reopenReception(UUID id, ReopenReceptionRequest request);
 
     /**
      * Updates the reception doc number (remisión) with audit trail.

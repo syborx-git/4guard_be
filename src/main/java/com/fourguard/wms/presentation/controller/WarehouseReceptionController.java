@@ -154,6 +154,19 @@ public class WarehouseReceptionController {
         return ResponseEntity.ok(ApiResponse.ok("Recepción cancelada con éxito", response));
     }
 
+    // ─── REOPEN RECEPTION (SUPERVISOR / ADMIN) ──────────────────────────────────
+
+    @PostMapping("/{id}/reopen")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasAuthority('RECEIVING_WRITE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('CEO')")
+    @Operation(summary = "Reapertura extraordinaria de recepción",
+               description = "Reabre una recepción finalizada para permitir el registro de pallets faltantes con autorización y motivo obligatorio.")
+    public ResponseEntity<ApiResponse<ReceptionResponse>> reopenReception(
+            @PathVariable UUID id,
+            @Valid @RequestBody ReopenReceptionRequest request) {
+        ReceptionResponse response = receptionUseCase.reopenReception(id, request);
+        return ResponseEntity.ok(ApiResponse.ok("Recepción reabierta con éxito para captura complementaria", response));
+    }
+
     // ─── CHANGE REMISIÓN ───────────────────────────────────────────────────────
 
     @PutMapping({"/{id}/change-shipping-note", "/{id}/change-document", "/{id}/change-waybill", "/{id}/change-remision"})

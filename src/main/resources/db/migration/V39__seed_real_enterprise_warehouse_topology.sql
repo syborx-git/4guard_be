@@ -175,4 +175,92 @@ BEGIN
         END LOOP;
 
     END LOOP;
+
+    -- 4. REASIGNACIÓN UNIVERSAL DE TODAS LAS UBICACIONES OBSOLETAS EN LOS 12 ALMACENES
+    DECLARE
+        r RECORD;
+        v_target_id UUID;
+        v_target_code VARCHAR(50);
+        v_legacy_zone VARCHAR(10);
+    BEGIN
+        FOR r IN (
+            SELECT id, code, zone, current_occupancy 
+            FROM wms.locations 
+            WHERE code NOT LIKE 'POS-%' 
+              AND code NOT LIKE 'LOC-RAMP-%'
+        ) LOOP
+            -- Determinar la letra del almacén (A..M) a partir del código o zona
+            v_legacy_zone := 'A';
+            IF r.code ~* 'LOC[-_]?(?:ALM[-_]?)?(?:Z)?([A-M])' THEN
+                v_legacy_zone := UPPER(SUBSTRING(r.code FROM '(?i)LOC[-_]?(?:ALM[-_]?)?(?:Z)?([A-M])'));
+            ELSIF r.zone ~* '^[A-M]$' THEN
+                v_legacy_zone := UPPER(r.zone);
+            END IF;
+            IF v_legacy_zone IS NULL OR v_legacy_zone = '' THEN
+                v_legacy_zone := 'A';
+            END IF;
+
+            -- Buscar la ubicación oficial POS-X-001
+            v_target_code := 'POS-' || v_legacy_zone || '-001';
+            SELECT id INTO v_target_id FROM wms.locations WHERE code = v_target_code LIMIT 1;
+
+            -- Si no existe POS-X-001, tomar la primera disponible de ese almacén
+            IF v_target_id IS NULL THEN
+                SELECT id, code INTO v_target_id, v_target_code 
+                FROM wms.locations 
+                WHERE code LIKE 'POS-' || v_legacy_zone || '-%' 
+                ORDER BY code ASC LIMIT 1;
+            END IF;
+
+            -- Fallback a POS-A-001
+            IF v_target_id IS NULL THEN
+                SELECT id, code INTO v_target_id, v_target_code FROM wms.locations WHERE code = 'POS-A-001' LIMIT 1;
+            END IF;
+
+            IF v_target_id IS NOT NULL THEN
+                -- A) Reasignar recepciones
+                UPDATE wms.warehouse_receptions 
+                SET storage_location_id = v_target_id, storage_location_code = v_target_code 
+                WHERE storage_location_id = r.id OR storage_location_code = r.code;
+
+                -- B) Reasignar pallets
+                UPDATE wms.pallets 
+                SET location_id = v_target_id, current_location = v_target_code 
+                WHERE location_id = r.id OR current_location = r.code;
+
+                -- C) Reasignar traspasos origen y destino
+                UPDATE wms.warehouse_transfers 
+                SET source_location_id = v_target_id 
+                WHERE source_location_id = r.id;
+
+                UPDATE wms.warehouse_transfers 
+                SET target_location_id = v_target_id 
+                WHERE target_location_id = r.id;
+
+                -- D) Reasignar transacciones de inventario si la tabla existe
+                IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'wms' AND table_name = 'inventory_transactions') THEN
+                    EXECUTE 'UPDATE wms.inventory_transactions SET location_id = $1 WHERE location_id = $2' 
+                    USING v_target_id, r.id;
+                END IF;
+
+                -- E) Reasignar lotes de inventario si la tabla existe
+                IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'wms' AND table_name = 'inventory_batches') THEN
+                    EXECUTE 'UPDATE wms.inventory_batches SET location_id = $1 WHERE location_id = $2' 
+                    USING v_target_id, r.id;
+                END IF;
+
+                -- F) Sumar ocupación si la ubicación legacy tenía inventario
+                IF r.current_occupancy IS NOT NULL AND r.current_occupancy > 0 THEN
+                    UPDATE wms.locations 
+                    SET current_occupancy = COALESCE(current_occupancy, 0) + r.current_occupancy 
+                    WHERE id = v_target_id;
+                END IF;
+            END IF;
+        END LOOP;
+
+        -- G) Eliminar definitivamente todas las ubicaciones legacy en los 12 almacenes (excepto rampas)
+        DELETE FROM wms.locations 
+        WHERE code NOT LIKE 'POS-%' 
+          AND code NOT LIKE 'LOC-RAMP-%';
+    END;
 END $$;
