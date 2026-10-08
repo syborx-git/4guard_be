@@ -235,6 +235,33 @@ public class WarehouseReceptionController {
         List<com.fourguard.wms.infrastructure.persistence.entity.InventoryAuditLogEntity> tree = receptionUseCase.getRemissionTree(folio);
         return ResponseEntity.ok(ApiResponse.ok("Árbol de vida de remisión obtenido con éxito", tree));
     }
+
+    // ─── AUTO-DETECCIÓN INTELIGENTE DE RETORNOS ─────────────────────────────────
+
+    @GetMapping("/detect-return")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasAuthority('RECEIVING_READ') or hasAuthority('SECURITY_GATE_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('FORKLIFT_OPERATOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
+    @Operation(summary = "Auto-Detección Inteligente de Retornos (Logística Inversa)",
+               description = "Busca si el documento/remisión, folio de salida o lote corresponde a un despacho histórico y retorna el manifiesto original.")
+    public ResponseEntity<ApiResponse<ReturnDetectionResponse>> detectReturn(
+            @RequestParam(required = false) UUID organizationId,
+            @RequestParam(required = false) UUID branchId,
+            @RequestParam String query) {
+        ReturnDetectionResponse response = receptionUseCase.detectReturn(organizationId, branchId, query);
+        return ResponseEntity.ok(ApiResponse.ok("Búsqueda de retorno ejecutada con éxito", response));
+    }
+
+    // ─── VERIFICACIÓN FÍSICA DE UA EN ANDÉN ───────────────────────────────────
+
+    @PostMapping("/{id}/verify-pallet")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasAuthority('RECEIVING_WRITE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('FORKLIFT_OPERATOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
+    @Operation(summary = "Verificación física de tarima/UA en andén",
+               description = "Valida y confirma el escaneo de un código de tarima en andén contra el manifiesto de retorno o recepción.")
+    public ResponseEntity<ApiResponse<VerifyPalletResponse>> verifyPallet(
+            @PathVariable UUID id,
+            @Valid @RequestBody VerifyPalletRequest request) {
+        VerifyPalletResponse response = receptionUseCase.verifyPallet(id, request);
+        return ResponseEntity.ok(ApiResponse.ok("Verificación de tarima completada", response));
+    }
 }
 
 

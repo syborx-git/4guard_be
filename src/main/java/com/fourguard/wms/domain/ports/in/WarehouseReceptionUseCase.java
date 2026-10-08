@@ -123,4 +123,21 @@ public interface WarehouseReceptionUseCase {
      * Deletes a lot from an open reception if no pallets are associated with it.
      */
     void deleteLot(UUID receptionId, UUID lotId);
+
+    /**
+     * Automatically detects if an incoming query (remission, outbound folio, lot, pallet)
+     * corresponds to a previous outbound dispatch (Logística Inversa / Retorno).
+     */
+    com.fourguard.wms.application.dto.response.reception.ReturnDetectionResponse detectReturn(
+            UUID organizationId,
+            UUID branchId,
+            String query);
+
+    /**
+     * Validates and marks an individual pallet code (UA/SSCC) scanned by a forklift operator
+     * in the unloading dock against the return manifest.
+     */
+    com.fourguard.wms.application.dto.response.reception.VerifyPalletResponse verifyPallet(
+            UUID receptionId,
+            com.fourguard.wms.application.dto.request.reception.VerifyPalletRequest request);
 }

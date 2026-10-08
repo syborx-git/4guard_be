@@ -68,5 +68,8 @@ public interface WarehouseMapLocationJpaRepository extends JpaRepository<Locatio
         ORDER BY wss.is_primary DESC, p.code ASC
     """, nativeQuery = true)
     List<Object[]> findAllSectionMaterials();
+
+    @Query("SELECT COUNT(l) FROM LocationEntity l WHERE l.section.id = :sectionId")
+    long countBySection_Id(@Param("sectionId") UUID sectionId);
 }
 

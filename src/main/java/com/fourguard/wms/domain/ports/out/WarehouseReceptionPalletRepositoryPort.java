@@ -14,6 +14,8 @@ public interface WarehouseReceptionPalletRepositoryPort {
 
     List<WarehouseReceptionPalletEntity> findByReceptionId(UUID receptionId);
 
+    List<WarehouseReceptionPalletEntity> findByReceptionIdIn(List<UUID> receptionIds);
+
     Optional<WarehouseReceptionPalletEntity> findById(UUID id);
 
     Optional<WarehouseReceptionPalletEntity> findByReceptionIdAndId(UUID receptionId, UUID palletId);

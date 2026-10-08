@@ -55,6 +55,7 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
     private final SecurityAuditHelper securityAuditHelper;
     private final PasswordEncoder passwordEncoder;
     private final WarehouseReceptionMapper receptionMapper;
+    private final WarehouseOutboundRepositoryPort outboundRepositoryPort;
     private final com.fourguard.wms.infrastructure.persistence.repository.SecurityPreCheckinJpaRepository preCheckinJpaRepository;
 
     @Override
@@ -404,6 +405,9 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
             if (storageLoc != null) {
                 entity.setStorageLocation(storageLoc);
             }
+        } else if (request.getStorageLocationCode() != null && !request.getStorageLocationCode().isBlank() && entity.getBranch() != null) {
+            locationRepositoryPort.findByBranchIdAndCode(entity.getBranch().getId(), request.getStorageLocationCode().trim())
+                    .ifPresent(entity::setStorageLocation);
         }
         if (entity.getStorageLocation() == null && entity.getBranch() != null) {
             LocationEntity autoStorage = allocateOptimalStorageLocation(entity.getBranch(), entity.getSku());
@@ -649,8 +653,19 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
 
         List<WarehouseReceptionEntity> entities = receptionRepositoryPort.findAll(
                 WarehouseReceptionSpecification.withFilters(organizationId, branchId, recStatus, cleanSearch));
+
+        if (entities.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<UUID> receptionIds = entities.stream().map(WarehouseReceptionEntity::getId).collect(Collectors.toList());
+        List<WarehouseReceptionPalletEntity> allPallets = palletRepositoryPort.findByReceptionIdIn(receptionIds);
+        Map<UUID, List<WarehouseReceptionPalletEntity>> palletsByRecId = allPallets.stream()
+                .filter(p -> p.getReception() != null && p.getReception().getId() != null)
+                .collect(Collectors.groupingBy(p -> p.getReception().getId()));
+
         return entities.stream().map(e -> {
-            List<WarehouseReceptionPalletEntity> pallets = palletRepositoryPort.findByReceptionId(e.getId());
+            List<WarehouseReceptionPalletEntity> pallets = palletsByRecId.getOrDefault(e.getId(), Collections.emptyList());
             return buildReceptionSummaryResponse(e, pallets);
         }).collect(Collectors.toList());
     }
@@ -1878,5 +1893,265 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
         }
 
         logAudit(receptionId, "LOTE_ELIMINADO", Map.of("lotNumber", lot.getLotNumber()), Map.of());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ReturnDetectionResponse detectReturn(UUID organizationId, UUID branchId, String query) {
+        if (query == null || query.trim().isBlank()) {
+            return ReturnDetectionResponse.builder().isReturn(false).build();
+        }
+
+        String cleanQuery = query.trim();
+        List<WarehouseOutboundEntity> matches = outboundRepositoryPort.searchOutboundsForReturn(organizationId, cleanQuery);
+
+        if (matches.isEmpty()) {
+            return ReturnDetectionResponse.builder().isReturn(false).build();
+        }
+
+        // Match más reciente
+        WarehouseOutboundEntity outbound = matches.get(0);
+
+        List<ExpectedReturnPalletDto> expected = new ArrayList<>();
+        if (outbound.getItems() != null) {
+            for (WarehouseOutboundItemEntity item : outbound.getItems()) {
+                ProductSkuEntity sku = item.getItem() != null ? item.getItem().getSku() : null;
+                expected.add(ExpectedReturnPalletDto.builder()
+                        .itemId(item.getItem() != null ? item.getItem().getId() : null)
+                        .palletCode(item.getPalletCode())
+                        .lotNumber(item.getLotNumber())
+                        .skuId(sku != null ? sku.getId() : null)
+                        .skuCode(sku != null ? sku.getCode() : null)
+                        .productName(sku != null ? sku.getName() : null)
+                        .pieces(item.getPieces())
+                        .expirationDate(item.getExpirationDate())
+                        .palletType("MADERA_ESTANDAR")
+                        .build());
+            }
+        }
+
+        return ReturnDetectionResponse.builder()
+                .isReturn(true)
+                .sourceOutboundId(outbound.getId())
+                .sourceOutboundFolio(outbound.getFolio())
+                .remisionNo(outbound.getRemisionNo())
+                .clientId(outbound.getClient() != null ? outbound.getClient().getId() : null)
+                .clientName(outbound.getClient() != null ? outbound.getClient().getName() : null)
+                .carrierId(outbound.getCarrier() != null ? outbound.getCarrier().getId() : null)
+                .carrierName(outbound.getCarrier() != null ? outbound.getCarrier().getName() : null)
+                .driverName(outbound.getDriverName())
+                .tractorPlates(outbound.getTractorPlates())
+                .boxPlates(outbound.getBoxPlates())
+                .dispatchedAt(outbound.getCompletedAt() != null ? outbound.getCompletedAt() : outbound.getCreatedAt())
+                .totalPallets(outbound.getTotalPallets() != null && outbound.getTotalPallets() > 0 ? outbound.getTotalPallets() : expected.size())
+                .totalPieces(outbound.getTotalPieces())
+                .destinationName(outbound.getDestinationName())
+                .expectedPallets(expected)
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public VerifyPalletResponse verifyPallet(UUID receptionId, VerifyPalletRequest request) {
+        if (request == null || request.getPalletCode() == null || request.getPalletCode().trim().isBlank()) {
+            throw new ValidationException("El código de tarima (UA) es obligatorio para la verificación.");
+        }
+
+        WarehouseReceptionEntity reception = receptionRepositoryPort.findById(receptionId)
+                .orElseThrow(() -> new EntityNotFoundException("Recepción no encontrada: " + receptionId));
+
+        if (reception.getStatus() == ReceptionStatus.CANCELLED) {
+            throw new ValidationException("No se pueden verificar tarimas en una recepción cancelada.");
+        }
+
+        String rawCode = request.getPalletCode().trim();
+        List<WarehouseReceptionPalletEntity> existingPallets = palletRepositoryPort.findByReceptionId(receptionId);
+
+        // 1. Revisar si ya fue verificada y registrada previamente en esta recepción
+        Optional<WarehouseReceptionPalletEntity> alreadyRegistered = existingPallets.stream()
+                .filter(p -> rawCode.equalsIgnoreCase(p.getPalletCode()) || rawCode.equalsIgnoreCase(p.getSupplierUaCode()) || rawCode.equalsIgnoreCase(p.getInternalUaCode()))
+                .findFirst();
+
+        boolean isReturn = "REENTRY".equalsIgnoreCase(reception.getOperationType()) || reception.getSourceOutboundId() != null;
+
+        if (isReturn && reception.getSourceOutboundId() != null) {
+            WarehouseOutboundEntity outbound = outboundRepositoryPort.findById(reception.getSourceOutboundId()).orElse(null);
+            if (outbound != null && outbound.getItems() != null) {
+                int totalExpected = outbound.getItems().size();
+
+                if (alreadyRegistered.isPresent()) {
+                    WarehouseReceptionPalletEntity p = alreadyRegistered.get();
+                    int verifiedCount = existingPallets.size();
+                    return VerifyPalletResponse.builder()
+                            .valid(true)
+                            .status("ALREADY_VERIFIED")
+                            .palletId(p.getId())
+                            .palletCode(p.getPalletCode())
+                            .lotNumber(p.getLotNumber())
+                            .skuCode(p.getSku() != null ? p.getSku().getCode() : null)
+                            .productName(p.getSku() != null ? p.getSku().getName() : null)
+                            .pieces(p.getPieces())
+                            .expirationDate(p.getExpirationDate())
+                            .verifiedCount(verifiedCount)
+                            .totalExpected(totalExpected)
+                            .remainingCount(Math.max(0, totalExpected - verifiedCount))
+                            .message("La tarima '" + rawCode + "' ya se encuentra escaneada y validada en esta recepción.")
+                            .build();
+                }
+
+                // Buscar en los items de la salida
+                Optional<WarehouseOutboundItemEntity> matchedOutboundItem = outbound.getItems().stream()
+                        .filter(i -> rawCode.equalsIgnoreCase(i.getPalletCode()))
+                        .findFirst();
+
+                if (matchedOutboundItem.isEmpty()) {
+                    // Discrepancia: La UA no pertenece a la salida
+                    int verifiedCount = existingPallets.size();
+                    return VerifyPalletResponse.builder()
+                            .valid(false)
+                            .status("DISCREPANCY")
+                            .palletCode(rawCode)
+                            .verifiedCount(verifiedCount)
+                            .totalExpected(totalExpected)
+                            .remainingCount(Math.max(0, totalExpected - verifiedCount))
+                            .message("🛑 Discrepancia: La tarima '" + rawCode + "' no pertenece al manifiesto de salida " + (reception.getSourceOutboundFolio() != null ? reception.getSourceOutboundFolio() : ""))
+                            .build();
+                }
+
+                WarehouseOutboundItemEntity outItem = matchedOutboundItem.get();
+                ProductSkuEntity sku = outItem.getItem() != null ? outItem.getItem().getSku() : reception.getSku();
+                String targetLot = outItem.getLotNumber() != null ? outItem.getLotNumber() : reception.getLotNumber();
+                java.time.LocalDate targetExp = outItem.getExpirationDate() != null ? outItem.getExpirationDate() : reception.getExpirationDate();
+
+                // Asegurar registro de lote en reception_lots si aplica
+                WarehouseReceptionLotEntity matchedLot = null;
+                if (targetLot != null) {
+                    matchedLot = lotRepositoryPort.findByReceptionIdAndLotNumber(receptionId, targetLot).orElse(null);
+                    if (matchedLot == null) {
+                        WarehouseReceptionLotEntity autoLot = WarehouseReceptionLotEntity.builder()
+                                .organization(reception.getOrganization())
+                                .branch(reception.getBranch())
+                                .reception(reception)
+                                .sku(sku)
+                                .lotNumber(targetLot)
+                                .expirationDate(targetExp)
+                                .shelfLifeDaysRemaining(365)
+                                .shelfLifeStatus("APPROVED")
+                                .build();
+                        matchedLot = lotRepositoryPort.save(autoLot);
+                    }
+                }
+
+                int nextPalletNum = existingPallets.stream()
+                        .mapToInt(p -> p.getPalletNumber() != null ? p.getPalletNumber() : 0)
+                        .max().orElse(0) + 1;
+
+                WarehouseReceptionPalletEntity newPallet = WarehouseReceptionPalletEntity.builder()
+                        .reception(reception)
+                        .receptionLot(matchedLot)
+                        .palletNumber(nextPalletNum)
+                        .palletCode(rawCode)
+                        .supplierUaCode(rawCode)
+                        .internalUaCode(null)
+                        .isUaRelabelled(false)
+                        .lotNumber(targetLot)
+                        .expirationDate(targetExp)
+                        .sku(sku != null ? sku : reception.getSku())
+                        .supplier(reception.getSupplier())
+                        .pieces(outItem.getPieces() != null ? outItem.getPieces() : BigDecimal.ZERO)
+                        .palletType(PalletType.MADERA_ESTANDAR)
+                        .observations("Tarima verificada por montacarguista en andén (Retorno " + (reception.getSourceOutboundFolio() != null ? reception.getSourceOutboundFolio() : "") + ")")
+                        .build();
+
+                WarehouseReceptionPalletEntity savedPallet = palletRepositoryPort.save(newPallet);
+
+                // Tree of life audit log
+                try {
+                    inventoryAuditLogRepositoryPort.save(InventoryAuditLogEntity.builder()
+                            .organization(reception.getOrganization())
+                            .pallet(savedPallet)
+                            .palletCode(rawCode)
+                            .remisionFolio(reception.getFolio())
+                            .eventType("REENTRY_PALLET_VERIFIED")
+                            .targetLocation(reception.getRamp() != null ? reception.getRamp().getCode() : "ANDEN")
+                            .performedBy(securityAuditHelper.getCurrentUsername())
+                            .reason("Tarima de retorno validada físicamente por escaneo en andén")
+                            .metadata(Map.of(
+                                    "sourceOutboundFolio", reception.getSourceOutboundFolio() != null ? reception.getSourceOutboundFolio() : "",
+                                    "lotNumber", targetLot != null ? targetLot : "",
+                                    "pieces", outItem.getPieces() != null ? outItem.getPieces().toString() : "0"
+                            ))
+                            .build());
+                } catch (Exception ignored) {}
+
+                int verifiedCount = existingPallets.size() + 1;
+                return VerifyPalletResponse.builder()
+                        .valid(true)
+                        .status("VERIFIED")
+                        .palletId(savedPallet.getId())
+                        .palletCode(rawCode)
+                        .lotNumber(targetLot)
+                        .skuCode(sku != null ? sku.getCode() : null)
+                        .productName(sku != null ? sku.getName() : null)
+                        .pieces(savedPallet.getPieces())
+                        .expirationDate(targetExp)
+                        .verifiedCount(verifiedCount)
+                        .totalExpected(totalExpected)
+                        .remainingCount(Math.max(0, totalExpected - verifiedCount))
+                        .message("✅ Tarima " + verifiedCount + " de " + totalExpected + " validada exitosamente contra el manifiesto de retorno.")
+                        .build();
+            }
+        }
+
+        // Modo estándar (si no es retorno)
+        if (alreadyRegistered.isPresent()) {
+            WarehouseReceptionPalletEntity p = alreadyRegistered.get();
+            return VerifyPalletResponse.builder()
+                    .valid(true)
+                    .status("ALREADY_VERIFIED")
+                    .palletId(p.getId())
+                    .palletCode(p.getPalletCode())
+                    .lotNumber(p.getLotNumber())
+                    .pieces(p.getPieces())
+                    .verifiedCount(existingPallets.size())
+                    .totalExpected(existingPallets.size())
+                    .remainingCount(0)
+                    .message("La tarima ya se encuentra registrada en esta recepción.")
+                    .build();
+        }
+
+        // Agregar tarima directa
+        int nextNum = existingPallets.stream()
+                .mapToInt(p -> p.getPalletNumber() != null ? p.getPalletNumber() : 0)
+                .max().orElse(0) + 1;
+
+        WarehouseReceptionPalletEntity stdPallet = WarehouseReceptionPalletEntity.builder()
+                .reception(reception)
+                .palletNumber(nextNum)
+                .palletCode(rawCode)
+                .supplierUaCode(rawCode)
+                .isUaRelabelled(false)
+                .lotNumber(reception.getLotNumber())
+                .expirationDate(reception.getExpirationDate())
+                .sku(reception.getSku())
+                .supplier(reception.getSupplier())
+                .pieces(reception.getPiecesPerPallet() != null ? reception.getPiecesPerPallet() : BigDecimal.ZERO)
+                .palletType(reception.getPalletType() != null ? reception.getPalletType() : PalletType.MADERA_ESTANDAR)
+                .build();
+
+        WarehouseReceptionPalletEntity saved = palletRepositoryPort.save(stdPallet);
+
+        return VerifyPalletResponse.builder()
+                .valid(true)
+                .status("VERIFIED")
+                .palletId(saved.getId())
+                .palletCode(rawCode)
+                .lotNumber(saved.getLotNumber())
+                .pieces(saved.getPieces())
+                .verifiedCount(existingPallets.size() + 1)
+                .totalExpected(existingPallets.size() + 1)
+                .remainingCount(0)
+                .message("Tarima registrada y verificada.")
+                .build();
     }
 }

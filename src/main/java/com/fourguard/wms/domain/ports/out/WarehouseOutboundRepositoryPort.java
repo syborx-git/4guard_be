@@ -24,5 +24,7 @@ public interface WarehouseOutboundRepositoryPort {
 
     List<WarehouseOutboundEntity> findAll(org.springframework.data.jpa.domain.Specification<WarehouseOutboundEntity> spec);
 
+    List<WarehouseOutboundEntity> searchOutboundsForReturn(UUID organizationId, String query);
+
     long nextFolioSequenceValue();
 }

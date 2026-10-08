@@ -28,6 +28,7 @@ public class UpdateReceptionParametersRequest {
     private String palletType;
 
     private UUID storageLocationId;
+    private String storageLocationCode;
 
     /** Optional: Assigned forklift operator */
     private UUID forkliftOperatorId;

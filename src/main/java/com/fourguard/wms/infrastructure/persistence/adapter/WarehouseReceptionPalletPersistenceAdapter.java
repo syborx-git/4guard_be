@@ -22,6 +22,14 @@ public class WarehouseReceptionPalletPersistenceAdapter implements WarehouseRece
     }
 
     @Override
+    public List<WarehouseReceptionPalletEntity> findByReceptionIdIn(List<UUID> receptionIds) {
+        if (receptionIds == null || receptionIds.isEmpty()) {
+            return List.of();
+        }
+        return repository.findByReceptionIdIn(receptionIds);
+    }
+
+    @Override
     public Optional<WarehouseReceptionPalletEntity> findById(UUID id) {
         return repository.findById(id);
     }

@@ -71,6 +71,40 @@ public class WarehouseMapController {
         return ResponseEntity.ok(ApiResponse.ok("Estado de la posición actualizado con éxito", response));
     }
 
+    @PostMapping("/positions")
+    @PreAuthorize("hasAuthority('LOCATIONS_CREATE') or hasAuthority('LAYOUT_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR')")
+    @Operation(summary = "Dar de alta una nueva posición/bahía", description = "Crea una posición fija, temporal de buffer o precarga en la sección de almacén.")
+    public ResponseEntity<ApiResponse<PositionMapDetailResponse>> createPosition(
+            @Valid @RequestBody com.fourguard.wms.application.dto.request.map.CreatePositionMapRequest request,
+            Authentication authentication) {
+        String username = authentication != null ? authentication.getName() : "SYSTEM";
+        PositionMapDetailResponse response = mapUseCase.createPosition(request, username);
+        return ResponseEntity.ok(ApiResponse.ok("Posición registrada con éxito", response));
+    }
+
+    @PutMapping("/positions/{positionId}")
+    @PreAuthorize("hasAuthority('LOCATIONS_UPDATE') or hasAuthority('LAYOUT_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR')")
+    @Operation(summary = "Actualizar configuración y capacidad de una posición", description = "Modifica la capacidad en tarimas, categoría, o coordenadas físicas.")
+    public ResponseEntity<ApiResponse<PositionMapDetailResponse>> updatePositionDetails(
+            @PathVariable UUID positionId,
+            @Valid @RequestBody com.fourguard.wms.application.dto.request.map.UpdatePositionDetailsMapRequest request,
+            Authentication authentication) {
+        String username = authentication != null ? authentication.getName() : "SYSTEM";
+        PositionMapDetailResponse response = mapUseCase.updatePositionDetails(positionId, request, username);
+        return ResponseEntity.ok(ApiResponse.ok("Posición actualizada con éxito", response));
+    }
+
+    @DeleteMapping("/positions/{positionId}")
+    @PreAuthorize("hasAuthority('LOCATIONS_DELETE') or hasAuthority('LAYOUT_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR')")
+    @Operation(summary = "Dar de baja una posición/bahía", description = "Inhabilita o da de baja lógica la posición si no tiene inventario activo.")
+    public ResponseEntity<ApiResponse<Void>> deletePosition(
+            @PathVariable UUID positionId,
+            Authentication authentication) {
+        String username = authentication != null ? authentication.getName() : "SYSTEM";
+        mapUseCase.deletePosition(positionId, username);
+        return ResponseEntity.ok(ApiResponse.ok("Posición dada de baja con éxito", null));
+    }
+
     @GetMapping("/catalogs/block-reasons")
     @PreAuthorize("hasAuthority('INVENTORY_READ') or hasAuthority('LAYOUT_READ') or hasAuthority('QUALITY_READ') or hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasAuthority('RECEIVING_READ') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('FORKLIFT_OPERATOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Obtener motivos de bloqueo QM", description = "Retorna el catálogo normalizado de causas de bloqueo para inspección de calidad.")
