@@ -22,6 +22,10 @@ public class ReceptionSummaryResponse {
     private UUID id;
     private String folio;
     private String status;
+    private String operationType;
+    private UUID sourceOutboundId;
+    private String sourceOutboundFolio;
+    private String reentryReason;
 
     // Check-in summary
     private String docNumber;

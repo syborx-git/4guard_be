@@ -42,6 +42,8 @@ public class UpdateReceptionParametersRequest {
     private String status;
 
     private String observations;
+    private String authorizedByOpsManager;
+    private String opsManagerReason;
 
     // ── Caseta / Transport Data Updates ──
     private String tractorPlates;

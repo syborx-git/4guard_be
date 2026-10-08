@@ -31,4 +31,6 @@ public interface WarehouseReceptionPalletRepositoryPort {
     int findMaxPalletNumber();
 
     int findMaxPalletNumber(UUID orgId, UUID branchId);
+
+    List<WarehouseReceptionPalletEntity> findByPalletCodeIn(List<String> palletCodes);
 }

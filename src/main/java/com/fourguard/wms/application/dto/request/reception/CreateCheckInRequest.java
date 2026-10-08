@@ -87,4 +87,13 @@ public class CreateCheckInRequest {
     private String noCartaPorte;
     /** Optional: Linked security pre-checkin pass UUID */
     private UUID preCheckinId;
+    private String authorizedByOpsManager;
+    private String opsManagerReason;
+
+    /** Reentry / Reverse logistics (ADR-021) */
+    private String operationType;
+    private UUID sourceOutboundId;
+    private String sourceOutboundFolio;
+    private String reentryReason;
+    private String reentryNotes;
 }

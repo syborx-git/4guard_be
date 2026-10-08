@@ -27,7 +27,7 @@ public class WarehouseMapController {
     private final WarehouseMapUseCase mapUseCase;
 
     @GetMapping("/topology")
-    @PreAuthorize("hasAuthority('INVENTORY_READ') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('INVENTORY_READ') or hasAuthority('LAYOUT_READ') or hasAuthority('SECTIONS_READ') or hasAuthority('LOCATIONS_READ') or hasAuthority('RECEIVING_READ') or hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasAuthority('QUALITY_READ') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('FORKLIFT_OPERATOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Obtener topología 2D completa", description = "Retorna las naves del almacén con coordenadas SVG y métricas agregadas de ocupación.")
     public ResponseEntity<ApiResponse<WarehouseTopologyResponse>> getTopology(
             @RequestParam UUID branchId) {
@@ -36,7 +36,7 @@ public class WarehouseMapController {
     }
 
     @GetMapping("/sections/{sectionId}/positions")
-    @PreAuthorize("hasAuthority('INVENTORY_READ') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('INVENTORY_READ') or hasAuthority('LAYOUT_READ') or hasAuthority('SECTIONS_READ') or hasAuthority('LOCATIONS_READ') or hasAuthority('RECEIVING_READ') or hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasAuthority('QUALITY_READ') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('FORKLIFT_OPERATOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Consultar posiciones de una sección", description = "Retorna la cuadrícula de posiciones de una nave con filtros de estado y búsqueda.")
     public ResponseEntity<ApiResponse<List<PositionMapDetailResponse>>> getPositionsBySection(
             @PathVariable UUID sectionId,
@@ -47,7 +47,7 @@ public class WarehouseMapController {
     }
 
     @GetMapping("/positions")
-    @PreAuthorize("hasAuthority('INVENTORY_READ') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('INVENTORY_READ') or hasAuthority('LAYOUT_READ') or hasAuthority('SECTIONS_READ') or hasAuthority('LOCATIONS_READ') or hasAuthority('RECEIVING_READ') or hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasAuthority('QUALITY_READ') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('FORKLIFT_OPERATOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Consultar todas las posiciones/bahías", description = "Retorna la cuadrícula completa de posiciones de la sucursal o filtrada por sección para la tabla de Consulta de Bahías.")
     public ResponseEntity<ApiResponse<List<PositionMapDetailResponse>>> getAllPositions(
             @RequestParam UUID branchId,
@@ -60,7 +60,7 @@ public class WarehouseMapController {
 
 
     @PatchMapping("/positions/{positionId}/status")
-    @PreAuthorize("hasAuthority('LOCATIONS_UPDATE') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('LOCATIONS_UPDATE') or hasAuthority('INVENTORY_UPDATE') or hasAuthority('QUALITY_UPDATE') or hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('FORKLIFT_OPERATOR')")
     @Operation(summary = "Actualizar estado operativo de posición", description = "Ejecuta transiciones FSM: BLOCK (bloqueo QM), RELEASE (liberación) u OCCUPY.")
     public ResponseEntity<ApiResponse<PositionMapDetailResponse>> updatePositionStatus(
             @PathVariable UUID positionId,
@@ -72,7 +72,7 @@ public class WarehouseMapController {
     }
 
     @GetMapping("/catalogs/block-reasons")
-    @PreAuthorize("hasAuthority('INVENTORY_READ') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('INVENTORY_READ') or hasAuthority('LAYOUT_READ') or hasAuthority('QUALITY_READ') or hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasAuthority('RECEIVING_READ') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('FORKLIFT_OPERATOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Obtener motivos de bloqueo QM", description = "Retorna el catálogo normalizado de causas de bloqueo para inspección de calidad.")
     public ResponseEntity<ApiResponse<List<CatBlockReasonResponse>>> getBlockReasons() {
         List<CatBlockReasonResponse> response = mapUseCase.getActiveBlockReasons();

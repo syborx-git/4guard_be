@@ -3,10 +3,8 @@ package com.fourguard.wms.domain.ports.in;
 import com.fourguard.wms.application.dto.request.security.DriverCheckinSubmissionRequest;
 import com.fourguard.wms.application.dto.request.security.GeneratePassRequest;
 import com.fourguard.wms.application.dto.request.security.GuardCheckinCompletionRequest;
-import com.fourguard.wms.application.dto.response.security.PassResponse;
-
 import com.fourguard.wms.application.dto.request.security.GuardCheckOutRequest;
-
+import com.fourguard.wms.application.dto.response.security.PassResponse;
 import com.fourguard.wms.application.dto.response.security.SecurityGatePublicCatalogsResponse;
 
 import java.util.List;
@@ -29,6 +27,10 @@ public interface SecurityGateUseCase {
     List<PassResponse> getHistoryPasses(UUID organizationId, UUID branchId, String search);
 
     PassResponse completeCheckin(String token, GuardCheckinCompletionRequest request);
+
+    default PassResponse checkOut(String tokenOrFolio) {
+        return checkOut(tokenOrFolio, new GuardCheckOutRequest());
+    }
 
     PassResponse checkOut(String tokenOrFolio, GuardCheckOutRequest request);
 

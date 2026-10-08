@@ -65,4 +65,9 @@ public class WarehouseReceptionPalletPersistenceAdapter implements WarehouseRece
     public int findMaxPalletNumber(UUID orgId, UUID branchId) {
         return repository.findMaxPalletNumberByOrgAndBranch(orgId, branchId);
     }
+
+    @Override
+    public List<WarehouseReceptionPalletEntity> findByPalletCodeIn(List<String> palletCodes) {
+        return repository.findByPalletCodeIn(palletCodes);
+    }
 }
