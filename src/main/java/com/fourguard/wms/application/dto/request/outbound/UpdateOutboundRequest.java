@@ -21,6 +21,7 @@ public class UpdateOutboundRequest {
 
     private UUID rampId;
     private Integer rampNumber;
+    private String rampCode;
 
     private UUID forkliftOperatorId;
     private String forkliftOperatorName;
