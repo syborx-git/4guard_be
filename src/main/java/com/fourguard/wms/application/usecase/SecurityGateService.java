@@ -210,10 +210,24 @@ public  class SecurityGateService implements SecurityGateUseCase {
         String searchToken = token.trim().toUpperCase();
         SecurityPreCheckinEntity entity = preCheckinJpaRepository.findByToken(searchToken)
                 .orElseGet(() -> {
-                    OrganizationEntity org = organizationRepositoryPort.findAll().stream().findFirst()
-                            .orElseThrow(() -> new EntityNotFoundException("No se encontró organización por defecto"));
-                    BranchEntity br = branchRepositoryPort.findByOrganizationId(org.getId()).stream().findFirst()
-                            .orElseThrow(() -> new EntityNotFoundException("No se encontró sucursal por defecto"));
+                    OrganizationEntity org = null;
+                    if (request.getOrganizationId() != null) {
+                        org = organizationRepositoryPort.findById(request.getOrganizationId()).orElse(null);
+                    }
+                    if (org == null) {
+                        org = organizationRepositoryPort.findAll().stream().findFirst()
+                                .orElseThrow(() -> new EntityNotFoundException("No se encontró organización por defecto"));
+                    }
+
+                    BranchEntity br = null;
+                    if (request.getBranchId() != null) {
+                        br = branchRepositoryPort.findById(request.getBranchId()).orElse(null);
+                    }
+                    if (br == null) {
+                        br = branchRepositoryPort.findByOrganizationId(org.getId()).stream().findFirst()
+                                .orElseThrow(() -> new EntityNotFoundException("No se encontró sucursal por defecto"));
+                    }
+
                     SecurityPreCheckinEntity newPre = SecurityPreCheckinEntity.builder()
                             .token(searchToken)
                             .organization(org)

@@ -18,6 +18,10 @@ public class DriverCheckinSubmissionRequest {
     @NotBlank(message = "El tipo de operación es obligatorio (CARGA o DESCARGA)")
     private String operationType;
 
+    // Organización y Sucursal (opcional en check-in estático)
+    private java.util.UUID organizationId;
+    private java.util.UUID branchId;
+
     // Documentos
     private String docNumber;
     private String noCartaPorte;
