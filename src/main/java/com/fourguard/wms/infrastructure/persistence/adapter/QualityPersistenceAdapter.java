@@ -7,15 +7,19 @@ import com.fourguard.wms.domain.enums.ReleaseDestination;
 import com.fourguard.wms.domain.ports.out.QualityRepositoryPort;
 import com.fourguard.wms.infrastructure.persistence.entity.IncidenceEntity;
 import com.fourguard.wms.infrastructure.persistence.entity.LoadVerificationEntity;
+import com.fourguard.wms.infrastructure.persistence.entity.QualityDeviationEntity;
 import com.fourguard.wms.infrastructure.persistence.entity.QualityReleaseEntity;
 import com.fourguard.wms.infrastructure.persistence.repository.IncidenceJpaRepository;
 import com.fourguard.wms.infrastructure.persistence.repository.LoadVerificationJpaRepository;
 import com.fourguard.wms.infrastructure.persistence.repository.QualityReleaseJpaRepository;
+import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.time.Year;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -28,6 +32,7 @@ public class QualityPersistenceAdapter implements QualityRepositoryPort {
     private final IncidenceJpaRepository incidenceRepository;
     private final QualityReleaseJpaRepository releaseRepository;
     private final LoadVerificationJpaRepository verificationRepository;
+    private final com.fourguard.wms.infrastructure.persistence.repository.QualityDeviationJpaRepository deviationRepository;
 
     // ── 1. Bloqueos y PNC (Incidences) ─────────────────────────────────────────
 
@@ -149,7 +154,6 @@ public class QualityPersistenceAdapter implements QualityRepositoryPort {
     }
 
     // ── 4. Reclamos e Incidencias ─────────────────────────────────────────────
-
     @Override
     public List<IncidenceEntity> findClaimsByBranch(UUID branchId, DetectionStage stage, LocalDate startDate, LocalDate endDate) {
         List<IncidenceEntity> list = incidenceRepository.findByItemBranchIdOrderByCreatedAtDesc(branchId);
@@ -158,5 +162,60 @@ public class QualityPersistenceAdapter implements QualityRepositoryPort {
                 .filter(i -> startDate == null || (i.getCreatedAt() != null && !i.getCreatedAt().toLocalDate().isBefore(startDate)))
                 .filter(i -> endDate == null || (i.getCreatedAt() != null && !i.getCreatedAt().toLocalDate().isAfter(endDate)))
                 .toList();
+    }
+
+    // ── 5. Desviaciones de Calidad (Nativas & KPIs) ───────────────────────────
+    @Override
+    public com.fourguard.wms.infrastructure.persistence.entity.QualityDeviationEntity saveDeviation(
+            com.fourguard.wms.infrastructure.persistence.entity.QualityDeviationEntity entity) {
+        return deviationRepository.saveAndFlush(Objects.requireNonNull(entity));
+    }
+
+    @Override
+    public Optional<com.fourguard.wms.infrastructure.persistence.entity.QualityDeviationEntity> findDeviationById(UUID id) {
+        return deviationRepository.findById(Objects.requireNonNull(id));
+    }
+
+    @Override
+    public Optional<com.fourguard.wms.infrastructure.persistence.entity.QualityDeviationEntity> findDeviationByFolio(String folio) {
+        return deviationRepository.findByFolio(folio);
+    }
+
+    @Override
+    public List<QualityDeviationEntity> findDeviationsByBranch(
+            UUID branchId, String materialType, String rootCause, LocalDate startDate, LocalDate endDate) {
+        Specification<QualityDeviationEntity> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+
+            if (branchId != null) {
+                predicates.add(cb.equal(root.get("branch").get("id"), branchId));
+            }
+            if (materialType != null && !materialType.isBlank() && !"ALL".equalsIgnoreCase(materialType)) {
+                predicates.add(cb.equal(root.get("materialType"), materialType));
+            }
+            if (rootCause != null && !rootCause.isBlank() && !"ALL".equalsIgnoreCase(rootCause)) {
+                predicates.add(cb.equal(root.get("rootCauseMotive"), rootCause));
+            }
+            if (startDate != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("deviationDate"), startDate));
+            }
+            if (endDate != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("deviationDate"), endDate));
+            }
+
+            if (query != null) {
+                query.orderBy(cb.desc(root.get("deviationDate")), cb.desc(root.get("createdAt")));
+            }
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+
+        return deviationRepository.findAll(spec);
+    }
+
+    @Override
+    public String generateNextDeviationFolio(UUID organizationId) {
+        long count = deviationRepository.countByOrganizationId(organizationId);
+        int currentYear = Year.now().getValue();
+        return String.format("DEV-%d-%04d", currentYear, count + 1);
     }
 }

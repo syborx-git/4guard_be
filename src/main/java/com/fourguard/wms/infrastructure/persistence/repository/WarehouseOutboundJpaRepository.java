@@ -22,6 +22,23 @@ public interface WarehouseOutboundJpaRepository extends
 
     Optional<WarehouseOutboundEntity> findByFolio(String folio);
 
+    List<WarehouseOutboundEntity> findByRemisionNoIgnoreCase(String remisionNo);
+
+    @Query("""
+        SELECT DISTINCT o FROM WarehouseOutboundEntity o
+        LEFT JOIN FETCH o.items i
+        WHERE (:organizationId IS NULL OR o.organization.id = :organizationId)
+          AND (UPPER(o.folio) = UPPER(:query)
+           OR UPPER(o.remisionNo) = UPPER(:query)
+           OR UPPER(i.lotNumber) = UPPER(:query)
+           OR UPPER(i.palletCode) = UPPER(:query))
+        ORDER BY o.createdAt DESC
+    """)
+    List<WarehouseOutboundEntity> searchOutboundsForReturn(
+        @org.springframework.data.repository.query.Param("organizationId") UUID organizationId,
+        @org.springframework.data.repository.query.Param("query") String query
+    );
+
     @Query(value = "SELECT nextval('wms.seq_outbound_folio')", nativeQuery = true)
     long getNextFolioSequenceValue();
 }

@@ -71,6 +71,19 @@ public class WarehouseReceptionLotEntity {
     @Column(columnDefinition = "TEXT")
     private String observations;
 
+    @Column(name = "requires_ops_authorization")
+    @Builder.Default
+    private Boolean requiresOpsAuthorization = false;
+
+    @Column(name = "authorized_by_ops_manager", length = 120)
+    private String authorizedByOpsManager;
+
+    @Column(name = "ops_manager_reason", columnDefinition = "TEXT")
+    private String opsManagerReason;
+
+    @Column(name = "ops_authorization_date")
+    private OffsetDateTime opsAuthorizationDate;
+
     @Version
     @Column(nullable = false)
     @Builder.Default

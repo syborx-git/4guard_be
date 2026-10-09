@@ -49,6 +49,14 @@ public class WarehouseOutboundPersistenceAdapter implements WarehouseOutboundRep
     }
 
     @Override
+    public List<WarehouseOutboundEntity> searchOutboundsForReturn(UUID organizationId, String query) {
+        if (query == null || query.isBlank()) {
+            return List.of();
+        }
+        return repository.searchOutboundsForReturn(organizationId, query.trim());
+    }
+
+    @Override
     public long nextFolioSequenceValue() {
         return repository.getNextFolioSequenceValue();
     }

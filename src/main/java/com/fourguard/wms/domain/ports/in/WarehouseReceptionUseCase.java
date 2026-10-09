@@ -5,6 +5,7 @@ import com.fourguard.wms.application.dto.request.reception.CancelReceptionReques
 import com.fourguard.wms.application.dto.request.reception.ChangeRemisionRequest;
 import com.fourguard.wms.application.dto.request.reception.CompleteReceptionRequest;
 import com.fourguard.wms.application.dto.request.reception.CreateCheckInRequest;
+import com.fourguard.wms.application.dto.request.reception.ReopenReceptionRequest;
 import com.fourguard.wms.application.dto.request.reception.UpdatePalletRequest;
 import com.fourguard.wms.application.dto.request.reception.UpdateReceptionParametersRequest;
 import com.fourguard.wms.application.dto.response.reception.MovementAuditResponse;
@@ -82,6 +83,12 @@ public interface WarehouseReceptionUseCase {
     ReceptionResponse cancelReception(UUID id, CancelReceptionRequest request);
 
     /**
+     * Reopens a completed reception with supervisor/admin authorization and reason,
+     * allowing forklift operators to scan and register omitted pallets.
+     */
+    ReceptionResponse reopenReception(UUID id, ReopenReceptionRequest request);
+
+    /**
      * Updates the reception doc number (remisión) with audit trail.
      */
     ReceptionResponse changeRemision(UUID id, ChangeRemisionRequest request);
@@ -123,4 +130,21 @@ public interface WarehouseReceptionUseCase {
      * Deletes a lot from an open reception if no pallets are associated with it.
      */
     void deleteLot(UUID receptionId, UUID lotId);
+
+    /**
+     * Automatically detects if an incoming query (remission, outbound folio, lot, pallet)
+     * corresponds to a previous outbound dispatch (Logística Inversa / Retorno).
+     */
+    com.fourguard.wms.application.dto.response.reception.ReturnDetectionResponse detectReturn(
+            UUID organizationId,
+            UUID branchId,
+            String query);
+
+    /**
+     * Validates and marks an individual pallet code (UA/SSCC) scanned by a forklift operator
+     * in the unloading dock against the return manifest.
+     */
+    com.fourguard.wms.application.dto.response.reception.VerifyPalletResponse verifyPallet(
+            UUID receptionId,
+            com.fourguard.wms.application.dto.request.reception.VerifyPalletRequest request);
 }

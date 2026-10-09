@@ -288,15 +288,18 @@ public class WarehouseTransferService implements WarehouseTransferUseCase {
         }
 
         WarehouseTransferEntity saved = transferRepositoryPort.save(transfer);
+        String originCode = (origin != null && origin.getCode() != null) ? origin.getCode() : "N/A";
+        String destinationCode = (destination != null && destination.getCode() != null) ? destination.getCode() : "N/A";
+        String operatorName = (operator != null && operator.getFullName() != null) ? operator.getFullName() : "N/A";
+        String safeFolio = (folio != null) ? folio : "";
 
         logAudit(saved.getId(), "TRASPASO_REGISTRADO", activeUser,
-                Map.of("origin", origin.getCode() != null ? origin.getCode() : "N/A"),
-                Map.of("folio", folio != null ? folio : "",
-                        "origin", origin.getCode() != null ? origin.getCode() : "N/A",
-                        "destination", destination.getCode() != null ? destination.getCode() : "N/A",
+                Map.of("origin", originCode),
+                Map.of("folio", safeFolio,
+                        "origin", originCode,
+                        "destination", destinationCode,
                         "totalPallets", String.valueOf(itemsToMove.size()),
-                        "operator",
-                        (operator != null && operator.getFullName() != null) ? operator.getFullName() : "N/A"));
+                        "operator", operatorName));
 
         return transferMapper.toResponse(saved);
     }

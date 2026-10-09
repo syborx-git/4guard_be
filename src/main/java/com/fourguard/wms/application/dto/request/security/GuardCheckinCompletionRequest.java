@@ -1,6 +1,5 @@
 package com.fourguard.wms.application.dto.request.security;
 
-import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.time.LocalDate;
@@ -9,7 +8,8 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Request DTO submitted by the Security Guard to validate, assign ramp, and authorize entrance.
+ * Request DTO submitted by the Security Guard to validate, assign ramp, and
+ * authorize entrance.
  */
 @Data
 public class GuardCheckinCompletionRequest {
@@ -17,7 +17,9 @@ public class GuardCheckinCompletionRequest {
     /** CARGA | DESCARGA */
     private String operationType;
 
-    @NotNull(message = "Rampa/Andén es obligatorio")
+    /**
+     * Optional: Ramp number assigned in Caseta or pending assignment by Warehouse
+     */
     private Integer rampNumber;
     private String rampCode;
     private UUID rampId;
@@ -38,7 +40,10 @@ public class GuardCheckinCompletionRequest {
     private String driverPhone;
     private String tractorPlates;
     private String noEcoTractor;
+    private String economicNumber;
     private String boxPlates;
+    private String boxEconomicNumber;
+    private String noEcoCaja;
     private String boxDimensions;
     private String transportType;
 

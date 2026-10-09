@@ -27,6 +27,8 @@ public class AddReceptionLotRequest {
     private LocalDate expirationDate;
 
     private String observations;
+    private String authorizedByOpsManager;
+    private String opsManagerReason;
 
     public String getNotes() {
         return observations;

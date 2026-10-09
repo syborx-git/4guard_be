@@ -22,6 +22,14 @@ public class WarehouseReceptionPalletPersistenceAdapter implements WarehouseRece
     }
 
     @Override
+    public List<WarehouseReceptionPalletEntity> findByReceptionIdIn(List<UUID> receptionIds) {
+        if (receptionIds == null || receptionIds.isEmpty()) {
+            return List.of();
+        }
+        return repository.findByReceptionIdIn(receptionIds);
+    }
+
+    @Override
     public Optional<WarehouseReceptionPalletEntity> findById(UUID id) {
         return repository.findById(id);
     }
@@ -64,5 +72,10 @@ public class WarehouseReceptionPalletPersistenceAdapter implements WarehouseRece
     @Override
     public int findMaxPalletNumber(UUID orgId, UUID branchId) {
         return repository.findMaxPalletNumberByOrgAndBranch(orgId, branchId);
+    }
+
+    @Override
+    public List<WarehouseReceptionPalletEntity> findByPalletCodeIn(List<String> palletCodes) {
+        return repository.findByPalletCodeIn(palletCodes);
     }
 }

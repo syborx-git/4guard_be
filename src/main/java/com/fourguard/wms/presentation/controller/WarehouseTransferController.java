@@ -29,7 +29,7 @@ public class WarehouseTransferController {
     // ─── CREATE TRANSFER ────────────────────────────────────────────────────────
 
     @PostMapping
-    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_CREATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('WAREHOUSE_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_CREATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR')")
     @Operation(summary = "Registrar cambio de almacén / traspaso",
                description = "Realiza la reubicación de tarimas entre bahías. Genera folio CAM-YYYY-XXXXXX y actualiza el inventario.")
     public ResponseEntity<ApiResponse<TransferResponse>> createTransfer(
@@ -41,7 +41,7 @@ public class WarehouseTransferController {
     // ─── GET BY ID ─────────────────────────────────────────────────────────────
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('FORKLIFT_OPERATOR')")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasAuthority('INVENTORY_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('FORKLIFT_OPERATOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Obtener traspaso por ID",
                description = "Retorna el detalle completo del traspaso y las tarimas reubicadas.")
     public ResponseEntity<ApiResponse<TransferResponse>> getTransferById(@PathVariable UUID id) {
@@ -52,7 +52,7 @@ public class WarehouseTransferController {
     // ─── GET LIST ──────────────────────────────────────────────────────────────
 
     @GetMapping
-    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('WAREHOUSE_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasAuthority('INVENTORY_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('FORKLIFT_OPERATOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Listar traspasos",
                description = "Retorna el historial de traspasos filtrado por organización, sucursal, estatus y término de búsqueda.")
     public ResponseEntity<ApiResponse<List<TransferSummaryResponse>>> getTransfers(
@@ -80,7 +80,7 @@ public class WarehouseTransferController {
     // ─── AUDIT LOGS ───────────────────────────────────────────────────────────
 
     @GetMapping("/{id}/audit")
-    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('WAREHOUSE_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR')")
     @Operation(summary = "Consultar auditoría del traspaso",
                description = "Retorna la línea de tiempo de auditoría del traspaso.")
     public ResponseEntity<ApiResponse<List<MovementAuditResponse>>> getAuditLogs(@PathVariable UUID id) {

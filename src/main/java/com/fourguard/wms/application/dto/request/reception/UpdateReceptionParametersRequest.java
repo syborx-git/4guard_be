@@ -28,6 +28,7 @@ public class UpdateReceptionParametersRequest {
     private String palletType;
 
     private UUID storageLocationId;
+    private String storageLocationCode;
 
     /** Optional: Assigned forklift operator */
     private UUID forkliftOperatorId;
@@ -42,10 +43,16 @@ public class UpdateReceptionParametersRequest {
     private String status;
 
     private String observations;
+    private String authorizedByOpsManager;
+    private String opsManagerReason;
 
     // ── Caseta / Transport Data Updates ──
     private String tractorPlates;
     private String boxPlates;
+    private String economicNumber;
+    private String noEcoTractor;
+    private String boxEconomicNumber;
+    private String noEcoCaja;
     private String driverName;
     private String docNumber;
     private LocalDate docDate;

@@ -40,7 +40,7 @@ public class QualityController {
     // ══════════════════════════════════════════════════════════════════════════
 
     @PostMapping("/blocks")
-    @PreAuthorize("hasAuthority('QUALITY_UPDATE') or hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('QUALITY_AUDITOR') or hasRole('WAREHOUSE_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('QUALITY_UPDATE') or hasAuthority('QUALITY_WRITE') or hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasAuthority('INVENTORY_UPDATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('QUALITY_AUDITOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('CONTROL_DESK') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('FORKLIFT_OPERATOR') or hasRole('CEO')")
     @Operation(summary = "Registrar bloqueo de calidad / PNC",
                description = "Coloca una tarima o lote en estado IN_QUALITY (20), asienta movimiento QUARANTINE en Kardex y genera folio BLQ-2026-XXXX.")
     public ResponseEntity<ApiResponse<QualityBlockResponse>> createBlock(
@@ -59,7 +59,7 @@ public class QualityController {
     }
 
     @GetMapping("/blocks")
-    @PreAuthorize("hasAuthority('QUALITY_READ') or hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('QUALITY_AUDITOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('FORKLIFT_OPERATOR')")
+    @PreAuthorize("hasAuthority('QUALITY_READ') or hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasAuthority('INVENTORY_READ') or hasAuthority('RECEIVING_READ') or hasAuthority('LAYOUT_READ') or hasAuthority('SECTIONS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('QUALITY_AUDITOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('CONTROL_DESK') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('FORKLIFT_OPERATOR') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('CEO')")
     @Operation(summary = "Listar bloqueos activos de calidad",
                description = "Retorna la lista de bloqueos vigentes con filtros opcionales de etapa y estado.")
     public ResponseEntity<ApiResponse<List<QualityBlockResponse>>> getActiveBlocks(
@@ -79,7 +79,7 @@ public class QualityController {
     }
 
     @GetMapping("/blocks/{id}")
-    @PreAuthorize("hasAuthority('QUALITY_READ') or hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('QUALITY_AUDITOR') or hasRole('WAREHOUSE_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('QUALITY_READ') or hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasAuthority('INVENTORY_READ') or hasAuthority('RECEIVING_READ') or hasAuthority('LAYOUT_READ') or hasAuthority('SECTIONS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('QUALITY_AUDITOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('CONTROL_DESK') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('FORKLIFT_OPERATOR') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('CEO')")
     @Operation(summary = "Obtener detalle de bloqueo por ID", description = "Retorna el detalle completo de un bloqueo, criterios marcados y evidencias adjuntas.")
     public ResponseEntity<ApiResponse<QualityBlockResponse>> getBlockById(@PathVariable UUID id) {
         QualityBlockResponse response = qualityUseCase.getBlockById(id);
@@ -91,7 +91,7 @@ public class QualityController {
     // ══════════════════════════════════════════════════════════════════════════
 
     @PostMapping("/releases")
-    @PreAuthorize("hasAuthority('QUALITY_AUTHORIZE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('QUALITY_AUDITOR')")
+    @PreAuthorize("hasAuthority('QUALITY_AUTHORIZE') or hasAuthority('QUALITY_UPDATE') or hasAuthority('QUALITY_WRITE') or hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('QUALITY_AUDITOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Dictaminar liberación formal de lote",
                description = "Emite dictamen con soporte documental y conmuta inventario según destino (DISTRIBUTION, DESTRUCTION, RETURN).")
     public ResponseEntity<ApiResponse<QualityReleaseResponse>> releaseBlock(
@@ -110,7 +110,7 @@ public class QualityController {
     }
 
     @GetMapping("/releases")
-    @PreAuthorize("hasAuthority('QUALITY_READ') or hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('QUALITY_AUDITOR') or hasRole('WAREHOUSE_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('QUALITY_READ') or hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasAuthority('INVENTORY_READ') or hasAuthority('RECEIVING_READ') or hasAuthority('LAYOUT_READ') or hasAuthority('SECTIONS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('QUALITY_AUDITOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('CONTROL_DESK') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('FORKLIFT_OPERATOR') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('CEO')")
     @Operation(summary = "Historial de liberaciones y dictámenes",
                description = "Retorna el historial de lotes dictaminados con filtro por destino final.")
     public ResponseEntity<ApiResponse<List<QualityReleaseResponse>>> getReleases(
@@ -129,7 +129,7 @@ public class QualityController {
     }
 
     @GetMapping("/releases/{id}")
-    @PreAuthorize("hasAuthority('QUALITY_READ') or hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('QUALITY_AUDITOR')")
+    @PreAuthorize("hasAuthority('QUALITY_READ') or hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasAuthority('INVENTORY_READ') or hasAuthority('RECEIVING_READ') or hasAuthority('LAYOUT_READ') or hasAuthority('SECTIONS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('QUALITY_AUDITOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('CONTROL_DESK') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('FORKLIFT_OPERATOR') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('CEO')")
     @Operation(summary = "Obtener dictamen de liberación por ID", description = "Retorna el detalle completo de un dictamen de liberación.")
     public ResponseEntity<ApiResponse<QualityReleaseResponse>> getReleaseById(@PathVariable UUID id) {
         QualityReleaseResponse response = qualityUseCase.getReleaseById(id);
@@ -141,7 +141,7 @@ public class QualityController {
     // ══════════════════════════════════════════════════════════════════════════
 
     @PostMapping("/load-verifications")
-    @PreAuthorize("hasAuthority('QUALITY_UPDATE') or hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('QUALITY_AUDITOR') or hasRole('WAREHOUSE_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('QUALITY_UPDATE') or hasAuthority('QUALITY_WRITE') or hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasAuthority('RECEIVING_UPDATE') or hasAuthority('INVENTORY_UPDATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('QUALITY_AUDITOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('CONTROL_DESK') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('FORKLIFT_OPERATOR') or hasRole('CEO')")
     @Operation(summary = "Guardar / Actualizar verificación de carga F01",
                description = "Persiste los 18 criterios normativos de producto y transporte, junto con firmas reglamentarias.")
     public ResponseEntity<ApiResponse<LoadVerificationResponse>> saveVerification(
@@ -160,7 +160,7 @@ public class QualityController {
     }
 
     @GetMapping("/load-verifications")
-    @PreAuthorize("hasAuthority('QUALITY_READ') or hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('QUALITY_AUDITOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SECURITY_GUARD') or hasRole('FORKLIFT_OPERATOR')")
+    @PreAuthorize("hasAuthority('QUALITY_READ') or hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasAuthority('INVENTORY_READ') or hasAuthority('RECEIVING_READ') or hasAuthority('LAYOUT_READ') or hasAuthority('SECTIONS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('QUALITY_AUDITOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('CONTROL_DESK') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('FORKLIFT_OPERATOR') or hasRole('CEO')")
     @Operation(summary = "Listar verificaciones de carga F01",
                description = "Retorna el directorio de verificaciones de carga filtrado por estatus o fecha.")
     public ResponseEntity<ApiResponse<List<LoadVerificationResponse>>> getVerifications(
@@ -180,7 +180,7 @@ public class QualityController {
     }
 
     @GetMapping("/load-verifications/{id}")
-    @PreAuthorize("hasAuthority('QUALITY_READ') or hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('QUALITY_AUDITOR') or hasRole('WAREHOUSE_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('QUALITY_READ') or hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasAuthority('INVENTORY_READ') or hasAuthority('RECEIVING_READ') or hasAuthority('LAYOUT_READ') or hasAuthority('SECTIONS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('QUALITY_AUDITOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('CONTROL_DESK') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('FORKLIFT_OPERATOR') or hasRole('CEO')")
     @Operation(summary = "Obtener formato de verificación de carga F01 por ID", description = "Retorna la pauta completa lista para consulta o impresión PDF.")
     public ResponseEntity<ApiResponse<LoadVerificationResponse>> getVerificationById(@PathVariable UUID id) {
         LoadVerificationResponse response = qualityUseCase.getVerificationById(id);
@@ -192,7 +192,7 @@ public class QualityController {
     // ══════════════════════════════════════════════════════════════════════════
 
     @PostMapping("/claims")
-    @PreAuthorize("hasAuthority('QUALITY_UPDATE') or hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('QUALITY_AUDITOR') or hasRole('WAREHOUSE_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('QUALITY_UPDATE') or hasAuthority('QUALITY_WRITE') or hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasAuthority('INVENTORY_UPDATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('QUALITY_AUDITOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('CONTROL_DESK') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('CEO')")
     @Operation(summary = "Registrar reclamo o incidencia de calidad",
                description = "Registra una incidencia con cuantificación de material dañado/perdido y cálculo financiero de impacto.")
     public ResponseEntity<ApiResponse<QualityClaimResponse>> createClaim(
@@ -211,7 +211,7 @@ public class QualityController {
     }
 
     @GetMapping("/claims")
-    @PreAuthorize("hasAuthority('QUALITY_READ') or hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('QUALITY_AUDITOR') or hasRole('WAREHOUSE_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('QUALITY_READ') or hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasAuthority('INVENTORY_READ') or hasAuthority('RECEIVING_READ') or hasAuthority('LAYOUT_READ') or hasAuthority('SECTIONS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('QUALITY_AUDITOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('CONTROL_DESK') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('FORKLIFT_OPERATOR') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('CEO')")
     @Operation(summary = "Listar reclamos e incidencias de calidad", description = "Retorna el concentrado histórico de reclamos por etapa.")
     public ResponseEntity<ApiResponse<List<QualityClaimResponse>>> getClaims(
             @RequestHeader(value = "X-Organization-Id", required = false) UUID orgHeader,
@@ -229,7 +229,7 @@ public class QualityController {
     }
 
     @GetMapping("/dashboard/kpis")
-    @PreAuthorize("hasAuthority('QUALITY_READ') or hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('QUALITY_AUDITOR') or hasRole('WAREHOUSE_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('QUALITY_READ') or hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasAuthority('INVENTORY_READ') or hasAuthority('RECEIVING_READ') or hasAuthority('LAYOUT_READ') or hasAuthority('SECTIONS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('QUALITY_AUDITOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('CONTROL_DESK') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('FORKLIFT_OPERATOR') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('CEO')")
     @Operation(summary = "Obtener KPIs consolidados de Calidad QM",
                description = "Retorna métricas ejecutivas: total de bloqueos, liberaciones por destino, verificaciones aprobadas y costo de reclamos.")
     public ResponseEntity<ApiResponse<QualityDashboardKpisResponse>> getDashboardKpis(
@@ -247,7 +247,7 @@ public class QualityController {
     }
 
     @GetMapping("/catalogs/block-reasons")
-    @PreAuthorize("hasAuthority('QUALITY_READ') or hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('QUALITY_AUDITOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('FORKLIFT_OPERATOR')")
+    @PreAuthorize("hasAuthority('QUALITY_READ') or hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasAuthority('INVENTORY_READ') or hasAuthority('RECEIVING_READ') or hasAuthority('LAYOUT_READ') or hasAuthority('SECTIONS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('QUALITY_AUDITOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('CONTROL_DESK') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('FORKLIFT_OPERATOR') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('CEO')")
     @Operation(summary = "Catálogo de motivos de bloqueo QM", description = "Retorna los motivos estandarizados para retención de tarimas.")
     public ResponseEntity<ApiResponse<List<CatBlockReasonResponse>>> getBlockReasons() {
         List<CatBlockReasonResponse> reasons = catBlockReasonRepository.findByIsActiveTrueOrderByDescriptionAsc().stream()
@@ -257,28 +257,150 @@ public class QualityController {
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    // RESOLUTORES AUXILIARES
+    // 5. SUBMÓDULO: DESVIACIONES NATIVAS Y TABLERO MENSUAL DE 10 KPIS
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @PostMapping("/deviations")
+    @PreAuthorize("hasAuthority('QUALITY_UPDATE') or hasAuthority('QUALITY_WRITE') or hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasAuthority('INVENTORY_UPDATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('QUALITY_AUDITOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('CONTROL_DESK') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('FORKLIFT_OPERATOR') or hasRole('CEO')")
+    @Operation(summary = "Registrar nueva desviación de calidad",
+               description = "Captura una desviación física u operativa en almacenamiento, recepción o transporte, sustituyendo los Google Forms externos.")
+    public ResponseEntity<ApiResponse<QualityDeviationResponse>> createDeviation(
+            @RequestHeader(value = "X-Organization-Id", required = false) UUID orgHeader,
+            @RequestHeader(value = "X-Branch-Id", required = false) UUID branchHeader,
+            @RequestParam(value = "organizationId", required = false) UUID orgParam,
+            @RequestParam(value = "branchId", required = false) UUID branchParam,
+            @Valid @RequestBody CreateQualityDeviationRequest request) {
+
+        UserEntity currentUser = resolveCurrentUser();
+        UUID orgId = resolveOrgId(orgHeader, orgParam, currentUser);
+        UUID branchId = resolveBranchId(branchHeader, branchParam, currentUser);
+
+        QualityDeviationResponse response = qualityUseCase.createDeviation(orgId, branchId, currentUser.getId(), request);
+        return ResponseEntity.ok(ApiResponse.ok("Desviación de calidad registrada exitosamente", response));
+    }
+
+    @GetMapping("/deviations")
+    @PreAuthorize("hasAuthority('QUALITY_READ') or hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasAuthority('INVENTORY_READ') or hasAuthority('RECEIVING_READ') or hasAuthority('LAYOUT_READ') or hasAuthority('SECTIONS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('QUALITY_AUDITOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('CONTROL_DESK') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('FORKLIFT_OPERATOR') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('CEO')")
+    @Operation(summary = "Listar desviaciones de calidad registradas",
+               description = "Retorna el concentrado de desviaciones con filtros opcionales por tipo de material, causa raíz o mes (YYYY-MM).")
+    public ResponseEntity<ApiResponse<List<QualityDeviationResponse>>> getDeviations(
+            @RequestHeader(value = "X-Organization-Id", required = false) UUID orgHeader,
+            @RequestHeader(value = "X-Branch-Id", required = false) UUID branchHeader,
+            @RequestParam(value = "organizationId", required = false) UUID orgParam,
+            @RequestParam(value = "branchId", required = false) UUID branchParam,
+            @RequestParam(value = "materialType", required = false) String materialType,
+            @RequestParam(value = "rootCause", required = false) String rootCause,
+            @RequestParam(value = "month", required = false) String month) {
+
+        UserEntity currentUser = resolveCurrentUser();
+        UUID orgId = resolveOrgId(orgHeader, orgParam, currentUser);
+        UUID branchId = resolveBranchId(branchHeader, branchParam, currentUser);
+
+        List<QualityDeviationResponse> response = qualityUseCase.getDeviations(orgId, branchId, materialType, rootCause, month);
+        return ResponseEntity.ok(ApiResponse.ok("Desviaciones de calidad obtenidas con éxito", response));
+    }
+
+    @GetMapping("/deviations/{id}")
+    @PreAuthorize("hasAuthority('QUALITY_READ') or hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasAuthority('INVENTORY_READ') or hasAuthority('RECEIVING_READ') or hasAuthority('LAYOUT_READ') or hasAuthority('SECTIONS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('QUALITY_AUDITOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('CONTROL_DESK') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('FORKLIFT_OPERATOR') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('CEO')")
+    @Operation(summary = "Obtener detalle de desviación por ID", description = "Retorna el detalle completo de una desviación de calidad.")
+    public ResponseEntity<ApiResponse<QualityDeviationResponse>> getDeviationById(@PathVariable UUID id) {
+        QualityDeviationResponse response = qualityUseCase.getDeviationById(id);
+        return ResponseEntity.ok(ApiResponse.ok("Desviación obtenida con éxito", response));
+    }
+
+    @GetMapping("/kpis/monthly-board")
+    @PreAuthorize("hasAuthority('QUALITY_READ') or hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasAuthority('INVENTORY_READ') or hasAuthority('RECEIVING_READ') or hasAuthority('LAYOUT_READ') or hasAuthority('SECTIONS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('QUALITY_AUDITOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('CONTROL_DESK') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('FORKLIFT_OPERATOR') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('CEO')")
+    @Operation(summary = "Obtener Tablero Mensual de los 10 KPIs de Calidad",
+               description = "Retorna el Bento Grid consolidado de los 10 KPIs de calidad, comparativa contra metas, causas raíz y desgloses por colaborador.")
+    public ResponseEntity<ApiResponse<QualityMonthlyBoardResponse>> getMonthlyBoard(
+            @RequestHeader(value = "X-Organization-Id", required = false) UUID orgHeader,
+            @RequestHeader(value = "X-Branch-Id", required = false) UUID branchHeader,
+            @RequestParam(value = "organizationId", required = false) UUID orgParam,
+            @RequestParam(value = "branchId", required = false) UUID branchParam,
+            @RequestParam(value = "year", required = false) Integer year,
+            @RequestParam(value = "month", required = false) Integer month) {
+
+        UserEntity currentUser = resolveCurrentUser();
+        UUID orgId = resolveOrgId(orgHeader, orgParam, currentUser);
+        UUID branchId = resolveBranchId(branchHeader, branchParam, currentUser);
+
+        QualityMonthlyBoardResponse response = qualityUseCase.getMonthlyBoard(orgId, branchId, year, month);
+        return ResponseEntity.ok(ApiResponse.ok("Tablero mensual de KPIs obtenido con éxito", response));
+    }
+
+    @GetMapping(value = "/deviations/export-excel", produces = "text/csv")
+    @PreAuthorize("hasAuthority('QUALITY_READ') or hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasAuthority('INVENTORY_READ') or hasAuthority('RECEIVING_READ') or hasAuthority('LAYOUT_READ') or hasAuthority('SECTIONS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('QUALITY_AUDITOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('CONTROL_DESK') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('FORKLIFT_OPERATOR') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('CEO')")
+    @Operation(summary = "Exportar concentrado mensual de desviaciones y KPIs",
+               description = "Genera el reporte tabular exportable que sustituye las hojas mensuales de Excel.")
+    public ResponseEntity<byte[]> exportDeviationsExcel(
+            @RequestHeader(value = "X-Organization-Id", required = false) UUID orgHeader,
+            @RequestHeader(value = "X-Branch-Id", required = false) UUID branchHeader,
+            @RequestParam(value = "organizationId", required = false) UUID orgParam,
+            @RequestParam(value = "branchId", required = false) UUID branchParam,
+            @RequestParam(value = "year", required = false) Integer year,
+            @RequestParam(value = "month", required = false) Integer month) {
+
+        UserEntity currentUser = resolveCurrentUser();
+        UUID orgId = resolveOrgId(orgHeader, orgParam, currentUser);
+        UUID branchId = resolveBranchId(branchHeader, branchParam, currentUser);
+
+        byte[] csvData = qualityUseCase.exportDeviationsExcel(orgId, branchId, year, month);
+        return ResponseEntity.ok()
+                .header("Content-Disposition", "attachment; filename=\"reporte-calidad-" + (year != null ? year : 2026) + "-" + (month != null ? month : 10) + ".csv\"")
+                .body(csvData);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // RESOLUTORES AUXILIARES CON CONTROL DE ACCESO (DEFENSA BOLA/IDOR Y AUTENTICACIÓN)
     // ══════════════════════════════════════════════════════════════════════════
 
     private UserEntity resolveCurrentUser() {
         String username = securityAuditHelper.getCurrentUsername();
+        if (username == null || username.isBlank() || "anonymousUser".equalsIgnoreCase(username) || "SYSTEM".equalsIgnoreCase(username)) {
+            throw new org.springframework.security.access.AccessDeniedException("Sesión no válida o no autenticada");
+        }
         return userRepositoryPort.findByUsername(username)
                 .or(() -> userRepositoryPort.findByEmail(username))
-                .orElseGet(() -> userRepositoryPort.findAll().stream().findFirst()
-                        .orElseThrow(() -> new IllegalStateException("No hay usuarios activos en el sistema")));
+                .orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("Usuario no encontrado en el sistema: " + username));
     }
 
     private UUID resolveOrgId(UUID header, UUID param, UserEntity user) {
-        if (header != null) return header;
-        if (param != null) return param;
-        if (user != null && user.getOrganization() != null) return user.getOrganization().getId();
-        return null;
+        UUID targetOrg = header != null ? header : (param != null ? param : (user != null && user.getOrganization() != null ? user.getOrganization().getId() : null));
+        if (user != null && user.getRole() != null && ("SUPER_ADMIN".equalsIgnoreCase(user.getRole().getName()) || "ADMIN".equalsIgnoreCase(user.getRole().getName()) || "CEO".equalsIgnoreCase(user.getRole().getName()))) {
+            return targetOrg != null ? targetOrg : (user.getOrganization() != null ? user.getOrganization().getId() : null);
+        }
+        if (user != null && user.getOrganization() != null) {
+            UUID userOrgId = user.getOrganization().getId();
+            if (targetOrg != null && !targetOrg.equals(userOrgId)) {
+                log.warn("Security Alert: User {} attempted cross-tenant access to org {}", user.getUsername(), targetOrg);
+                throw new org.springframework.security.access.AccessDeniedException("No tiene permisos para acceder a una organización ajena");
+            }
+            return userOrgId;
+        }
+        return targetOrg;
     }
 
     private UUID resolveBranchId(UUID header, UUID param, UserEntity user) {
-        if (header != null) return header;
-        if (param != null) return param;
-        if (user != null && user.getBranch() != null) return user.getBranch().getId();
-        return DEFAULT_BRANCH_ID;
+        UUID targetBranch = header != null ? header : (param != null ? param : (user != null && user.getBranch() != null ? user.getBranch().getId() : DEFAULT_BRANCH_ID));
+        if (user != null && user.getRole() != null && (
+                "SUPER_ADMIN".equalsIgnoreCase(user.getRole().getName()) ||
+                "ADMIN".equalsIgnoreCase(user.getRole().getName()) ||
+                "OPERATIONS_MANAGER".equalsIgnoreCase(user.getRole().getName()) ||
+                "OPERATIONS_SUPERVISOR".equalsIgnoreCase(user.getRole().getName()) ||
+                "CEO".equalsIgnoreCase(user.getRole().getName()) ||
+                "QUALITY_AUDITOR".equalsIgnoreCase(user.getRole().getName()) ||
+                "CONTROL_DESK".equalsIgnoreCase(user.getRole().getName())
+        )) {
+            return targetBranch != null ? targetBranch : DEFAULT_BRANCH_ID;
+        }
+        if (user != null && user.getBranch() != null) {
+            UUID userBranchId = user.getBranch().getId();
+            if (targetBranch != null && !targetBranch.equals(userBranchId)) {
+                log.warn("Security Alert: User {} attempted cross-branch access to branch {}", user.getUsername(), targetBranch);
+                throw new org.springframework.security.access.AccessDeniedException("No tiene permisos para operar en una sucursal no asignada");
+            }
+            return userBranchId;
+        }
+        return targetBranch != null ? targetBranch : DEFAULT_BRANCH_ID;
     }
 }

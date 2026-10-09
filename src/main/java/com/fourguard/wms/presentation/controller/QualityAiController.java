@@ -36,7 +36,7 @@ public class QualityAiController {
     private final UserRepositoryPort userRepositoryPort;
 
     @PostMapping("/evaluate-rule")
-    @PreAuthorize("hasAuthority('QUALITY_READ') or hasAuthority('QUALITY_UPDATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('QUALITY_AUDITOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('FORKLIFT_OPERATOR')")
+    @PreAuthorize("hasAuthority('QUALITY_READ') or hasAuthority('QUALITY_UPDATE') or hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasAuthority('INVENTORY_READ') or hasAuthority('RECEIVING_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('QUALITY_AUDITOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('CONTROL_DESK') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('FORKLIFT_OPERATOR') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('CEO')")
     @Operation(summary = "Evaluación determinista de reglas físicas de calidad",
                description = "Evalúa en < 1ms tolerancias de inclinación, daños en empaque, uso de Diurex, roturas de tarima y límites de humedad bajo IT01, IT02 e IT01-8.6-02.")
     public ResponseEntity<ApiResponse<QualityAiEvaluationResponse>> evaluateRule(
@@ -47,7 +47,7 @@ public class QualityAiController {
     }
 
     @PostMapping("/chat")
-    @PreAuthorize("hasAuthority('QUALITY_READ') or hasAuthority('QUALITY_UPDATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('QUALITY_AUDITOR') or hasRole('WAREHOUSE_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('QUALITY_READ') or hasAuthority('QUALITY_UPDATE') or hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasAuthority('INVENTORY_READ') or hasAuthority('RECEIVING_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('QUALITY_AUDITOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('CONTROL_DESK') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('FORKLIFT_OPERATOR') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('CEO')")
     @Operation(summary = "Consultar al Asistente IA de Calidad",
                description = "Responde dudas técnicas y normativas fundamentadas en los instructivos oficiales de 4GUARD con fallback a motor de reglas.")
     public ResponseEntity<ApiResponse<QualityAiChatResponse>> askAssistant(
@@ -66,7 +66,7 @@ public class QualityAiController {
     }
 
     @PostMapping("/sampling-calc")
-    @PreAuthorize("hasAuthority('QUALITY_READ') or hasAuthority('QUALITY_UPDATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('QUALITY_AUDITOR') or hasRole('WAREHOUSE_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('QUALITY_READ') or hasAuthority('QUALITY_UPDATE') or hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasAuthority('INVENTORY_READ') or hasAuthority('RECEIVING_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('QUALITY_AUDITOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('CONTROL_DESK') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('FORKLIFT_OPERATOR') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('CEO')")
     @Operation(summary = "Calcular plan oficial de muestreo",
                description = "Calcula la cantidad exacta de muestra y el protocolo de extracción por tipo de material o café verde bajo IT01-PO-GC-8.6-04 Rev. 02.")
     public ResponseEntity<ApiResponse<SamplingCalculationResponse>> calculateSampling(
@@ -77,28 +77,56 @@ public class QualityAiController {
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    // RESOLUTORES AUXILIARES
+    // RESOLUTORES AUXILIARES CON CONTROL DE ACCESO (DEFENSA BOLA/IDOR Y AUTENTICACIÓN)
     // ══════════════════════════════════════════════════════════════════════════
 
     private UserEntity resolveCurrentUser() {
         String username = securityAuditHelper.getCurrentUsername();
+        if (username == null || username.isBlank() || "anonymousUser".equalsIgnoreCase(username) || "SYSTEM".equalsIgnoreCase(username)) {
+            throw new org.springframework.security.access.AccessDeniedException("Sesión no válida o no autenticada");
+        }
         return userRepositoryPort.findByUsername(username)
                 .or(() -> userRepositoryPort.findByEmail(username))
-                .orElseGet(() -> userRepositoryPort.findAll().stream().findFirst()
-                        .orElseThrow(() -> new IllegalStateException("No hay usuarios activos en el sistema")));
+                .orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("Usuario no encontrado en el sistema: " + username));
     }
 
     private UUID resolveOrgId(UUID header, UUID param, UserEntity user) {
-        if (header != null) return header;
-        if (param != null) return param;
-        if (user != null && user.getOrganization() != null) return user.getOrganization().getId();
-        return null;
+        UUID targetOrg = header != null ? header : (param != null ? param : (user != null && user.getOrganization() != null ? user.getOrganization().getId() : null));
+        if (user != null && user.getRole() != null && ("SUPER_ADMIN".equalsIgnoreCase(user.getRole().getName()) || "ADMIN".equalsIgnoreCase(user.getRole().getName()) || "CEO".equalsIgnoreCase(user.getRole().getName()))) {
+            return targetOrg != null ? targetOrg : (user.getOrganization() != null ? user.getOrganization().getId() : null);
+        }
+        if (user != null && user.getOrganization() != null) {
+            UUID userOrgId = user.getOrganization().getId();
+            if (targetOrg != null && !targetOrg.equals(userOrgId)) {
+                log.warn("Security Alert: User {} attempted cross-tenant access to org {}", user.getUsername(), targetOrg);
+                throw new org.springframework.security.access.AccessDeniedException("No tiene permisos para acceder a una organización ajena");
+            }
+            return userOrgId;
+        }
+        return targetOrg;
     }
 
     private UUID resolveBranchId(UUID header, UUID param, UserEntity user) {
-        if (header != null) return header;
-        if (param != null) return param;
-        if (user != null && user.getBranch() != null) return user.getBranch().getId();
-        return DEFAULT_BRANCH_ID;
+        UUID targetBranch = header != null ? header : (param != null ? param : (user != null && user.getBranch() != null ? user.getBranch().getId() : DEFAULT_BRANCH_ID));
+        if (user != null && user.getRole() != null && (
+                "SUPER_ADMIN".equalsIgnoreCase(user.getRole().getName()) ||
+                "ADMIN".equalsIgnoreCase(user.getRole().getName()) ||
+                "OPERATIONS_MANAGER".equalsIgnoreCase(user.getRole().getName()) ||
+                "OPERATIONS_SUPERVISOR".equalsIgnoreCase(user.getRole().getName()) ||
+                "CEO".equalsIgnoreCase(user.getRole().getName()) ||
+                "QUALITY_AUDITOR".equalsIgnoreCase(user.getRole().getName()) ||
+                "CONTROL_DESK".equalsIgnoreCase(user.getRole().getName())
+        )) {
+            return targetBranch != null ? targetBranch : DEFAULT_BRANCH_ID;
+        }
+        if (user != null && user.getBranch() != null) {
+            UUID userBranchId = user.getBranch().getId();
+            if (targetBranch != null && !targetBranch.equals(userBranchId)) {
+                log.warn("Security Alert: User {} attempted cross-branch access to branch {}", user.getUsername(), targetBranch);
+                throw new org.springframework.security.access.AccessDeniedException("No tiene permisos para operar en una sucursal no asignada");
+            }
+            return userBranchId;
+        }
+        return targetBranch != null ? targetBranch : DEFAULT_BRANCH_ID;
     }
 }

@@ -26,6 +26,11 @@ public class ReceptionResponse {
     private UUID branchId;
     private String folio;
     private String status;
+    private String operationType;
+    private UUID sourceOutboundId;
+    private String sourceOutboundFolio;
+    private String reentryReason;
+    private String reentryNotes;
 
     // CheckIn Caseta
     private UUID carrierId;
@@ -44,6 +49,10 @@ public class ReceptionResponse {
     private String driverName;
     private String tractorPlates;
     private String boxPlates;
+    private String economicNumber;
+    private String noEcoTractor;
+    private String boxEconomicNumber;
+    private String noEcoCaja;
     private List<String> sealNumbers;
 
     // Parámetros de Descarga / Lote
@@ -57,6 +66,10 @@ public class ReceptionResponse {
     private LocalDate expirationDate;
     private Long shelfLifeDaysRemaining;
     private String shelfLifeStatus;
+    private Boolean requiresOpsAuthorization;
+    private String authorizedByOpsManager;
+    private String opsManagerReason;
+    private OffsetDateTime opsAuthorizationDate;
     private Double piecesPerPallet;
     private String palletType;
     private String palletTypeLabel;

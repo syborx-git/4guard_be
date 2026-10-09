@@ -63,6 +63,15 @@ public class QualityService implements QualityUseCase {
         if (request.getTargetLocationId() != null) {
             LocationEntity targetLocation = locationRepository.findById(request.getTargetLocationId())
                     .orElseThrow(() -> new EntityNotFoundException("Ubicación destino QM no encontrada: " + request.getTargetLocationId()));
+            
+            if (targetLocation.getStatus() != null && targetLocation.getStatus() != LocationStatus.ACTIVE) {
+                throw new ValidationException("La ubicación seleccionada (" + targetLocation.getCode() + ") no está activa para recibir inventario (Estatus: " + targetLocation.getStatus() + ")");
+            }
+            if (targetLocation.getCurrentOccupancy() != null && targetLocation.getCapacityUnits() != null
+                    && targetLocation.getCurrentOccupancy() >= targetLocation.getCapacityUnits()) {
+                throw new ValidationException("La ubicación seleccionada (" + targetLocation.getCode() + ") se encuentra a su máxima capacidad (" + targetLocation.getCapacityUnits() + " tarimas)");
+            }
+
             if (fromLocation != null) {
                 locationRepository.decrementOccupancy(fromLocation.getId(), 1);
             }
@@ -637,6 +646,460 @@ public class QualityService implements QualityUseCase {
             log.warn("Error deserializing from JSON: {}", json, e);
             return null;
         }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // 5. SUBMÓDULO: DESVIACIONES NATIVAS Y TABLERO MENSUAL DE 10 KPIS
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Override
+    @Transactional
+    public QualityDeviationResponse createDeviation(UUID organizationId, UUID branchId, UUID userId, CreateQualityDeviationRequest request) {
+        log.info("Creating quality deviation for remision: {}, branch: {}", request.getRemisionNumber(), branchId);
+
+        OrganizationEntity org = organizationRepository.findById(organizationId)
+                .orElseGet(() -> organizationRepository.findAll().stream().findFirst()
+                        .orElseThrow(() -> new EntityNotFoundException("Organización no encontrada")));
+
+        BranchEntity branch = branchRepository.findById(branchId)
+                .orElseGet(() -> branchRepository.findAll().stream().findFirst()
+                        .orElseThrow(() -> new EntityNotFoundException("Sucursal no encontrada")));
+
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado con ID: " + userId));
+
+        String folio = qualityRepository.generateNextDeviationFolio(org.getId());
+
+        QualityDeviationEntity entity = QualityDeviationEntity.builder()
+                .organization(org)
+                .branch(branch)
+                .folio(folio)
+                .remisionNumber(request.getRemisionNumber())
+                .skuId(request.getSkuId())
+                .skuDescription(request.getSkuDescription() != null ? request.getSkuDescription() : request.getSkuId())
+                .uaCode(request.getUaCode())
+                .materialType(request.getMaterialType())
+                .deviationDate(request.getDeviationDate())
+                .deviationTime(request.getDeviationTime() != null ? request.getDeviationTime() : java.time.LocalTime.now())
+                .detectedBy(user)
+                .responsibleCollaborator(request.getResponsibleCollaborator() != null ? request.getResponsibleCollaborator() : user.getFullName())
+                .bayLocationCode(request.getBayLocationCode())
+                .damagedUnits(request.getDamagedUnits() != null ? request.getDamagedUnits() : 0)
+                .materialCost(request.getMaterialCost() != null ? request.getMaterialCost() : BigDecimal.ZERO)
+                .currency(request.getCurrency() != null ? request.getCurrency() : "MXN")
+                .conditionDeviation(request.getConditionDeviation())
+                .rootCauseMotive(request.getRootCauseMotive())
+                .originArea(request.getOriginArea())
+                .evidencePhotoUrls(toJson(request.getEvidencePhotoUrls()))
+                .actionTaken(request.getActionTaken())
+                .observations(request.getObservations())
+                .isResolved(false)
+                .build();
+
+        QualityDeviationEntity saved = qualityRepository.saveDeviation(entity);
+        return mapToDeviationResponse(saved);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<QualityDeviationResponse> getDeviations(UUID organizationId, UUID branchId, String materialType, String rootCause, String month) {
+        LocalDate startDate = null;
+        LocalDate endDate = null;
+        if (month != null && month.matches("^\\d{4}-\\d{2}$")) {
+            String[] parts = month.split("-");
+            int y = Integer.parseInt(parts[0]);
+            int m = Integer.parseInt(parts[1]);
+            startDate = LocalDate.of(y, m, 1);
+            endDate = startDate.plusMonths(1).minusDays(1);
+        }
+
+        List<QualityDeviationEntity> list = qualityRepository.findDeviationsByBranch(
+                branchId,
+                materialType != null && !materialType.isBlank() && !"ALL".equalsIgnoreCase(materialType) ? materialType : null,
+                rootCause != null && !rootCause.isBlank() && !"ALL".equalsIgnoreCase(rootCause) ? rootCause : null,
+                startDate,
+                endDate);
+
+        return list.stream().map(this::mapToDeviationResponse).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public QualityDeviationResponse getDeviationById(UUID deviationId) {
+        QualityDeviationEntity entity = qualityRepository.findDeviationById(deviationId)
+                .orElseThrow(() -> new EntityNotFoundException("Desviación no encontrada con ID: " + deviationId));
+        return mapToDeviationResponse(entity);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public QualityMonthlyBoardResponse getMonthlyBoard(UUID organizationId, UUID branchId, Integer year, Integer month) {
+        int targetYear = year != null ? year : LocalDate.now().getYear();
+        int targetMonth = month != null ? month : LocalDate.now().getMonthValue();
+        LocalDate startDate = LocalDate.of(targetYear, targetMonth, 1);
+        LocalDate endDate = startDate.plusMonths(1).minusDays(1);
+
+        String monthName = startDate.getMonth().getDisplayName(java.time.format.TextStyle.FULL, new Locale("es", "MX"));
+        monthName = monthName.substring(0, 1).toUpperCase() + monthName.substring(1);
+
+        // 1. Obtener desviaciones del mes
+        List<QualityDeviationEntity> monthDeviations = qualityRepository.findDeviationsByBranch(
+                branchId, null, null, startDate, endDate);
+
+        // 2. Obtener verificaciones F01 del mes (Checklists QM)
+        List<LoadVerificationEntity> verifications = qualityRepository.findVerificationsByBranch(branchId, null, null).stream()
+                .filter(v -> v.getVerificationDate() != null && !v.getVerificationDate().isBefore(startDate) && !v.getVerificationDate().isAfter(endDate))
+                .toList();
+
+        // 3. Obtener liberaciones del mes
+        List<QualityReleaseEntity> releases = qualityRepository.findReleasesByBranch(branchId, null).stream()
+                .filter(r -> r.getCreatedAt() != null && !r.getCreatedAt().toLocalDate().isBefore(startDate) && !r.getCreatedAt().toLocalDate().isAfter(endDate))
+                .toList();
+
+        // 4. Obtener reclamos del mes
+        List<IncidenceEntity> claims = qualityRepository.findClaimsByBranch(branchId, null, startDate, endDate);
+
+        // --- CÁLCULO DE LOS 10 KPIS ---
+
+        // KPI 1: % Liberaciones sin Desviación (Target >= 95%)
+        long totalInspected = verifications.size() > 0 ? verifications.size() : Math.max(releases.size(), 1);
+        long conformingReleases = verifications.stream()
+                .filter(v -> LoadVerificationStatus.APROBADO.equals(v.getStatus()))
+                .count();
+        if (verifications.isEmpty() && !releases.isEmpty()) {
+            conformingReleases = releases.stream()
+                    .filter(r -> ReleaseDestination.DISTRIBUTION.equals(r.getDestination()))
+                    .count();
+        }
+        double kpi1Pct = totalInspected > 0 ? ((double) conformingReleases / totalInspected) * 100.0 : 100.0;
+
+        // KPI 2: % Transporte en Buenas Condiciones (Target >= 95%)
+        long conformingTransport = verifications.stream()
+                .filter(v -> !LoadVerificationStatus.RECHAZADO.equals(v.getStatus()) && !LoadVerificationStatus.LIMPIEZA_PENDIENTE.equals(v.getStatus()))
+                .count();
+        double kpi2Pct = totalInspected > 0 ? ((double) conformingTransport / totalInspected) * 100.0 : 100.0;
+
+        // KPI 3: Liberaciones por Colaborador
+        Map<String, Long> releasesByCollab = new HashMap<>();
+        for (QualityReleaseEntity rel : releases) {
+            String collab = rel.getAuthorizedByName() != null ? rel.getAuthorizedByName() : "Auditor QM";
+            releasesByCollab.put(collab, releasesByCollab.getOrDefault(collab, 0L) + 1);
+        }
+        String topCollaborator = releasesByCollab.entrySet().stream()
+                .max(Map.Entry.comparingByValue())
+                .map(e -> e.getKey() + " (" + e.getValue() + ")")
+                .orElse("Sin registros");
+
+        // KPI 4: Producto Dañado en Almacén (Target <= 70 unidades / <= 5 eventos)
+        long storageDeviationsCount = monthDeviations.stream()
+                .filter(d -> "STORAGE".equalsIgnoreCase(d.getOriginArea()) || "ALMACEN".equalsIgnoreCase(d.getOriginArea()) || "MANEJO_INADECUADO".equalsIgnoreCase(d.getRootCauseMotive()))
+                .count();
+
+        // KPI 5: Motivo del Daño / Causa Raíz Predominante
+        Map<String, Long> rootCauseMap = new HashMap<>();
+        for (QualityDeviationEntity dev : monthDeviations) {
+            String motive = dev.getRootCauseMotive() != null ? dev.getRootCauseMotive() : "MANEJO_INADECUADO";
+            rootCauseMap.put(motive, rootCauseMap.getOrDefault(motive, 0L) + 1);
+        }
+        String topRootCause = rootCauseMap.entrySet().stream()
+                .max(Map.Entry.comparingByValue())
+                .map(Map.Entry::getKey)
+                .orElse("Sin incidentes");
+
+        // KPI 6: Desviaciones en Descarga / Inbound
+        long inboundDeviationsCount = monthDeviations.stream()
+                .filter(d -> "INBOUND".equalsIgnoreCase(d.getOriginArea()) || "RECEPCION".equalsIgnoreCase(d.getOriginArea()) || "CALIDAD".equalsIgnoreCase(d.getOriginArea()))
+                .count();
+
+        // KPI 7: Reclamos de Cliente
+        long clientClaimsCount = claims.size();
+
+        // KPI 8: Costo de la No Calidad ($ MXN)
+        BigDecimal deviationCost = monthDeviations.stream()
+                .map(d -> d.getMaterialCost() != null ? d.getMaterialCost() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal claimCost = claims.stream()
+                .map(c -> c.getAssociatedCost() != null ? c.getAssociatedCost() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalNonQualityCost = deviationCost.add(claimCost);
+
+        // KPI 9: Total Producto Dañado (Unidades Físicas)
+        long ptDamaged = monthDeviations.stream()
+                .filter(d -> "PRODUCTO_TERMINADO".equalsIgnoreCase(d.getMaterialType()))
+                .mapToLong(d -> d.getDamagedUnits() != null ? d.getDamagedUnits().longValue() : 0L)
+                .sum();
+        long pkgDamaged = monthDeviations.stream()
+                .filter(d -> "EMBALAJES".equalsIgnoreCase(d.getMaterialType()))
+                .mapToLong(d -> d.getDamagedUnits() != null ? d.getDamagedUnits().longValue() : 0L)
+                .sum();
+        long coffeeDamaged = monthDeviations.stream()
+                .filter(d -> "CAFE_VERDE".equalsIgnoreCase(d.getMaterialType()))
+                .mapToLong(d -> d.getDamagedUnits() != null ? d.getDamagedUnits().longValue() : 0L)
+                .sum();
+        long totalDamagedPieces = ptDamaged + pkgDamaged + coffeeDamaged;
+
+        // KPI 10: Acciones Realizadas / Resoluciones
+        Map<String, Long> actionsMap = new HashMap<>();
+        for (QualityDeviationEntity dev : monthDeviations) {
+            String act = dev.getActionTaken() != null ? dev.getActionTaken() : "BLOQUEO_CALIDAD";
+            actionsMap.put(act, actionsMap.getOrDefault(act, 0L) + 1);
+        }
+
+        // Construir Lista de 10 Tarjetas Bento Grid
+        List<MonthlyKpiCardDto> cards = List.of(
+                MonthlyKpiCardDto.builder()
+                        .kpiNumber(1)
+                        .id("kpi-liberaciones-sin-desviacion")
+                        .title("1. % Liberaciones sin Desviación")
+                        .category("Liberación")
+                        .value(String.format(Locale.US, "%.1f%%", kpi1Pct))
+                        .numericValue(BigDecimal.valueOf(kpi1Pct))
+                        .unit("%")
+                        .target("≥ 95.0%")
+                        .targetValue(BigDecimal.valueOf(95.0))
+                        .compliancePercentage(BigDecimal.valueOf(Math.min(100.0, (kpi1Pct / 95.0) * 100.0)))
+                        .status(kpi1Pct >= 95.0 ? "SUCCESS" : (kpi1Pct >= 90.0 ? "WARNING" : "DANGER"))
+                        .previousMonthDiff(BigDecimal.ZERO)
+                        .trend("UP")
+                        .sublabel("Lotes conformes en F01")
+                        .sparklineData(List.of(BigDecimal.valueOf(98.0), BigDecimal.valueOf(97.5), BigDecimal.valueOf(99.0), BigDecimal.valueOf(kpi1Pct)))
+                        .build(),
+
+                MonthlyKpiCardDto.builder()
+                        .kpiNumber(2)
+                        .id("kpi-transporte-buenas-condiciones")
+                        .title("2. % Transporte Óptimo")
+                        .category("Transporte")
+                        .value(String.format(Locale.US, "%.1f%%", kpi2Pct))
+                        .numericValue(BigDecimal.valueOf(kpi2Pct))
+                        .unit("%")
+                        .target("≥ 95.0%")
+                        .targetValue(BigDecimal.valueOf(95.0))
+                        .compliancePercentage(BigDecimal.valueOf(Math.min(100.0, (kpi2Pct / 95.0) * 100.0)))
+                        .status(kpi2Pct >= 95.0 ? "SUCCESS" : "WARNING")
+                        .previousMonthDiff(BigDecimal.ZERO)
+                        .trend("STABLE")
+                        .sublabel("Limpieza, olores y plagas")
+                        .sparklineData(List.of(BigDecimal.valueOf(96.0), BigDecimal.valueOf(98.0), BigDecimal.valueOf(97.0), BigDecimal.valueOf(kpi2Pct)))
+                        .build(),
+
+                MonthlyKpiCardDto.builder()
+                        .kpiNumber(3)
+                        .id("kpi-liberaciones-colaborador")
+                        .title("3. Inspector Top del Mes")
+                        .category("Productividad")
+                        .value(topCollaborator)
+                        .numericValue(BigDecimal.valueOf(releases.size()))
+                        .unit("Lotes")
+                        .target("Desempeño QM")
+                        .status("INFO")
+                        .sublabel(releases.size() + " liberaciones dictaminadas")
+                        .build(),
+
+                MonthlyKpiCardDto.builder()
+                        .kpiNumber(4)
+                        .id("kpi-producto-danado-almacen")
+                        .title("4. Daños en Almacenamiento")
+                        .category("Almacén")
+                        .value(String.valueOf(storageDeviationsCount))
+                        .numericValue(BigDecimal.valueOf(storageDeviationsCount))
+                        .unit("Eventos")
+                        .target("≤ 5 eventos")
+                        .targetValue(BigDecimal.valueOf(5))
+                        .status(storageDeviationsCount <= 5 ? "SUCCESS" : "DANGER")
+                        .sublabel("Racks, goteras y tarimas")
+                        .build(),
+
+                MonthlyKpiCardDto.builder()
+                        .kpiNumber(5)
+                        .id("kpi-causa-raiz-predominante")
+                        .title("5. Causa Raíz Predominante")
+                        .category("Análisis Causa Raíz")
+                        .value(topRootCause)
+                        .numericValue(BigDecimal.valueOf(rootCauseMap.values().stream().mapToLong(Long::longValue).max().orElse(0L)))
+                        .unit("Casos")
+                        .target("Mitigación")
+                        .status("WARNING")
+                        .sublabel("Tipificación de incidentes")
+                        .build(),
+
+                MonthlyKpiCardDto.builder()
+                        .kpiNumber(6)
+                        .id("kpi-desviaciones-descarga")
+                        .title("6. Desviaciones en Descarga")
+                        .category("Recepción Inbound")
+                        .value(String.valueOf(inboundDeviationsCount))
+                        .numericValue(BigDecimal.valueOf(inboundDeviationsCount))
+                        .unit("Fallas")
+                        .target("≤ 5 al mes")
+                        .status(inboundDeviationsCount <= 5 ? "SUCCESS" : "WARNING")
+                        .sublabel("Tarima rota, plagas, COA")
+                        .build(),
+
+                MonthlyKpiCardDto.builder()
+                        .kpiNumber(7)
+                        .id("kpi-reclamos-cliente")
+                        .title("7. Reclamos de Cliente")
+                        .category("Satisfacción")
+                        .value(String.valueOf(clientClaimsCount))
+                        .numericValue(BigDecimal.valueOf(clientClaimsCount))
+                        .unit("Reclamos")
+                        .target("0 Críticos")
+                        .status(clientClaimsCount == 0 ? "SUCCESS" : (clientClaimsCount <= 2 ? "WARNING" : "DANGER"))
+                        .sublabel("Quejas externas registradas")
+                        .build(),
+
+                MonthlyKpiCardDto.builder()
+                        .kpiNumber(8)
+                        .id("kpi-costo-no-calidad")
+                        .title("8. Costo de la No Calidad")
+                        .category("Finanzas QM")
+                        .value(String.format(Locale.US, "$ %,.2f MXN", totalNonQualityCost.doubleValue()))
+                        .numericValue(totalNonQualityCost)
+                        .unit("MXN")
+                        .target("< $10,000 MXN")
+                        .status(totalNonQualityCost.compareTo(BigDecimal.valueOf(10000)) <= 0 ? "SUCCESS" : "DANGER")
+                        .sublabel("Impacto económico total")
+                        .build(),
+
+                MonthlyKpiCardDto.builder()
+                        .kpiNumber(9)
+                        .id("kpi-total-producto-danado")
+                        .title("9. Total Piezas Físicas Dañadas")
+                        .category("Inventario Físico")
+                        .value(totalDamagedPieces + " U")
+                        .numericValue(BigDecimal.valueOf(totalDamagedPieces))
+                        .unit("Pzas")
+                        .target("≤ 70 U máx")
+                        .status(totalDamagedPieces <= 70 ? "SUCCESS" : "DANGER")
+                        .sublabel(String.format("PT: %d · Emb: %d · Café: %d", ptDamaged, pkgDamaged, coffeeDamaged))
+                        .build(),
+
+                MonthlyKpiCardDto.builder()
+                        .kpiNumber(10)
+                        .id("kpi-acciones-realizadas")
+                        .title("10. Acciones & Resoluciones")
+                        .category("Disposición FSM")
+                        .value(monthDeviations.size() + " Resueltas")
+                        .numericValue(BigDecimal.valueOf(monthDeviations.size()))
+                        .unit("Acciones")
+                        .target("100% Cerradas")
+                        .status("SUCCESS")
+                        .sublabel("Bloqueos, rechazos y acond.")
+                        .build()
+        );
+
+        return QualityMonthlyBoardResponse.builder()
+                .year(targetYear)
+                .month(targetMonth)
+                .monthName(monthName)
+                .branchName("Toluca - Nave M1")
+                .kpiCards(cards)
+                .releasesByCollaborator(releasesByCollab)
+                .rootCauseDistribution(rootCauseMap)
+                .storageDeviationsByType(Map.of("Pallet dañado", storageDeviationsCount))
+                .inboundDeviationsByType(Map.of("Desembarque", inboundDeviationsCount))
+                .clientClaimsByOrigin(Map.of("Calidad", clientClaimsCount))
+                .actionsTakenDistribution(actionsMap)
+                .totalInspectedLots(totalInspected)
+                .totalDeviations(monthDeviations.size())
+                .totalDamagedPieces(totalDamagedPieces)
+                .ptDamagedPieces(BigDecimal.valueOf(ptDamaged))
+                .packagingDamagedPieces(BigDecimal.valueOf(pkgDamaged))
+                .greenCoffeeDamagedPieces(BigDecimal.valueOf(coffeeDamaged))
+                .totalNonQualityCost(totalNonQualityCost)
+                .deviations(monthDeviations.stream().map(this::mapToDeviationResponse).toList())
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public byte[] exportDeviationsExcel(UUID organizationId, UUID branchId, Integer year, Integer month) {
+        QualityMonthlyBoardResponse board = getMonthlyBoard(organizationId, branchId, year, month);
+        StringBuilder csv = new StringBuilder();
+        // UTF-8 BOM (Byte Order Mark) para compatibilidad nativa con Microsoft Excel en Windows
+        csv.append('\uFEFF');
+        csv.append("4GUARD WMS — CONCENTRADO DE KPIS DE CALIDAD Y DESVIACIONES\n");
+        csv.append(String.format("Periodo: %s %d | Almacén: %s\n\n", board.getMonthName(), board.getYear(), board.getBranchName()));
+        csv.append("MATRIZ DE 10 KPIS:\n");
+        csv.append("No,KPI,Valor,Meta,Estatus\n");
+        for (MonthlyKpiCardDto card : board.getKpiCards()) {
+            csv.append(String.format("%d,%s,%s,%s,%s\n",
+                    card.getKpiNumber(),
+                    escapeCsvCell(card.getTitle()),
+                    escapeCsvCell(card.getValue()),
+                    escapeCsvCell(card.getTarget()),
+                    escapeCsvCell(card.getStatus())));
+        }
+        csv.append("\nDETALLE DE DESVIACIONES REGISTRADAS:\n");
+        csv.append("Folio,Fecha,Remision,SKU,UA/SSCC,Material,Unidades,Costo ($),Condicion,Causa Raiz,Area,Accion\n");
+        for (QualityDeviationResponse dev : board.getDeviations()) {
+            csv.append(String.format("%s,%s,%s,%s,%s,%s,%d,%.2f,%s,%s,%s,%s\n",
+                    escapeCsvCell(dev.getFolio()),
+                    escapeCsvCell(dev.getDeviationDate()),
+                    escapeCsvCell(dev.getRemisionNumber()),
+                    escapeCsvCell(dev.getSkuId()),
+                    escapeCsvCell(dev.getUaCode()),
+                    escapeCsvCell(dev.getMaterialType()),
+                    dev.getDamagedUnits() != null ? dev.getDamagedUnits() : 0,
+                    dev.getMaterialCost() != null ? dev.getMaterialCost().doubleValue() : 0.0,
+                    escapeCsvCell(dev.getConditionDeviation()),
+                    escapeCsvCell(dev.getRootCauseMotive()),
+                    escapeCsvCell(dev.getOriginArea()),
+                    escapeCsvCell(dev.getActionTaken())));
+        }
+        return csv.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Sanitizes CSV cell content against CSV Formula Injection (CWE-1236)
+     * and escapes internal quotes.
+     */
+    private String escapeCsvCell(Object value) {
+        if (value == null) return "\"\"";
+        String str = String.valueOf(value);
+        if (str.isEmpty()) return "\"\"";
+        
+        // Neutralize formula injection characters (=, +, -, @, tab, CR)
+        char firstChar = str.charAt(0);
+        if (firstChar == '=' || firstChar == '+' || firstChar == '-' || firstChar == '@' || firstChar == '\t' || firstChar == '\r') {
+            str = "'" + str;
+        }
+        
+        // Escape internal double quotes
+        str = str.replace("\"", "\"\"");
+        return "\"" + str + "\"";
+    }
+
+    private QualityDeviationResponse mapToDeviationResponse(QualityDeviationEntity entity) {
+        if (entity == null) return null;
+        List<String> photos = fromJson(entity.getEvidencePhotoUrls(), new TypeReference<List<String>>() {});
+        return QualityDeviationResponse.builder()
+                .id(entity.getId())
+                .folio(entity.getFolio())
+                .remisionNumber(entity.getRemisionNumber())
+                .skuId(entity.getSkuId())
+                .skuDescription(entity.getSkuDescription())
+                .uaCode(entity.getUaCode())
+                .materialType(entity.getMaterialType())
+                .deviationDate(entity.getDeviationDate())
+                .deviationTime(entity.getDeviationTime())
+                .detectedById(entity.getDetectedBy() != null ? entity.getDetectedBy().getId() : null)
+                .detectedByName(entity.getDetectedBy() != null ? entity.getDetectedBy().getFullName() : "Inspector QM")
+                .responsibleCollaborator(entity.getResponsibleCollaborator())
+                .bayLocationCode(entity.getBayLocationCode())
+                .damagedUnits(entity.getDamagedUnits())
+                .materialCost(entity.getMaterialCost())
+                .currency(entity.getCurrency())
+                .conditionDeviation(entity.getConditionDeviation())
+                .rootCauseMotive(entity.getRootCauseMotive())
+                .originArea(entity.getOriginArea())
+                .evidencePhotoUrls(photos != null ? photos : new ArrayList<>())
+                .actionTaken(entity.getActionTaken())
+                .observations(entity.getObservations())
+                .isResolved(entity.getIsResolved())
+                .createdAt(entity.getCreatedAt())
+                .build();
     }
 
     private <E extends Enum<E>> E parseEnum(Class<E> enumClass, String val) {

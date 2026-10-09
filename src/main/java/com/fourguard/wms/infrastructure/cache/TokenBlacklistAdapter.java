@@ -67,8 +67,11 @@ public class TokenBlacklistAdapter implements TokenBlacklistPort {
             Cache cache = cacheManager.getCache(SecurityConstants.CACHE_SESSIONS);
             if (cache != null) {
                 Cache.ValueWrapper wrapper = cache.get(userId.toString());
-                if (wrapper != null && wrapper.get() instanceof Number) {
-                    return ((Number) wrapper.get()).longValue();
+                if (wrapper != null) {
+                    Object val = wrapper.get();
+                    if (val instanceof Number num) {
+                        return num.longValue();
+                    }
                 }
             }
         } catch (Exception e) {

@@ -28,7 +28,7 @@ public class CarrierController {
     private final CarrierUseCase carrierUseCase;
 
     @PostMapping
-    @PreAuthorize("hasAuthority('CARRIERS_CREATE') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('CARRIERS_CREATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     @Operation(summary = "Crear transportista", description = "Registra un nuevo transportista en el WMS con sus capacidades de vehículos y clientes preferenciales.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Transportista creado con éxito"),
@@ -42,7 +42,7 @@ public class CarrierController {
     }
 
     @PutMapping
-    @PreAuthorize("hasAuthority('CARRIERS_UPDATE') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('CARRIERS_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     @Operation(summary = "Actualizar transportista", description = "Actualiza los datos, capacidades y relaciones de un transportista existente.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Transportista actualizado con éxito"),
@@ -57,7 +57,7 @@ public class CarrierController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('CARRIERS_READ') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('CARRIERS_READ') or hasAuthority('SECURITY_GATE_READ') or hasAuthority('RECEIVING_READ') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Obtener transportista por ID", description = "Recupera los detalles completos de un transportista específico por su UUID.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Transportista encontrado con éxito"),
@@ -71,7 +71,7 @@ public class CarrierController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAuthority('CARRIERS_READ') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('CARRIERS_READ') or hasAuthority('SECURITY_GATE_READ') or hasAuthority('RECEIVING_READ') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Obtener transportistas", description = "Recupera la lista de transportistas de la organización, incluyendo sus relaciones.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Lista de transportistas recuperada con éxito"),
@@ -89,7 +89,7 @@ public class CarrierController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('CARRIERS_DELETE') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('CARRIERS_DELETE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     @Operation(summary = "Eliminar transportista", description = "Elimina físicamente un transportista del sistema por su ID (e inyecta el log a la bitácora de auditoría).")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Transportista eliminado con éxito"),
@@ -103,7 +103,7 @@ public class CarrierController {
     }
 
     @PatchMapping("/{id}/status")
-    @PreAuthorize("hasAuthority('CARRIERS_UPDATE') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('CARRIERS_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     @Operation(summary = "Actualizar estado de transportista", description = "Cambia el estado operativo de un transportista (ACTIVE, INACTIVE, SUSPENDED) registrando el motivo y observaciones del modal.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Estado actualizado con éxito"),
@@ -120,7 +120,7 @@ public class CarrierController {
     }
 
     @GetMapping("/{id}/audit")
-    @PreAuthorize("hasAuthority('CARRIERS_READ') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('CARRIERS_READ') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR')")
     @Operation(summary = "Obtener historial de auditoría", description = "Devuelve todo el historial cronológico de cambios de un transportista específico.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Historial de auditoría recuperado con éxito"),
@@ -134,7 +134,7 @@ public class CarrierController {
     }
 
     @GetMapping("/validate-rfc")
-    @PreAuthorize("hasAuthority('CARRIERS_READ') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('CARRIERS_READ') or hasAuthority('SECURITY_GATE_READ') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA')")
     @Operation(summary = "Validar RFC de transportista", description = "Verifica que el RFC (tax_id) especificado no esté registrado previamente para otro transportista.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "RFC disponible"),

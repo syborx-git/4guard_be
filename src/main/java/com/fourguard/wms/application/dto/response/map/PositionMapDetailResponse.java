@@ -19,6 +19,7 @@ public class PositionMapDetailResponse {
     private String sectionName;
     private String skuCode;
     private String skuDescription;
+    private String category; // FIXED_STORAGE | TEMPORARY_BUFFER | PRELOAD_STAGING
     private String status; // AVAILABLE | OCCUPIED | BLOCKED | MAINTENANCE
     private Integer capacityTarimas;
     private Integer currentTarimas;

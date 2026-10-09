@@ -55,6 +55,10 @@ public class WarehouseReceptionEntity extends BaseVersionedEntity {
 
     // ── CheckIn Caseta ──────────────────────────────────────────────────────
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "pre_checkin_id")
+    private SecurityPreCheckinEntity preCheckin;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "carrier_id")
     private CarrierEntity carrier;
 
@@ -127,6 +131,36 @@ public class WarehouseReceptionEntity extends BaseVersionedEntity {
 
     @Column(columnDefinition = "TEXT")
     private String observations;
+
+    @Column(name = "requires_ops_authorization")
+    @Builder.Default
+    private Boolean requiresOpsAuthorization = false;
+
+    @Column(name = "authorized_by_ops_manager", length = 120)
+    private String authorizedByOpsManager;
+
+    @Column(name = "ops_manager_reason", columnDefinition = "TEXT")
+    private String opsManagerReason;
+
+    @Column(name = "ops_authorization_date")
+    private OffsetDateTime opsAuthorizationDate;
+
+    // ── Reingresos y Devoluciones (ADR-021) ──────────────────────────────────
+    @Column(name = "operation_type", length = 30)
+    @Builder.Default
+    private String operationType = "ENTRY"; // ENTRY, REENTRY
+
+    @Column(name = "source_outbound_id")
+    private UUID sourceOutboundId;
+
+    @Column(name = "source_outbound_folio", length = 50)
+    private String sourceOutboundFolio;
+
+    @Column(name = "reentry_reason", length = 100)
+    private String reentryReason;
+
+    @Column(name = "reentry_notes", columnDefinition = "TEXT")
+    private String reentryNotes;
 
     // ── Cierre y Cancelación ────────────────────────────────────────────────
     @Column(name = "completed_at")

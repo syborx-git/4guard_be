@@ -22,4 +22,7 @@ public interface ClientRepositoryPort {
     // Validaciones de unicidad — External ID / Código ERP
     boolean existsByOrganizationIdAndExternalId(UUID organizationId, String externalId);
     boolean existsByOrganizationIdAndExternalIdAndIdNot(UUID organizationId, String externalId, UUID id);
+
+    // Búsqueda directa indexada por código, RFC o nombre
+    Optional<ClientEntity> findByOrganizationIdAndSearch(UUID organizationId, String search);
 }

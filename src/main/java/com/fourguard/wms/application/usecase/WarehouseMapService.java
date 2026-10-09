@@ -2,6 +2,7 @@ package com.fourguard.wms.application.usecase;
 
 import com.fourguard.wms.application.dto.request.map.UpdatePositionStatusMapRequest;
 import com.fourguard.wms.application.dto.response.map.*;
+import com.fourguard.wms.domain.enums.LocationCategory;
 import com.fourguard.wms.domain.enums.LocationStatus;
 import com.fourguard.wms.domain.ports.in.WarehouseMapUseCase;
 import com.fourguard.wms.infrastructure.persistence.entity.LocationEntity;
@@ -205,6 +206,151 @@ public class WarehouseMapService implements WarehouseMapUseCase {
     }
 
     @Override
+    @Transactional
+    public PositionMapDetailResponse createPosition(com.fourguard.wms.application.dto.request.map.CreatePositionMapRequest request, String username) {
+        WarehouseSectionEntity section = sectionRepository.findById(request.getSectionId())
+            .orElseThrow(() -> new EntityNotFoundException("Sección no encontrada con ID: " + request.getSectionId()));
+
+        String sanitizedUser = (username != null && !username.isBlank()) ? username : "OPERATIONS_DESK";
+        
+        String rawCode = section.getCode() != null ? section.getCode() : "";
+        String zoneChar = rawCode.replaceAll("(?i)sec-alm-", "").replaceAll("(?i)sec-", "").replaceAll("(?i)alm-", "").trim();
+        if (zoneChar.isEmpty()) {
+            zoneChar = "A";
+        }
+        if (zoneChar.length() > 1 && section.getName() != null) {
+            java.util.regex.Matcher zm = java.util.regex.Pattern.compile("(?i)(?:Almac[eé]n|Nave|Zone)\\s*([A-Za-z])").matcher(section.getName());
+            if (zm.find()) {
+                zoneChar = zm.group(1).toUpperCase();
+            }
+        }
+
+        String category = request.getCategory() != null ? request.getCategory().toUpperCase() : "FIXED_STORAGE";
+        List<LocationEntity> existingLocs = locationRepository.findBySectionIdOrderByCodeAsc(section.getId());
+        
+        int maxSeq = 0;
+        java.util.regex.Pattern pattern;
+        if ("TEMPORARY_BUFFER".equalsIgnoreCase(category)) {
+            pattern = java.util.regex.Pattern.compile("POS-" + zoneChar + "-T(\\d+)", java.util.regex.Pattern.CASE_INSENSITIVE);
+        } else if ("PRELOAD_STAGING".equalsIgnoreCase(category)) {
+            pattern = java.util.regex.Pattern.compile("POS-" + zoneChar + "-PRE(\\d+)", java.util.regex.Pattern.CASE_INSENSITIVE);
+        } else {
+            pattern = java.util.regex.Pattern.compile("POS-" + zoneChar + "-(\\d+)", java.util.regex.Pattern.CASE_INSENSITIVE);
+        }
+
+        for (LocationEntity l : existingLocs) {
+            if (l.getCode() != null) {
+                if ("FIXED_STORAGE".equalsIgnoreCase(category) && (l.getCode().contains("-T") || l.getCode().contains("-PRE"))) {
+                    continue;
+                }
+                java.util.regex.Matcher m = pattern.matcher(l.getCode());
+                if (m.find()) {
+                    try {
+                        int num = Integer.parseInt(m.group(1));
+                        if (num > maxSeq) maxSeq = num;
+                    } catch (NumberFormatException ignored) {}
+                }
+            }
+        }
+
+        if ("FIXED_STORAGE".equalsIgnoreCase(category) && section.getPosFijas() != null && section.getPosFijas() > maxSeq) {
+            maxSeq = section.getPosFijas();
+        }
+
+        int nextSeq = maxSeq + 1;
+        String code = request.getCode();
+        if (code == null || code.isBlank()) {
+            if ("TEMPORARY_BUFFER".equalsIgnoreCase(category)) {
+                code = String.format("POS-%s-T%02d", zoneChar, nextSeq);
+            } else if ("PRELOAD_STAGING".equalsIgnoreCase(category)) {
+                code = String.format("POS-%s-PRE%02d", zoneChar, nextSeq);
+            } else {
+                code = String.format("POS-%s-%03d", zoneChar, nextSeq);
+            }
+        }
+
+        int currentCount = existingLocs != null ? existingLocs.size() : 0;
+        LocationCategory locCategory;
+        try {
+            locCategory = LocationCategory.valueOf(category);
+        } catch (Exception e) {
+            locCategory = LocationCategory.FIXED_STORAGE;
+        }
+
+        LocationEntity loc = new LocationEntity();
+        loc.setBranch(section.getBranch());
+        loc.setSection(section);
+        loc.setCode(code.trim().toUpperCase());
+        loc.setName("Posición " + loc.getCode());
+        loc.setZone(zoneChar);
+        loc.setAisle(request.getAisle() != null ? request.getAisle() : "01");
+        loc.setRack(request.getRack() != null ? request.getRack() : "01");
+        loc.setLevel(request.getLevel() != null ? request.getLevel() : 1);
+        loc.setPosition(String.valueOf(currentCount + 1));
+        loc.setCategory(locCategory);
+        loc.setStatus(LocationStatus.ACTIVE);
+        loc.setIsBlocked(false);
+        loc.setCapacityUnits(request.getCapacityTarimas() != null ? request.getCapacityTarimas() : 22);
+        loc.setCurrentOccupancy(0);
+        loc.setCreatedBy(sanitizedUser);
+        loc.setUpdatedBy(sanitizedUser);
+
+        LocationEntity saved = locationRepository.save(loc);
+        Map<String, List<String>> materialsMap = loadMaterialsMap();
+        return mapLocationToPositionDetail(saved, materialsMap);
+    }
+
+    @Override
+    @Transactional
+    public PositionMapDetailResponse updatePositionDetails(UUID positionId, com.fourguard.wms.application.dto.request.map.UpdatePositionDetailsMapRequest request, String username) {
+        LocationEntity loc = locationRepository.findById(positionId)
+            .orElseThrow(() -> new EntityNotFoundException("Ubicación no encontrada con ID: " + positionId));
+
+        String sanitizedUser = (username != null && !username.isBlank()) ? username : "OPERATIONS_DESK";
+
+        if (request.getCode() != null && !request.getCode().isBlank()) {
+            loc.setCode(request.getCode().trim().toUpperCase());
+            loc.setName("Posición " + loc.getCode());
+        }
+        if (request.getCategory() != null && !request.getCategory().isBlank()) {
+            try {
+                loc.setCategory(LocationCategory.valueOf(request.getCategory().trim().toUpperCase()));
+            } catch (Exception ignored) {
+                loc.setCategory(LocationCategory.FIXED_STORAGE);
+            }
+        }
+        if (request.getCapacityTarimas() != null && request.getCapacityTarimas() > 0) {
+            loc.setCapacityUnits(request.getCapacityTarimas());
+        }
+        if (request.getAisle() != null) loc.setAisle(request.getAisle());
+        if (request.getRack() != null) loc.setRack(request.getRack());
+        if (request.getLevel() != null) loc.setLevel(request.getLevel());
+
+        loc.setUpdatedBy(sanitizedUser);
+        LocationEntity saved = locationRepository.save(loc);
+        Map<String, List<String>> materialsMap = loadMaterialsMap();
+        return mapLocationToPositionDetail(saved, materialsMap);
+    }
+
+    @Override
+    @Transactional
+    public void deletePosition(UUID positionId, String username) {
+        LocationEntity loc = locationRepository.findById(positionId)
+            .orElseThrow(() -> new EntityNotFoundException("Ubicación no encontrada con ID: " + positionId));
+
+        if (loc.getCurrentOccupancy() != null && loc.getCurrentOccupancy() > 0) {
+            throw new IllegalStateException("No se puede dar de baja una posición con inventario activo (" + loc.getCurrentOccupancy() + " tarimas). Debe ser desocupada primero.");
+        }
+
+        loc.setStatus(LocationStatus.MAINTENANCE);
+        loc.setIsBlocked(true);
+        loc.setBlockReason("BAJA_LOGICA_POR_USUARIO");
+        loc.setStatusReason("Posición dada de baja del catálogo operativo");
+        loc.setUpdatedBy(username != null ? username : "OPERATIONS_DESK");
+        locationRepository.save(loc);
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public List<CatBlockReasonResponse> getActiveBlockReasons() {
         return blockReasonRepository.findByIsActiveTrueOrderByDescriptionAsc().stream()
@@ -254,6 +400,7 @@ public class WarehouseMapService implements WarehouseMapUseCase {
             .sectionName(l.getSection() != null ? l.getSection().getName() : "")
             .skuCode(skuCode)
             .skuDescription(skuDescription)
+            .category(l.getCategory() != null ? l.getCategory().name() : "FIXED_STORAGE")
             .status(visualStatus)
             .capacityTarimas(l.getCapacityUnits() != null ? l.getCapacityUnits() : 22)
             .currentTarimas(l.getCurrentOccupancy() != null ? l.getCurrentOccupancy() : 0)
