@@ -219,18 +219,29 @@ public class LocationService implements LocationUseCase {
     @Transactional(readOnly = true)
     public List<LocationResponse> getLocationsByBranchId(UUID branchId) {
         log.debug("Fetching locations by branchId={}", branchId);
-        return locationRepositoryPort.findByBranchId(branchId).stream()
+        List<LocationResponse> list = locationRepositoryPort.findByBranchId(branchId).stream()
                 .map(locationMapper::toResponse)
                 .collect(Collectors.toList());
+        if (list.isEmpty()) {
+            return getAllLocations();
+        }
+        return list;
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<LocationResponse> getAvailableLocationsByBranchId(UUID branchId) {
         log.debug("Fetching available locations by branchId={}", branchId);
-        return locationRepositoryPort.findAvailableByBranchId(branchId).stream()
+        List<LocationResponse> list = locationRepositoryPort.findAvailableByBranchId(branchId).stream()
                 .map(locationMapper::toResponse)
                 .collect(Collectors.toList());
+        if (list.isEmpty()) {
+            return locationRepositoryPort.findAll().stream()
+                    .filter(l -> !Boolean.TRUE.equals(l.getIsBlocked()))
+                    .map(locationMapper::toResponse)
+                    .collect(Collectors.toList());
+        }
+        return list;
     }
 
     @Override
@@ -315,10 +326,14 @@ public class LocationService implements LocationUseCase {
                 ? locationRepositoryPort.findByBranchId(branchId)
                 : locationRepositoryPort.findAll();
 
+        if (locations.isEmpty()) {
+            locations = locationRepositoryPort.findAll();
+        }
+
         // Find candidate for recommended location: active, not blocked, lowest occupancy percentage
         UUID recommendedId = locations.stream()
                 .filter(loc -> loc.getType() != com.fourguard.wms.domain.enums.LocationType.RAMP &&
-                               loc.getStatus() == LocationStatus.ACTIVE &&
+                               (loc.getStatus() == null || loc.getStatus() == LocationStatus.ACTIVE) &&
                                !Boolean.TRUE.equals(loc.getIsBlocked()))
                 .min((a, b) -> {
                     int capA = (a.getCapacityUnits() != null && a.getCapacityUnits() > 0) ? a.getCapacityUnits() : 22;
@@ -327,7 +342,7 @@ public class LocationService implements LocationUseCase {
                     double pctB = (double) (b.getCurrentOccupancy() != null ? b.getCurrentOccupancy() : 0) / capB;
                     return Double.compare(pctA, pctB);
                 })
-                .map(loc -> loc.getId())
+                .map(LocationEntity::getId)
                 .orElse(null);
 
         return locations.stream()
@@ -347,19 +362,26 @@ public class LocationService implements LocationUseCase {
                         trafficLight = "RED";
                     }
 
-                    String sectionName = loc.getSection() != null ? loc.getSection().getName() : "General";
+                    String sectionName = loc.getSection() != null ? loc.getSection().getName() : (loc.getZone() != null ? loc.getZone() : "Nave Principal");
+                    int available = Math.max(0, capacity - current);
 
                     return com.fourguard.wms.application.dto.response.BayOccupancyResponse.builder()
                             .id(loc.getId())
                             .code(loc.getCode())
-                            .name(loc.getName())
-                            .zone(loc.getZone())
+                            .name(loc.getName() != null ? loc.getName() : loc.getCode())
+                            .zone(loc.getZone() != null ? loc.getZone() : "Almacén")
                             .sectionName(sectionName)
+                            .aisle(loc.getAisle())
+                            .rack(loc.getRack())
+                            .level(loc.getLevel() != null ? String.valueOf(loc.getLevel()) : null)
+                            .position(loc.getPosition())
                             .capacityPallets(capacity)
                             .currentStoredPallets(current)
+                            .availableUnits(available)
                             .occupancyPercentage(percentage)
                             .status(loc.getStatus() != null ? loc.getStatus().name() : "ACTIVE")
                             .isBlocked(Boolean.TRUE.equals(loc.getIsBlocked()))
+                            .category(loc.getCategory() != null ? loc.getCategory().name() : "FIXED_STORAGE")
                             .trafficLight(trafficLight)
                             .isRecommended(java.util.Objects.equals(loc.getId(), recommendedId))
                             .build();
@@ -402,6 +424,7 @@ public class LocationService implements LocationUseCase {
         state.put("coordY", entity.getCoordY());
         state.put("coordZ", entity.getCoordZ());
         state.put("type", entity.getType() != null ? entity.getType().name() : null);
+        state.put("category", entity.getCategory() != null ? entity.getCategory().name() : null);
         state.put("status", entity.getStatus() != null ? entity.getStatus().name() : null);
         state.put("statusReason", entity.getStatusReason());
         state.put("notes", entity.getNotes());

@@ -58,6 +58,11 @@ public class LocationEntity extends BaseVersionedEntity {
     @Column(length = 20)
     private LocationType type;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "category", length = 30)
+    @Builder.Default
+    private com.fourguard.wms.domain.enums.LocationCategory category = com.fourguard.wms.domain.enums.LocationCategory.FIXED_STORAGE;
+
     @Column(name = "capacity_units")
     @Builder.Default
     private Integer capacityUnits = 1;

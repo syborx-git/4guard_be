@@ -13,6 +13,8 @@ public interface WarehouseReceptionPalletJpaRepository extends JpaRepository<War
 
     List<WarehouseReceptionPalletEntity> findByReceptionIdOrderByPalletNumberAsc(UUID receptionId);
 
+    List<WarehouseReceptionPalletEntity> findByReceptionIdIn(List<UUID> receptionIds);
+
     Optional<WarehouseReceptionPalletEntity> findByReceptionIdAndId(UUID receptionId, UUID palletId);
 
     Optional<WarehouseReceptionPalletEntity> findByReceptionIdAndPalletCode(UUID receptionId, String palletCode);

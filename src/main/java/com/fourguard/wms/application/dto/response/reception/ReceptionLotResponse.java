@@ -27,6 +27,10 @@ public class ReceptionLotResponse {
     private String shelfLifeStatus;
     private String status;
     private String observations;
+    private Boolean requiresOpsAuthorization;
+    private String authorizedByOpsManager;
+    private String opsManagerReason;
+    private OffsetDateTime opsAuthorizationDate;
     private Integer palletsCount;
     private Double piecesCount;
     private OffsetDateTime createdAt;

@@ -55,7 +55,19 @@ public class SecurityPreCheckinEntity extends BaseVersionedEntity {
 
     @Column(name = "operation_type", nullable = false, length = 20)
     @Builder.Default
-    private String operationType = "DESCARGA"; // CARGA, DESCARGA
+    private String operationType = "DESCARGA"; // CARGA, DESCARGA, REENTRY
+
+    @Column(name = "source_outbound_id")
+    private UUID sourceOutboundId;
+
+    @Column(name = "source_outbound_folio", length = 50)
+    private String sourceOutboundFolio;
+
+    @Column(name = "reentry_reason", length = 100)
+    private String reentryReason;
+
+    @Column(name = "reentry_notes", columnDefinition = "TEXT")
+    private String reentryNotes;
 
     // ── Client & Carrier ──
     @ManyToOne(fetch = FetchType.LAZY)

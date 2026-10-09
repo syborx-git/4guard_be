@@ -29,4 +29,36 @@ public class GuardCheckOutRequest {
 
     @Schema(description = "Notas internas adicionales del guardia")
     private String guardNotes;
+
+    public LocalTime getDepartureTime() {
+        return departureTime;
+    }
+
+    public void setDepartureTime(LocalTime departureTime) {
+        this.departureTime = departureTime;
+    }
+
+    public String getExitObservations() {
+        return exitObservations;
+    }
+
+    public void setExitObservations(String exitObservations) {
+        this.exitObservations = exitObservations;
+    }
+
+    public List<String> getExitSealNumbers() {
+        return exitSealNumbers;
+    }
+
+    public void setExitSealNumbers(List<String> exitSealNumbers) {
+        this.exitSealNumbers = exitSealNumbers;
+    }
+
+    public String getGuardNotes() {
+        return guardNotes;
+    }
+
+    public void setGuardNotes(String guardNotes) {
+        this.guardNotes = guardNotes;
+    }
 }

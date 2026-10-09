@@ -26,6 +26,11 @@ public class ReceptionResponse {
     private UUID branchId;
     private String folio;
     private String status;
+    private String operationType;
+    private UUID sourceOutboundId;
+    private String sourceOutboundFolio;
+    private String reentryReason;
+    private String reentryNotes;
 
     // CheckIn Caseta
     private UUID carrierId;
@@ -57,6 +62,10 @@ public class ReceptionResponse {
     private LocalDate expirationDate;
     private Long shelfLifeDaysRemaining;
     private String shelfLifeStatus;
+    private Boolean requiresOpsAuthorization;
+    private String authorizedByOpsManager;
+    private String opsManagerReason;
+    private OffsetDateTime opsAuthorizationDate;
     private Double piecesPerPallet;
     private String palletType;
     private String palletTypeLabel;
