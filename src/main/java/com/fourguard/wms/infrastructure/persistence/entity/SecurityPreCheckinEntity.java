@@ -200,4 +200,12 @@ public class SecurityPreCheckinEntity extends BaseVersionedEntity {
 
     @Column(name = "expires_at", nullable = false)
     private OffsetDateTime expiresAt;
+
+    public String getNoEcoCaja() {
+        return this.boxEconomicNumber;
+    }
+
+    public void setNoEcoCaja(String noEcoCaja) {
+        this.boxEconomicNumber = noEcoCaja;
+    }
 }

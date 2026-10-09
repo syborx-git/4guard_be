@@ -49,6 +49,10 @@ public class UpdateReceptionParametersRequest {
     // ── Caseta / Transport Data Updates ──
     private String tractorPlates;
     private String boxPlates;
+    private String economicNumber;
+    private String noEcoTractor;
+    private String boxEconomicNumber;
+    private String noEcoCaja;
     private String driverName;
     private String docNumber;
     private LocalDate docDate;

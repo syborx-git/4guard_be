@@ -44,6 +44,10 @@ public class ReceptionSummaryResponse {
     private String driverName;
     private String tractorPlates;
     private String boxPlates;
+    private String economicNumber;
+    private String noEcoTractor;
+    private String boxEconomicNumber;
+    private String noEcoCaja;
 
     // Product summary
     private UUID skuId;

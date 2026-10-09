@@ -209,6 +209,14 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
             preCheckin = preCheckinJpaRepository.findById(Objects.requireNonNull(request.getPreCheckinId())).orElse(null);
         }
 
+        String ecoTractor = (request.getEconomicNumber() != null && !request.getEconomicNumber().isBlank())
+                ? request.getEconomicNumber().trim()
+                : (preCheckin != null ? (preCheckin.getEconomicNumber() != null && !preCheckin.getEconomicNumber().isBlank() ? preCheckin.getEconomicNumber().trim() : preCheckin.getNoEcoTractor()) : null);
+
+        String ecoCaja = (request.getBoxEconomicNumber() != null && !request.getBoxEconomicNumber().isBlank())
+                ? request.getBoxEconomicNumber().trim()
+                : (preCheckin != null ? (preCheckin.getBoxEconomicNumber() != null && !preCheckin.getBoxEconomicNumber().isBlank() ? preCheckin.getBoxEconomicNumber().trim() : preCheckin.getNoEcoCaja()) : null);
+
         WarehouseOutboundEntity outbound = WarehouseOutboundEntity.builder()
                 .organization(organization)
                 .branch(branch)
@@ -224,8 +232,8 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
                 .forkliftOperator(operator)
                 .transportType(request.getTransportType() != null ? request.getTransportType().toUpperCase().trim() : "TRAILER")
                 .driverName(request.getDriverName())
-                .economicNumber(request.getEconomicNumber())
-                .boxEconomicNumber(request.getBoxEconomicNumber())
+                .economicNumber(ecoTractor)
+                .boxEconomicNumber(ecoCaja)
                 .tractorPlates(request.getTractorPlates())
                 .boxPlates(request.getBoxPlates())
                 .sealNumber(request.getSealNumber())

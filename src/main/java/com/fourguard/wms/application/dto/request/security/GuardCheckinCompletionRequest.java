@@ -40,7 +40,10 @@ public class GuardCheckinCompletionRequest {
     private String driverPhone;
     private String tractorPlates;
     private String noEcoTractor;
+    private String economicNumber;
     private String boxPlates;
+    private String boxEconomicNumber;
+    private String noEcoCaja;
     private String boxDimensions;
     private String transportType;
 

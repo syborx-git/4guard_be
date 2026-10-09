@@ -178,6 +178,21 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
         SecurityPreCheckinEntity preCheckin = null;
         if (request.getPreCheckinId() != null) {
             preCheckin = preCheckinJpaRepository.findById(request.getPreCheckinId()).orElse(null);
+            if (preCheckin != null) {
+                if (request.getEconomicNumber() != null && !request.getEconomicNumber().isBlank()) {
+                    preCheckin.setEconomicNumber(request.getEconomicNumber().trim());
+                    preCheckin.setNoEcoTractor(request.getEconomicNumber().trim());
+                } else if (request.getNoEcoTractor() != null && !request.getNoEcoTractor().isBlank()) {
+                    preCheckin.setEconomicNumber(request.getNoEcoTractor().trim());
+                    preCheckin.setNoEcoTractor(request.getNoEcoTractor().trim());
+                }
+                if (request.getBoxEconomicNumber() != null && !request.getBoxEconomicNumber().isBlank()) {
+                    preCheckin.setBoxEconomicNumber(request.getBoxEconomicNumber().trim());
+                } else if (request.getNoEcoCaja() != null && !request.getNoEcoCaja().isBlank()) {
+                    preCheckin.setBoxEconomicNumber(request.getNoEcoCaja().trim());
+                }
+                preCheckinJpaRepository.save(preCheckin);
+            }
         }
 
         WarehouseReceptionEntity entity = WarehouseReceptionEntity.builder()
@@ -437,6 +452,31 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
         }
         if (request.getReceptionTime() != null) {
             entity.setReceptionTime(request.getReceptionTime());
+        }
+
+        if (entity.getPreCheckin() != null) {
+            String ecoTractor = (request.getEconomicNumber() != null && !request.getEconomicNumber().isBlank())
+                    ? request.getEconomicNumber().trim()
+                    : ((request.getNoEcoTractor() != null && !request.getNoEcoTractor().isBlank())
+                            ? request.getNoEcoTractor().trim() : null);
+            if (ecoTractor != null) {
+                entity.getPreCheckin().setEconomicNumber(ecoTractor);
+                entity.getPreCheckin().setNoEcoTractor(ecoTractor);
+            }
+            String ecoCaja = (request.getBoxEconomicNumber() != null && !request.getBoxEconomicNumber().isBlank())
+                    ? request.getBoxEconomicNumber().trim()
+                    : ((request.getNoEcoCaja() != null && !request.getNoEcoCaja().isBlank())
+                            ? request.getNoEcoCaja().trim() : null);
+            if (ecoCaja != null) {
+                entity.getPreCheckin().setBoxEconomicNumber(ecoCaja);
+            }
+            if (request.getTractorPlates() != null && !request.getTractorPlates().isBlank()) {
+                entity.getPreCheckin().setTractorPlates(request.getTractorPlates().trim().toUpperCase());
+            }
+            if (request.getBoxPlates() != null && !request.getBoxPlates().isBlank()) {
+                entity.getPreCheckin().setBoxPlates(request.getBoxPlates().trim().toUpperCase());
+            }
+            preCheckinJpaRepository.save(entity.getPreCheckin());
         }
 
         // Carrier update
