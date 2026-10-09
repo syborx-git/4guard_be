@@ -31,6 +31,8 @@ public interface WarehouseOutboundMapper {
     @Mapping(source = "forkliftOperator.id", target = "forkliftOperatorId")
     @Mapping(source = "forkliftOperator.fullName", target = "forkliftOperatorName")
     @Mapping(source = "status", target = "status", qualifiedByName = "outboundStatusToString")
+    @Mapping(target = "economicNumber", expression = "java(entity.getEconomicNumber() != null && !entity.getEconomicNumber().isBlank() ? entity.getEconomicNumber() : (entity.getPreCheckin() != null ? (entity.getPreCheckin().getEconomicNumber() != null && !entity.getPreCheckin().getEconomicNumber().isBlank() ? entity.getPreCheckin().getEconomicNumber() : entity.getPreCheckin().getNoEcoTractor()) : null))")
+    @Mapping(target = "boxEconomicNumber", expression = "java(entity.getBoxEconomicNumber() != null && !entity.getBoxEconomicNumber().isBlank() ? entity.getBoxEconomicNumber() : (entity.getPreCheckin() != null ? (entity.getPreCheckin().getBoxEconomicNumber() != null && !entity.getPreCheckin().getBoxEconomicNumber().isBlank() ? entity.getPreCheckin().getBoxEconomicNumber() : entity.getPreCheckin().getNoEcoCaja()) : null))")
     @Mapping(source = "items", target = "items")
     OutboundResponse toResponse(WarehouseOutboundEntity entity);
 
@@ -47,6 +49,8 @@ public interface WarehouseOutboundMapper {
     @Mapping(source = "forkliftOperator.id", target = "forkliftOperatorId")
     @Mapping(source = "forkliftOperator.fullName", target = "forkliftOperatorName")
     @Mapping(source = "status", target = "status", qualifiedByName = "outboundStatusToString")
+    @Mapping(target = "economicNumber", expression = "java(entity.getEconomicNumber() != null && !entity.getEconomicNumber().isBlank() ? entity.getEconomicNumber() : (entity.getPreCheckin() != null ? (entity.getPreCheckin().getEconomicNumber() != null && !entity.getPreCheckin().getEconomicNumber().isBlank() ? entity.getPreCheckin().getEconomicNumber() : entity.getPreCheckin().getNoEcoTractor()) : null))")
+    @Mapping(target = "boxEconomicNumber", expression = "java(entity.getBoxEconomicNumber() != null && !entity.getBoxEconomicNumber().isBlank() ? entity.getBoxEconomicNumber() : (entity.getPreCheckin() != null ? (entity.getPreCheckin().getBoxEconomicNumber() != null && !entity.getPreCheckin().getBoxEconomicNumber().isBlank() ? entity.getPreCheckin().getBoxEconomicNumber() : entity.getPreCheckin().getNoEcoCaja()) : null))")
     OutboundSummaryResponse toSummaryResponse(WarehouseOutboundEntity entity);
 
     @Mapping(source = "item.id", target = "itemId")
