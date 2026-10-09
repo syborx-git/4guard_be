@@ -7,6 +7,7 @@ import com.fourguard.wms.domain.enums.InventoryState;
 import com.fourguard.wms.domain.enums.LocationStatus;
 import com.fourguard.wms.domain.enums.LocationType;
 import com.fourguard.wms.domain.enums.MovementType;
+import com.fourguard.wms.domain.enums.OutboundStatus;
 import com.fourguard.wms.domain.enums.PalletType;
 import com.fourguard.wms.domain.enums.ReceptionStatus;
 import com.fourguard.wms.domain.exception.EntityNotFoundException;
@@ -128,9 +129,9 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
                 }
             }
         }
-        // Si no se proporcionó rampa en caseta, se deja pendiente para asignación en andén de recepción
-        if (ramp != null && Boolean.TRUE.equals(ramp.getIsBlocked())) {
-            throw new ValidationException("La rampa asignada (" + ramp.getCode() + ") se encuentra bloqueada por mantenimiento o restricción operativa.");
+        // Si se proporcionó rampa en caseta, validar que esté libre y no bloqueada
+        if (ramp != null) {
+            validateRampAvailability(ramp, branch.getId(), null, null);
         }
 
         ForkliftOperatorEntity operator = null;
@@ -392,21 +393,25 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
         }
 
         // Ramp update
+        LocationEntity newRamp = null;
         if (request.getRampId() != null) {
-            locationRepositoryPort.findById(request.getRampId()).ifPresent(ramp -> {
-                if (Boolean.TRUE.equals(ramp.getIsBlocked())) {
-                    throw new ValidationException("La rampa asignada (" + ramp.getCode() + ") se encuentra bloqueada.");
-                }
-                entity.setRamp(ramp);
-            });
+            newRamp = locationRepositoryPort.findById(request.getRampId()).orElse(null);
         } else if (request.getRampNumber() != null && entity.getBranch() != null) {
             String formattedCode = String.format("LOC-RAMP-%02d", request.getRampNumber());
-            locationRepositoryPort.findByBranchIdAndCode(entity.getBranch().getId(), formattedCode)
-                    .ifPresent(entity::setRamp);
+            newRamp = locationRepositoryPort.findByBranchIdAndCode(entity.getBranch().getId(), formattedCode).orElse(null);
+            if (newRamp == null) {
+                newRamp = locationRepositoryPort.findFirstByCode(formattedCode).orElse(null);
+            }
         } else if (request.getRampCode() != null && !request.getRampCode().isBlank() && entity.getBranch() != null) {
             String cleanCode = request.getRampCode().trim();
-            locationRepositoryPort.findByBranchIdAndCode(entity.getBranch().getId(), cleanCode)
-                    .ifPresent(entity::setRamp);
+            newRamp = locationRepositoryPort.findByBranchIdAndCode(entity.getBranch().getId(), cleanCode).orElse(null);
+            if (newRamp == null) {
+                newRamp = locationRepositoryPort.findFirstByCode(cleanCode).orElse(null);
+            }
+        }
+        if (newRamp != null) {
+            validateRampAvailability(newRamp, entity.getBranch() != null ? entity.getBranch().getId() : null, entity.getId(), null);
+            entity.setRamp(newRamp);
         }
 
         // Lifecycle Status transition
@@ -2265,5 +2270,51 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
                 .remainingCount(0)
                 .message("Tarima registrada y verificada.")
                 .build();
+    }
+
+    private void validateRampAvailability(LocationEntity ramp, UUID branchId, UUID currentReceptionId, UUID currentOutboundId) {
+        if (ramp == null) return;
+        if (Boolean.TRUE.equals(ramp.getIsBlocked())) {
+            throw new ValidationException("La rampa asignada (" + (ramp.getName() != null ? ramp.getName() : ramp.getCode()) + ") se encuentra bloqueada por mantenimiento o restricción operativa.");
+        }
+        if (branchId == null) return;
+
+        // 1. Verificar si otra recepción activa en planta tiene esta rampa asignada
+        List<WarehouseReceptionEntity> activeReceptions = receptionRepositoryPort.findAll(
+                WarehouseReceptionSpecification.withFilters(null, branchId, null, null));
+
+        for (WarehouseReceptionEntity rec : activeReceptions) {
+            if (rec.getStatus() != ReceptionStatus.COMPLETED && rec.getStatus() != ReceptionStatus.CANCELLED) {
+                if (currentReceptionId != null && rec.getId() != null && rec.getId().equals(currentReceptionId)) {
+                    continue;
+                }
+                if (rec.getRamp() != null && (
+                        (ramp.getId() != null && rec.getRamp().getId() != null && rec.getRamp().getId().equals(ramp.getId())) ||
+                        (rec.getRamp().getCode() != null && ramp.getCode() != null && rec.getRamp().getCode().equalsIgnoreCase(ramp.getCode()))
+                )) {
+                    throw new ValidationException("La rampa " + (ramp.getName() != null ? ramp.getName() : ramp.getCode()) +
+                            " se encuentra actualmente ocupada por la Recepción Folio #" + rec.getFolio() + " (" + rec.getStatus() + "). Debe liberarse antes de asignarla.");
+                }
+            }
+        }
+
+        // 2. Verificar si un embarque activo en planta tiene esta rampa asignada
+        List<WarehouseOutboundEntity> activeOutbounds = outboundRepositoryPort.findAll(
+                WarehouseOutboundSpecification.withFilters(null, branchId, null, null));
+
+        for (WarehouseOutboundEntity out : activeOutbounds) {
+            if (out.getStatus() != OutboundStatus.COMPLETED && out.getStatus() != OutboundStatus.CANCELLED) {
+                if (currentOutboundId != null && out.getId() != null && out.getId().equals(currentOutboundId)) {
+                    continue;
+                }
+                if (out.getRamp() != null && (
+                        (ramp.getId() != null && out.getRamp().getId() != null && out.getRamp().getId().equals(ramp.getId())) ||
+                        (out.getRamp().getCode() != null && ramp.getCode() != null && out.getRamp().getCode().equalsIgnoreCase(ramp.getCode()))
+                )) {
+                    throw new ValidationException("La rampa " + (ramp.getName() != null ? ramp.getName() : ramp.getCode()) +
+                            " se encuentra actualmente ocupada por el Embarque Folio #" + out.getFolio() + " (" + out.getStatus() + "). Debe liberarse antes de asignarla.");
+                }
+            }
+        }
     }
 }

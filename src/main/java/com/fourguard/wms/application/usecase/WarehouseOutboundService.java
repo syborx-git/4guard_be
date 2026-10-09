@@ -14,6 +14,7 @@ import com.fourguard.wms.application.mapper.WarehouseOutboundMapper;
 import com.fourguard.wms.domain.enums.InventoryState;
 import com.fourguard.wms.domain.enums.MovementType;
 import com.fourguard.wms.domain.enums.OutboundStatus;
+import com.fourguard.wms.domain.enums.ReceptionStatus;
 import com.fourguard.wms.domain.exception.EntityNotFoundException;
 import com.fourguard.wms.domain.exception.ValidationException;
 import com.fourguard.wms.domain.ports.in.WarehouseOutboundUseCase;
@@ -42,6 +43,7 @@ import java.util.stream.Collectors;
 public class WarehouseOutboundService implements WarehouseOutboundUseCase {
 
     private final WarehouseOutboundRepositoryPort outboundRepositoryPort;
+    private final WarehouseReceptionRepositoryPort receptionRepositoryPort;
     private final OrganizationRepositoryPort organizationRepositoryPort;
     private final BranchRepositoryPort branchRepositoryPort;
     private final ClientRepositoryPort clientRepositoryPort;
@@ -131,9 +133,9 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
                 ramp = locationRepositoryPort.findFirstByCode(cleanCode).orElse(null);
             }
         }
-        // Si no se proporcionó rampa en caseta, se deja pendiente para asignación en mesa de control
-        if (ramp != null && Boolean.TRUE.equals(ramp.getIsBlocked())) {
-            throw new ValidationException("La rampa seleccionada (" + (ramp.getCode() != null ? ramp.getCode() : "Rampa") + ") se encuentra bloqueada: " + (ramp.getBlockReason() != null ? ramp.getBlockReason() : "Mantenimiento / Bloqueada"));
+        // Si se proporcionó rampa en caseta, validar que esté libre y no bloqueada
+        if (ramp != null) {
+            validateRampAvailability(ramp, branch.getId(), null, null);
         }
 
         ForkliftOperatorEntity operator = null;
@@ -419,7 +421,7 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
         }
 
         // 2. Ramp assignment
-        if (request.getRampId() != null || request.getRampNumber() != null) {
+        if (request.getRampId() != null || request.getRampNumber() != null || (request.getRampCode() != null && !request.getRampCode().isBlank())) {
             LocationEntity ramp = null;
             if (request.getRampId() != null) {
                 ramp = locationRepositoryPort.findById(request.getRampId()).orElse(null);
@@ -431,15 +433,24 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
                 if (ramp == null) {
                     ramp = locationRepositoryPort.findFirstByCode(formattedCode).orElse(null);
                 }
-            }
-            String oldRamp = outbound.getRamp() != null ? (outbound.getRamp().getCode() != null ? outbound.getRamp().getCode() : outbound.getRamp().getName()) : "Sin asignar";
-            String newRamp = ramp != null ? (ramp.getCode() != null ? ramp.getCode() : (ramp.getName() != null ? ramp.getName() : ("Rampa " + request.getRampNumber()))) : (request.getRampNumber() != null ? ("Rampa " + request.getRampNumber()) : null);
-            if (newRamp != null && !Objects.equals(oldRamp, newRamp)) {
-                if (ramp != null) {
-                    outbound.setRamp(ramp);
+            } else if (request.getRampCode() != null && !request.getRampCode().isBlank()) {
+                String cleanCode = request.getRampCode().trim();
+                if (outbound.getBranch() != null) {
+                    ramp = locationRepositoryPort.findByBranchIdAndCode(outbound.getBranch().getId(), cleanCode).orElse(null);
                 }
-                oldValues.put("ramp", oldRamp);
-                newValues.put("ramp", newRamp);
+                if (ramp == null) {
+                    ramp = locationRepositoryPort.findFirstByCode(cleanCode).orElse(null);
+                }
+            }
+            if (ramp != null) {
+                validateRampAvailability(ramp, outbound.getBranch() != null ? outbound.getBranch().getId() : null, outbound.getId(), null);
+                String oldRamp = outbound.getRamp() != null ? (outbound.getRamp().getCode() != null ? outbound.getRamp().getCode() : outbound.getRamp().getName()) : "Sin asignar";
+                String newRamp = ramp.getCode() != null ? ramp.getCode() : (ramp.getName() != null ? ramp.getName() : ("Rampa " + request.getRampNumber()));
+                if (!Objects.equals(oldRamp, newRamp)) {
+                    outbound.setRamp(ramp);
+                    oldValues.put("ramp", oldRamp);
+                    newValues.put("ramp", newRamp);
+                }
             }
         }
 
@@ -1149,5 +1160,51 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
             case "PENDING" -> "Pendiente de Carga";
             default -> val;
         };
+    }
+
+    private void validateRampAvailability(LocationEntity ramp, UUID branchId, UUID currentOutboundId, UUID currentReceptionId) {
+        if (ramp == null) return;
+        if (Boolean.TRUE.equals(ramp.getIsBlocked())) {
+            throw new ValidationException("La rampa seleccionada (" + (ramp.getName() != null ? ramp.getName() : ramp.getCode()) + ") se encuentra bloqueada: " + (ramp.getBlockReason() != null ? ramp.getBlockReason() : "Mantenimiento / Bloqueada"));
+        }
+        if (branchId == null) return;
+
+        // 1. Verificar si otro embarque activo en planta tiene esta rampa asignada
+        List<WarehouseOutboundEntity> activeOutbounds = outboundRepositoryPort.findAll(
+                WarehouseOutboundSpecification.withFilters(null, branchId, null, null));
+
+        for (WarehouseOutboundEntity out : activeOutbounds) {
+            if (out.getStatus() != OutboundStatus.COMPLETED && out.getStatus() != OutboundStatus.CANCELLED) {
+                if (currentOutboundId != null && out.getId() != null && out.getId().equals(currentOutboundId)) {
+                    continue;
+                }
+                if (out.getRamp() != null && (
+                        (ramp.getId() != null && out.getRamp().getId() != null && out.getRamp().getId().equals(ramp.getId())) ||
+                        (out.getRamp().getCode() != null && ramp.getCode() != null && out.getRamp().getCode().equalsIgnoreCase(ramp.getCode()))
+                )) {
+                    throw new ValidationException("La rampa " + (ramp.getName() != null ? ramp.getName() : ramp.getCode()) +
+                            " se encuentra actualmente ocupada por el Embarque Folio #" + out.getFolio() + " (" + out.getStatus() + "). Debe liberarse antes de asignarla.");
+                }
+            }
+        }
+
+        // 2. Verificar si una recepción activa en planta tiene esta rampa asignada
+        List<WarehouseReceptionEntity> activeReceptions = receptionRepositoryPort.findAll(
+                WarehouseReceptionSpecification.withFilters(null, branchId, null, null));
+
+        for (WarehouseReceptionEntity rec : activeReceptions) {
+            if (rec.getStatus() != ReceptionStatus.COMPLETED && rec.getStatus() != ReceptionStatus.CANCELLED) {
+                if (currentReceptionId != null && rec.getId() != null && rec.getId().equals(currentReceptionId)) {
+                    continue;
+                }
+                if (rec.getRamp() != null && (
+                        (ramp.getId() != null && rec.getRamp().getId() != null && rec.getRamp().getId().equals(ramp.getId())) ||
+                        (rec.getRamp().getCode() != null && ramp.getCode() != null && rec.getRamp().getCode().equalsIgnoreCase(ramp.getCode()))
+                )) {
+                    throw new ValidationException("La rampa " + (ramp.getName() != null ? ramp.getName() : ramp.getCode()) +
+                            " se encuentra actualmente ocupada por la Recepción Folio #" + rec.getFolio() + " (" + rec.getStatus() + "). Debe liberarse antes de asignarla.");
+                }
+            }
+        }
     }
 }
