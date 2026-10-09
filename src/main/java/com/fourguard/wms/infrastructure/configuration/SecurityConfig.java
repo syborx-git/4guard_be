@@ -55,6 +55,19 @@ public class SecurityConfig {
                             response.setContentType("application/json");
                             response.getWriter().write("{\"success\":false,\"message\":\"No autenticado o token expirado\",\"data\":null}");
                         })
+                        .accessDeniedHandler((request, response, accessDeniedException) -> {
+                            org.springframework.security.core.Authentication auth =
+                                    org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+                            if (auth == null || auth instanceof org.springframework.security.authentication.AnonymousAuthenticationToken || !auth.isAuthenticated()) {
+                                response.setStatus(jakarta.servlet.http.HttpServletResponse.SC_UNAUTHORIZED);
+                                response.setContentType("application/json");
+                                response.getWriter().write("{\"success\":false,\"message\":\"No autenticado o token expirado\",\"data\":null}");
+                            } else {
+                                response.setStatus(jakarta.servlet.http.HttpServletResponse.SC_FORBIDDEN);
+                                response.setContentType("application/json");
+                                response.getWriter().write("{\"success\":false,\"message\":\"No tiene permisos para realizar esta operación\",\"data\":null}");
+                            }
+                        })
                 )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
