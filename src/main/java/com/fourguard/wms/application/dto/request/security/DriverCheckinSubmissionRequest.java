@@ -45,7 +45,10 @@ public class DriverCheckinSubmissionRequest {
     private String tractorPlates;
 
     private String noEcoTractor;
+    private String economicNumber;
     private String boxPlates;
+    private String noEcoCaja;
+    private String boxEconomicNumber;
     private String boxDimensions;
     private String transportType;
 

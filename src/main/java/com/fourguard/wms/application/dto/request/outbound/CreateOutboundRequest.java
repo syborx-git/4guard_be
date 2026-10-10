@@ -47,7 +47,9 @@ public class CreateOutboundRequest {
     private String driverName;
 
     private String economicNumber;
+    private String noEcoTractor;
     private String boxEconomicNumber;
+    private String noEcoCaja;
 
     @NotBlank(message = "tractorPlates es obligatorio")
     private String tractorPlates;

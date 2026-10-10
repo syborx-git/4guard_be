@@ -213,11 +213,15 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
 
         String ecoTractor = (request.getEconomicNumber() != null && !request.getEconomicNumber().isBlank())
                 ? request.getEconomicNumber().trim()
-                : (preCheckin != null ? (preCheckin.getEconomicNumber() != null && !preCheckin.getEconomicNumber().isBlank() ? preCheckin.getEconomicNumber().trim() : preCheckin.getNoEcoTractor()) : null);
+                : (request.getNoEcoTractor() != null && !request.getNoEcoTractor().isBlank()
+                        ? request.getNoEcoTractor().trim()
+                        : (preCheckin != null ? (preCheckin.getEconomicNumber() != null && !preCheckin.getEconomicNumber().isBlank() ? preCheckin.getEconomicNumber().trim() : preCheckin.getNoEcoTractor()) : null));
 
         String ecoCaja = (request.getBoxEconomicNumber() != null && !request.getBoxEconomicNumber().isBlank())
                 ? request.getBoxEconomicNumber().trim()
-                : (preCheckin != null ? (preCheckin.getBoxEconomicNumber() != null && !preCheckin.getBoxEconomicNumber().isBlank() ? preCheckin.getBoxEconomicNumber().trim() : preCheckin.getNoEcoCaja()) : null);
+                : (request.getNoEcoCaja() != null && !request.getNoEcoCaja().isBlank()
+                        ? request.getNoEcoCaja().trim()
+                        : (preCheckin != null ? (preCheckin.getBoxEconomicNumber() != null && !preCheckin.getBoxEconomicNumber().isBlank() ? preCheckin.getBoxEconomicNumber().trim() : preCheckin.getNoEcoCaja()) : null));
 
         WarehouseOutboundEntity outbound = WarehouseOutboundEntity.builder()
                 .organization(organization)
@@ -512,22 +516,26 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
                 outbound.setBoxPlates(newBox);
             }
         }
-        if (request.getEconomicNumber() != null) {
+        String incomingEco = (request.getEconomicNumber() != null && !request.getEconomicNumber().isBlank())
+                ? request.getEconomicNumber().trim()
+                : (request.getNoEcoTractor() != null && !request.getNoEcoTractor().isBlank() ? request.getNoEcoTractor().trim() : null);
+        if (incomingEco != null) {
             String oldEco = outbound.getEconomicNumber() != null ? outbound.getEconomicNumber().trim() : "";
-            String newEco = request.getEconomicNumber().trim();
-            if (!Objects.equals(oldEco, newEco) && (!oldEco.isEmpty() || !newEco.isEmpty())) {
+            if (!Objects.equals(oldEco, incomingEco) && (!oldEco.isEmpty() || !incomingEco.isEmpty())) {
                 oldValues.put("economicNumber", !oldEco.isEmpty() ? oldEco : "Sin especificar");
-                newValues.put("economicNumber", !newEco.isEmpty() ? newEco : "Sin especificar");
-                outbound.setEconomicNumber(!newEco.isEmpty() ? newEco : null);
+                newValues.put("economicNumber", incomingEco);
+                outbound.setEconomicNumber(incomingEco);
             }
         }
-        if (request.getBoxEconomicNumber() != null) {
+        String incomingBoxEco = (request.getBoxEconomicNumber() != null && !request.getBoxEconomicNumber().isBlank())
+                ? request.getBoxEconomicNumber().trim()
+                : (request.getNoEcoCaja() != null && !request.getNoEcoCaja().isBlank() ? request.getNoEcoCaja().trim() : null);
+        if (incomingBoxEco != null) {
             String oldBoxEco = outbound.getBoxEconomicNumber() != null ? outbound.getBoxEconomicNumber().trim() : "";
-            String newBoxEco = request.getBoxEconomicNumber().trim();
-            if (!Objects.equals(oldBoxEco, newBoxEco) && (!oldBoxEco.isEmpty() || !newBoxEco.isEmpty())) {
+            if (!Objects.equals(oldBoxEco, incomingBoxEco) && (!oldBoxEco.isEmpty() || !incomingBoxEco.isEmpty())) {
                 oldValues.put("boxEconomicNumber", !oldBoxEco.isEmpty() ? oldBoxEco : "Sin especificar");
-                newValues.put("boxEconomicNumber", !newBoxEco.isEmpty() ? newBoxEco : "Sin especificar");
-                outbound.setBoxEconomicNumber(!newBoxEco.isEmpty() ? newBoxEco : null);
+                newValues.put("boxEconomicNumber", incomingBoxEco);
+                outbound.setBoxEconomicNumber(incomingBoxEco);
             }
         }
 

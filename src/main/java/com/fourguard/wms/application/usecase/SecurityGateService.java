@@ -256,8 +256,23 @@ public  class SecurityGateService implements SecurityGateUseCase {
         entity.setDriverPhone(request.getDriverPhone());
         entity.setTractorPlates(
                 request.getTractorPlates() != null ? request.getTractorPlates().toUpperCase().trim() : null);
-        entity.setNoEcoTractor(request.getNoEcoTractor());
+        String ecoTractor = (request.getNoEcoTractor() != null && !request.getNoEcoTractor().isBlank())
+                ? request.getNoEcoTractor().trim()
+                : (request.getEconomicNumber() != null && !request.getEconomicNumber().isBlank()
+                        ? request.getEconomicNumber().trim()
+                        : null);
+        entity.setNoEcoTractor(ecoTractor);
+        entity.setEconomicNumber(ecoTractor);
+
         entity.setBoxPlates(request.getBoxPlates() != null ? request.getBoxPlates().toUpperCase().trim() : null);
+        String ecoCaja = (request.getBoxEconomicNumber() != null && !request.getBoxEconomicNumber().isBlank())
+                ? request.getBoxEconomicNumber().trim()
+                : (request.getNoEcoCaja() != null && !request.getNoEcoCaja().isBlank()
+                        ? request.getNoEcoCaja().trim()
+                        : null);
+        entity.setBoxEconomicNumber(ecoCaja);
+        entity.setNoEcoCaja(ecoCaja);
+
         entity.setBoxDimensions(request.getBoxDimensions());
         entity.setTransportType(request.getTransportType());
 
@@ -545,7 +560,9 @@ public  class SecurityGateService implements SecurityGateUseCase {
                                 : null));
 
         outReq.setEconomicNumber(ecoTractor);
+        outReq.setNoEcoTractor(ecoTractor);
         outReq.setBoxEconomicNumber(ecoCaja);
+        outReq.setNoEcoCaja(ecoCaja);
         String outboundSeal = (entity.getSealNumbers() != null && !entity.getSealNumbers().isEmpty())
                 ? String.join(", ", entity.getSealNumbers())
                 : "PENDIENTE_ANDEN";
