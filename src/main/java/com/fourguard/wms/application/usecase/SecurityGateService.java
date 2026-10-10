@@ -265,10 +265,10 @@ public  class SecurityGateService implements SecurityGateUseCase {
         entity.setEconomicNumber(ecoTractor);
 
         entity.setBoxPlates(request.getBoxPlates() != null ? request.getBoxPlates().toUpperCase().trim() : null);
-        String ecoCaja = (request.getBoxEconomicNumber() != null && !request.getBoxEconomicNumber().isBlank())
-                ? request.getBoxEconomicNumber().trim()
-                : (request.getNoEcoCaja() != null && !request.getNoEcoCaja().isBlank()
-                        ? request.getNoEcoCaja().trim()
+        String ecoCaja = (request.getNoEcoCaja() != null && !request.getNoEcoCaja().isBlank())
+                ? request.getNoEcoCaja().trim()
+                : (request.getBoxEconomicNumber() != null && !request.getBoxEconomicNumber().isBlank()
+                        ? request.getBoxEconomicNumber().trim()
                         : null);
         entity.setBoxEconomicNumber(ecoCaja);
         entity.setNoEcoCaja(ecoCaja);
@@ -478,10 +478,12 @@ public  class SecurityGateService implements SecurityGateUseCase {
             entity.setNoEcoTractor(request.getEconomicNumber().trim());
             entity.setEconomicNumber(request.getEconomicNumber().trim());
         }
-        if (request.getBoxEconomicNumber() != null && !request.getBoxEconomicNumber().isBlank()) {
-            entity.setBoxEconomicNumber(request.getBoxEconomicNumber().trim());
-        } else if (request.getNoEcoCaja() != null && !request.getNoEcoCaja().isBlank()) {
+        if (request.getNoEcoCaja() != null && !request.getNoEcoCaja().isBlank()) {
             entity.setBoxEconomicNumber(request.getNoEcoCaja().trim());
+            entity.setNoEcoCaja(request.getNoEcoCaja().trim());
+        } else if (request.getBoxEconomicNumber() != null && !request.getBoxEconomicNumber().isBlank()) {
+            entity.setBoxEconomicNumber(request.getBoxEconomicNumber().trim());
+            entity.setNoEcoCaja(request.getBoxEconomicNumber().trim());
         }
         if (request.getTransportType() != null)
             entity.setTransportType(request.getTransportType());
@@ -813,6 +815,10 @@ public  class SecurityGateService implements SecurityGateUseCase {
                 .driverName(rec.getDriverName())
                 .tractorPlates(rec.getTractorPlates())
                 .boxPlates(rec.getBoxPlates())
+                .economicNumber(rec.getPreCheckin() != null ? (rec.getPreCheckin().getNoEcoTractor() != null ? rec.getPreCheckin().getNoEcoTractor() : rec.getPreCheckin().getEconomicNumber()) : null)
+                .noEcoTractor(rec.getPreCheckin() != null ? (rec.getPreCheckin().getNoEcoTractor() != null ? rec.getPreCheckin().getNoEcoTractor() : rec.getPreCheckin().getEconomicNumber()) : null)
+                .boxEconomicNumber(rec.getPreCheckin() != null ? (rec.getPreCheckin().getNoEcoCaja() != null ? rec.getPreCheckin().getNoEcoCaja() : rec.getPreCheckin().getBoxEconomicNumber()) : null)
+                .noEcoCaja(rec.getPreCheckin() != null ? (rec.getPreCheckin().getNoEcoCaja() != null ? rec.getPreCheckin().getNoEcoCaja() : rec.getPreCheckin().getBoxEconomicNumber()) : null)
                 .sealNumbers(seals)
                 .docNumber(rec.getDocNumber())
                 .docDate(docDate)
@@ -852,8 +858,10 @@ public  class SecurityGateService implements SecurityGateUseCase {
                 .tractorPlates(out.getTractorPlates())
                 .boxPlates(out.getBoxPlates())
                 .transportType(out.getTransportType())
-                .economicNumber(out.getEconomicNumber())
-                .boxEconomicNumber(out.getBoxEconomicNumber())
+                .economicNumber(out.getEconomicNumber() != null ? out.getEconomicNumber() : (out.getPreCheckin() != null ? out.getPreCheckin().getNoEcoTractor() : null))
+                .noEcoTractor(out.getEconomicNumber() != null ? out.getEconomicNumber() : (out.getPreCheckin() != null ? out.getPreCheckin().getNoEcoTractor() : null))
+                .boxEconomicNumber(out.getBoxEconomicNumber() != null ? out.getBoxEconomicNumber() : (out.getPreCheckin() != null ? out.getPreCheckin().getNoEcoCaja() : null))
+                .noEcoCaja(out.getBoxEconomicNumber() != null ? out.getBoxEconomicNumber() : (out.getPreCheckin() != null ? out.getPreCheckin().getNoEcoCaja() : null))
                 .sealNumbers(seals)
                 .docNumber(out.getRemisionNo())
                 .docDate(docDate)
@@ -949,15 +957,29 @@ public  class SecurityGateService implements SecurityGateUseCase {
                 .driverPhone(entity.getDriverPhone())
                 .transportType(entity.getTransportType())
                 .economicNumber(
-                        (entity.getEconomicNumber() != null && !entity.getEconomicNumber().isBlank())
-                                ? entity.getEconomicNumber().trim()
-                                : ((entity.getNoEcoTractor() != null && !entity.getNoEcoTractor().isBlank())
-                                        ? entity.getNoEcoTractor().trim()
+                        (entity.getNoEcoTractor() != null && !entity.getNoEcoTractor().isBlank())
+                                ? entity.getNoEcoTractor().trim()
+                                : ((entity.getEconomicNumber() != null && !entity.getEconomicNumber().isBlank())
+                                        ? entity.getEconomicNumber().trim()
+                                        : null))
+                .noEcoTractor(
+                        (entity.getNoEcoTractor() != null && !entity.getNoEcoTractor().isBlank())
+                                ? entity.getNoEcoTractor().trim()
+                                : ((entity.getEconomicNumber() != null && !entity.getEconomicNumber().isBlank())
+                                        ? entity.getEconomicNumber().trim()
                                         : null))
                 .boxEconomicNumber(
-                        (entity.getBoxEconomicNumber() != null && !entity.getBoxEconomicNumber().isBlank())
-                                ? entity.getBoxEconomicNumber().trim()
-                                : null)
+                        (entity.getNoEcoCaja() != null && !entity.getNoEcoCaja().isBlank())
+                                ? entity.getNoEcoCaja().trim()
+                                : ((entity.getBoxEconomicNumber() != null && !entity.getBoxEconomicNumber().isBlank())
+                                        ? entity.getBoxEconomicNumber().trim()
+                                        : null))
+                .noEcoCaja(
+                        (entity.getNoEcoCaja() != null && !entity.getNoEcoCaja().isBlank())
+                                ? entity.getNoEcoCaja().trim()
+                                : ((entity.getBoxEconomicNumber() != null && !entity.getBoxEconomicNumber().isBlank())
+                                        ? entity.getBoxEconomicNumber().trim()
+                                        : null))
                 .tractorPlates(entity.getTractorPlates())
                 .boxPlates(entity.getBoxPlates())
                 .boxDimensions(entity.getBoxDimensions())

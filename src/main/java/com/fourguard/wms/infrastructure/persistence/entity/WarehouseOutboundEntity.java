@@ -142,4 +142,20 @@ public class WarehouseOutboundEntity extends BaseVersionedEntity {
     @OneToMany(mappedBy = "outbound", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @Builder.Default
     private List<WarehouseOutboundItemEntity> items = new ArrayList<>();
+
+    public String getNoEcoTractor() {
+        return this.economicNumber;
+    }
+
+    public void setNoEcoTractor(String noEcoTractor) {
+        this.economicNumber = noEcoTractor;
+    }
+
+    public String getNoEcoCaja() {
+        return this.boxEconomicNumber;
+    }
+
+    public void setNoEcoCaja(String noEcoCaja) {
+        this.boxEconomicNumber = noEcoCaja;
+    }
 }

@@ -211,17 +211,17 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
             preCheckin = preCheckinJpaRepository.findById(Objects.requireNonNull(request.getPreCheckinId())).orElse(null);
         }
 
-        String ecoTractor = (request.getEconomicNumber() != null && !request.getEconomicNumber().isBlank())
-                ? request.getEconomicNumber().trim()
-                : (request.getNoEcoTractor() != null && !request.getNoEcoTractor().isBlank()
-                        ? request.getNoEcoTractor().trim()
-                        : (preCheckin != null ? (preCheckin.getEconomicNumber() != null && !preCheckin.getEconomicNumber().isBlank() ? preCheckin.getEconomicNumber().trim() : preCheckin.getNoEcoTractor()) : null));
+        String ecoTractor = (request.getNoEcoTractor() != null && !request.getNoEcoTractor().isBlank())
+                ? request.getNoEcoTractor().trim()
+                : (request.getEconomicNumber() != null && !request.getEconomicNumber().isBlank()
+                        ? request.getEconomicNumber().trim()
+                        : (preCheckin != null ? (preCheckin.getNoEcoTractor() != null && !preCheckin.getNoEcoTractor().isBlank() ? preCheckin.getNoEcoTractor().trim() : preCheckin.getEconomicNumber()) : null));
 
-        String ecoCaja = (request.getBoxEconomicNumber() != null && !request.getBoxEconomicNumber().isBlank())
-                ? request.getBoxEconomicNumber().trim()
-                : (request.getNoEcoCaja() != null && !request.getNoEcoCaja().isBlank()
-                        ? request.getNoEcoCaja().trim()
-                        : (preCheckin != null ? (preCheckin.getBoxEconomicNumber() != null && !preCheckin.getBoxEconomicNumber().isBlank() ? preCheckin.getBoxEconomicNumber().trim() : preCheckin.getNoEcoCaja()) : null));
+        String ecoCaja = (request.getNoEcoCaja() != null && !request.getNoEcoCaja().isBlank())
+                ? request.getNoEcoCaja().trim()
+                : (request.getBoxEconomicNumber() != null && !request.getBoxEconomicNumber().isBlank()
+                        ? request.getBoxEconomicNumber().trim()
+                        : (preCheckin != null ? (preCheckin.getNoEcoCaja() != null && !preCheckin.getNoEcoCaja().isBlank() ? preCheckin.getNoEcoCaja().trim() : preCheckin.getBoxEconomicNumber()) : null));
 
         WarehouseOutboundEntity outbound = WarehouseOutboundEntity.builder()
                 .organization(organization)
@@ -516,9 +516,9 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
                 outbound.setBoxPlates(newBox);
             }
         }
-        String incomingEco = (request.getEconomicNumber() != null && !request.getEconomicNumber().isBlank())
-                ? request.getEconomicNumber().trim()
-                : (request.getNoEcoTractor() != null && !request.getNoEcoTractor().isBlank() ? request.getNoEcoTractor().trim() : null);
+        String incomingEco = (request.getNoEcoTractor() != null && !request.getNoEcoTractor().isBlank())
+                ? request.getNoEcoTractor().trim()
+                : (request.getEconomicNumber() != null && !request.getEconomicNumber().isBlank() ? request.getEconomicNumber().trim() : null);
         if (incomingEco != null) {
             String oldEco = outbound.getEconomicNumber() != null ? outbound.getEconomicNumber().trim() : "";
             if (!Objects.equals(oldEco, incomingEco) && (!oldEco.isEmpty() || !incomingEco.isEmpty())) {
@@ -527,9 +527,9 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
                 outbound.setEconomicNumber(incomingEco);
             }
         }
-        String incomingBoxEco = (request.getBoxEconomicNumber() != null && !request.getBoxEconomicNumber().isBlank())
-                ? request.getBoxEconomicNumber().trim()
-                : (request.getNoEcoCaja() != null && !request.getNoEcoCaja().isBlank() ? request.getNoEcoCaja().trim() : null);
+        String incomingBoxEco = (request.getNoEcoCaja() != null && !request.getNoEcoCaja().isBlank())
+                ? request.getNoEcoCaja().trim()
+                : (request.getBoxEconomicNumber() != null && !request.getBoxEconomicNumber().isBlank() ? request.getBoxEconomicNumber().trim() : null);
         if (incomingBoxEco != null) {
             String oldBoxEco = outbound.getBoxEconomicNumber() != null ? outbound.getBoxEconomicNumber().trim() : "";
             if (!Objects.equals(oldBoxEco, incomingBoxEco) && (!oldBoxEco.isEmpty() || !incomingBoxEco.isEmpty())) {

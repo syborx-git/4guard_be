@@ -180,17 +180,19 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
         if (request.getPreCheckinId() != null) {
             preCheckin = preCheckinJpaRepository.findById(request.getPreCheckinId()).orElse(null);
             if (preCheckin != null) {
-                if (request.getEconomicNumber() != null && !request.getEconomicNumber().isBlank()) {
-                    preCheckin.setEconomicNumber(request.getEconomicNumber().trim());
-                    preCheckin.setNoEcoTractor(request.getEconomicNumber().trim());
-                } else if (request.getNoEcoTractor() != null && !request.getNoEcoTractor().isBlank()) {
-                    preCheckin.setEconomicNumber(request.getNoEcoTractor().trim());
+                if (request.getNoEcoTractor() != null && !request.getNoEcoTractor().isBlank()) {
                     preCheckin.setNoEcoTractor(request.getNoEcoTractor().trim());
+                    preCheckin.setEconomicNumber(request.getNoEcoTractor().trim());
+                } else if (request.getEconomicNumber() != null && !request.getEconomicNumber().isBlank()) {
+                    preCheckin.setNoEcoTractor(request.getEconomicNumber().trim());
+                    preCheckin.setEconomicNumber(request.getEconomicNumber().trim());
                 }
-                if (request.getBoxEconomicNumber() != null && !request.getBoxEconomicNumber().isBlank()) {
-                    preCheckin.setBoxEconomicNumber(request.getBoxEconomicNumber().trim());
-                } else if (request.getNoEcoCaja() != null && !request.getNoEcoCaja().isBlank()) {
+                if (request.getNoEcoCaja() != null && !request.getNoEcoCaja().isBlank()) {
+                    preCheckin.setNoEcoCaja(request.getNoEcoCaja().trim());
                     preCheckin.setBoxEconomicNumber(request.getNoEcoCaja().trim());
+                } else if (request.getBoxEconomicNumber() != null && !request.getBoxEconomicNumber().isBlank()) {
+                    preCheckin.setNoEcoCaja(request.getBoxEconomicNumber().trim());
+                    preCheckin.setBoxEconomicNumber(request.getBoxEconomicNumber().trim());
                 }
                 preCheckinJpaRepository.save(preCheckin);
             }
@@ -460,19 +462,20 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
         }
 
         if (entity.getPreCheckin() != null) {
-            String ecoTractor = (request.getEconomicNumber() != null && !request.getEconomicNumber().isBlank())
-                    ? request.getEconomicNumber().trim()
-                    : ((request.getNoEcoTractor() != null && !request.getNoEcoTractor().isBlank())
-                            ? request.getNoEcoTractor().trim() : null);
+            String ecoTractor = (request.getNoEcoTractor() != null && !request.getNoEcoTractor().isBlank())
+                    ? request.getNoEcoTractor().trim()
+                    : ((request.getEconomicNumber() != null && !request.getEconomicNumber().isBlank())
+                            ? request.getEconomicNumber().trim() : null);
             if (ecoTractor != null) {
-                entity.getPreCheckin().setEconomicNumber(ecoTractor);
                 entity.getPreCheckin().setNoEcoTractor(ecoTractor);
+                entity.getPreCheckin().setEconomicNumber(ecoTractor);
             }
-            String ecoCaja = (request.getBoxEconomicNumber() != null && !request.getBoxEconomicNumber().isBlank())
-                    ? request.getBoxEconomicNumber().trim()
-                    : ((request.getNoEcoCaja() != null && !request.getNoEcoCaja().isBlank())
-                            ? request.getNoEcoCaja().trim() : null);
+            String ecoCaja = (request.getNoEcoCaja() != null && !request.getNoEcoCaja().isBlank())
+                    ? request.getNoEcoCaja().trim()
+                    : ((request.getBoxEconomicNumber() != null && !request.getBoxEconomicNumber().isBlank())
+                            ? request.getBoxEconomicNumber().trim() : null);
             if (ecoCaja != null) {
+                entity.getPreCheckin().setNoEcoCaja(ecoCaja);
                 entity.getPreCheckin().setBoxEconomicNumber(ecoCaja);
             }
             if (request.getTractorPlates() != null && !request.getTractorPlates().isBlank()) {
