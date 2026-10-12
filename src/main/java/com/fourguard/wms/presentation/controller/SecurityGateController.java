@@ -60,7 +60,7 @@ public class SecurityGateController {
     // ─── GUARD / ADMIN AUTHENTICATED ENDPOINTS ────────────────────────────────
 
     @PostMapping("/passes/generate")
-    @PreAuthorize("hasAuthority('SECURITY_GATE_CREATE') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('SECURITY_GATE_CREATE') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('CEO') or hasRole('WAREHOUSE_MANAGER')")
     @Operation(summary = "Generar nuevo Pase Digital QR para Chofer",
                description = "Crea un token único de acceso con código QR para que el chofer complete el formato de acceso en su smartphone.")
     public ResponseEntity<ApiResponse<PassResponse>> generatePass(
@@ -70,7 +70,7 @@ public class SecurityGateController {
     }
 
     @GetMapping("/passes/active")
-    @PreAuthorize("hasAuthority('SECURITY_GATE_READ') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('SECURITY_GATE_READ') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('CEO') or hasRole('WAREHOUSE_MANAGER')")
     @Operation(summary = "Listar pases activos y choferes en espera",
                description = "Retorna la cola de choferes en espera o con auto-registro enviado para revisión del guardia.")
     public ResponseEntity<ApiResponse<List<PassResponse>>> getActivePasses(
@@ -81,7 +81,7 @@ public class SecurityGateController {
     }
 
     @GetMapping("/passes/in-yard")
-    @PreAuthorize("hasAuthority('SECURITY_GATE_READ') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('SECURITY_GATE_READ') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('CEO') or hasRole('WAREHOUSE_MANAGER')")
     @Operation(summary = "Listar unidades en planta (patio / andenes)",
                description = "Retorna los vehículos que han ingresado y están actualmente en descarga, carga o listos para salida.")
     public ResponseEntity<ApiResponse<List<PassResponse>>> getInYardPasses(
@@ -92,7 +92,7 @@ public class SecurityGateController {
     }
 
     @GetMapping("/passes/history")
-    @PreAuthorize("hasAuthority('SECURITY_GATE_READ') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('SECURITY_GATE_READ') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('CEO') or hasRole('WAREHOUSE_MANAGER')")
     @Operation(summary = "Historial y Auditoría de Caseta de Seguridad",
                description = "Retorna el histórico completo de pases y movimientos con búsqueda para reimpresión de boleta F01.")
     public ResponseEntity<ApiResponse<List<PassResponse>>> getHistoryPasses(
@@ -104,7 +104,7 @@ public class SecurityGateController {
     }
 
     @PostMapping("/passes/{token}/complete")
-    @PreAuthorize("hasAuthority('SECURITY_GATE_UPDATE') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('SECURITY_GATE_UPDATE') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('CEO') or hasRole('WAREHOUSE_MANAGER')")
     @Operation(summary = "Validar y autorizar entrada a planta (Check-In Oficial WMS)",
                description = "El guardia confirma los datos, asigna el andén/rampa y genera el folio oficial de Recepción o Salida en el WMS.")
     public ResponseEntity<ApiResponse<PassResponse>> completeCheckin(
@@ -115,7 +115,7 @@ public class SecurityGateController {
     }
 
     @PostMapping("/passes/{token}/check-out")
-    @PreAuthorize("hasAuthority('SECURITY_GATE_UPDATE') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('SECURITY_GATE_UPDATE') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('CEO') or hasRole('WAREHOUSE_MANAGER')")
     @Operation(summary = "Registrar Salida de Planta (Check-Out Oficial y Cierre de Pase F01)",
                description = "El guardia registra la hora de salida de la unidad, observaciones finales y sella la salida para imprimir o descargar el formato F01.")
     public ResponseEntity<ApiResponse<PassResponse>> checkOut(
@@ -127,7 +127,7 @@ public class SecurityGateController {
     }
 
     @DeleteMapping("/passes/{id}")
-    @PreAuthorize("hasAuthority('SECURITY_GATE_DELETE') or hasAuthority('SECURITY_GATE_UPDATE') or hasAuthority('SECURITY_GATE_CREATE') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('SECURITY_GATE_DELETE') or hasAuthority('SECURITY_GATE_UPDATE') or hasAuthority('SECURITY_GATE_CREATE') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('CEO') or hasRole('WAREHOUSE_MANAGER')")
     @Operation(summary = "Cancelar / Descartar Pase Digital QR",
                description = "Elimina un pase de acceso generado o pendiente que no fue utilizado.")
     public ResponseEntity<ApiResponse<Void>> deletePass(@PathVariable UUID id) {

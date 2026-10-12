@@ -213,15 +213,15 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
 
         String ecoTractor = (request.getNoEcoTractor() != null && !request.getNoEcoTractor().isBlank())
                 ? request.getNoEcoTractor().trim()
-                : (request.getEconomicNumber() != null && !request.getEconomicNumber().isBlank()
-                        ? request.getEconomicNumber().trim()
-                        : (preCheckin != null ? (preCheckin.getNoEcoTractor() != null && !preCheckin.getNoEcoTractor().isBlank() ? preCheckin.getNoEcoTractor().trim() : preCheckin.getEconomicNumber()) : null));
+                : (preCheckin != null && preCheckin.getNoEcoTractor() != null && !preCheckin.getNoEcoTractor().isBlank()
+                        ? preCheckin.getNoEcoTractor().trim()
+                        : null);
 
         String ecoCaja = (request.getNoEcoCaja() != null && !request.getNoEcoCaja().isBlank())
                 ? request.getNoEcoCaja().trim()
-                : (request.getBoxEconomicNumber() != null && !request.getBoxEconomicNumber().isBlank()
-                        ? request.getBoxEconomicNumber().trim()
-                        : (preCheckin != null ? (preCheckin.getNoEcoCaja() != null && !preCheckin.getNoEcoCaja().isBlank() ? preCheckin.getNoEcoCaja().trim() : preCheckin.getBoxEconomicNumber()) : null));
+                : (preCheckin != null && preCheckin.getNoEcoCaja() != null && !preCheckin.getNoEcoCaja().isBlank()
+                        ? preCheckin.getNoEcoCaja().trim()
+                        : null);
 
         WarehouseOutboundEntity outbound = WarehouseOutboundEntity.builder()
                 .organization(organization)
@@ -238,8 +238,8 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
                 .forkliftOperator(operator)
                 .transportType(request.getTransportType() != null ? request.getTransportType().toUpperCase().trim() : "TRAILER")
                 .driverName(request.getDriverName())
-                .economicNumber(ecoTractor)
-                .boxEconomicNumber(ecoCaja)
+                .noEcoTractor(ecoTractor)
+                .noEcoCaja(ecoCaja)
                 .tractorPlates(request.getTractorPlates())
                 .boxPlates(request.getBoxPlates())
                 .sealNumber(request.getSealNumber())
@@ -518,24 +518,24 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
         }
         String incomingEco = (request.getNoEcoTractor() != null && !request.getNoEcoTractor().isBlank())
                 ? request.getNoEcoTractor().trim()
-                : (request.getEconomicNumber() != null && !request.getEconomicNumber().isBlank() ? request.getEconomicNumber().trim() : null);
+                : null;
         if (incomingEco != null) {
-            String oldEco = outbound.getEconomicNumber() != null ? outbound.getEconomicNumber().trim() : "";
+            String oldEco = outbound.getNoEcoTractor() != null ? outbound.getNoEcoTractor().trim() : "";
             if (!Objects.equals(oldEco, incomingEco) && (!oldEco.isEmpty() || !incomingEco.isEmpty())) {
-                oldValues.put("economicNumber", !oldEco.isEmpty() ? oldEco : "Sin especificar");
-                newValues.put("economicNumber", incomingEco);
-                outbound.setEconomicNumber(incomingEco);
+                oldValues.put("noEcoTractor", !oldEco.isEmpty() ? oldEco : "Sin especificar");
+                newValues.put("noEcoTractor", incomingEco);
+                outbound.setNoEcoTractor(incomingEco);
             }
         }
         String incomingBoxEco = (request.getNoEcoCaja() != null && !request.getNoEcoCaja().isBlank())
                 ? request.getNoEcoCaja().trim()
-                : (request.getBoxEconomicNumber() != null && !request.getBoxEconomicNumber().isBlank() ? request.getBoxEconomicNumber().trim() : null);
+                : null;
         if (incomingBoxEco != null) {
-            String oldBoxEco = outbound.getBoxEconomicNumber() != null ? outbound.getBoxEconomicNumber().trim() : "";
+            String oldBoxEco = outbound.getNoEcoCaja() != null ? outbound.getNoEcoCaja().trim() : "";
             if (!Objects.equals(oldBoxEco, incomingBoxEco) && (!oldBoxEco.isEmpty() || !incomingBoxEco.isEmpty())) {
-                oldValues.put("boxEconomicNumber", !oldBoxEco.isEmpty() ? oldBoxEco : "Sin especificar");
-                newValues.put("boxEconomicNumber", incomingBoxEco);
-                outbound.setBoxEconomicNumber(incomingBoxEco);
+                oldValues.put("noEcoCaja", !oldBoxEco.isEmpty() ? oldBoxEco : "Sin especificar");
+                newValues.put("noEcoCaja", incomingBoxEco);
+                outbound.setNoEcoCaja(incomingBoxEco);
             }
         }
 
@@ -1139,8 +1139,8 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
             case "driver", "driverName" -> "Operador del Transporte";
             case "plates", "tractorPlates" -> "Placas del Tracto";
             case "boxPlates" -> "Placas de la Caja";
-            case "economicNumber" -> "No. Económico Tractor";
-            case "boxEconomicNumber" -> "No. Económico Caja";
+            case "economicNumber", "noEcoTractor" -> "No. Económico Tractor";
+            case "boxEconomicNumber", "noEcoCaja" -> "No. Económico Caja";
             case "ramp", "rampId", "rampNumber" -> "Rampa Asignada";
             case "status" -> "Estado Operativo";
             case "reason", "cancellationReason" -> "Motivo / Justificación";

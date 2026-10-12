@@ -49,9 +49,7 @@ public class ReceptionResponse {
     private String driverName;
     private String tractorPlates;
     private String boxPlates;
-    private String economicNumber;
     private String noEcoTractor;
-    private String boxEconomicNumber;
     private String noEcoCaja;
     private List<String> sealNumbers;
 

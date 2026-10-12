@@ -31,10 +31,8 @@ public interface WarehouseOutboundMapper {
     @Mapping(source = "forkliftOperator.id", target = "forkliftOperatorId")
     @Mapping(source = "forkliftOperator.fullName", target = "forkliftOperatorName")
     @Mapping(source = "status", target = "status", qualifiedByName = "outboundStatusToString")
-    @Mapping(target = "economicNumber", expression = "java(entity.getEconomicNumber() != null && !entity.getEconomicNumber().isBlank() ? entity.getEconomicNumber() : (entity.getPreCheckin() != null ? (entity.getPreCheckin().getNoEcoTractor() != null && !entity.getPreCheckin().getNoEcoTractor().isBlank() ? entity.getPreCheckin().getNoEcoTractor() : entity.getPreCheckin().getEconomicNumber()) : null))")
-    @Mapping(target = "noEcoTractor", expression = "java(entity.getEconomicNumber() != null && !entity.getEconomicNumber().isBlank() ? entity.getEconomicNumber() : (entity.getPreCheckin() != null ? (entity.getPreCheckin().getNoEcoTractor() != null && !entity.getPreCheckin().getNoEcoTractor().isBlank() ? entity.getPreCheckin().getNoEcoTractor() : entity.getPreCheckin().getEconomicNumber()) : null))")
-    @Mapping(target = "boxEconomicNumber", expression = "java(entity.getBoxEconomicNumber() != null && !entity.getBoxEconomicNumber().isBlank() ? entity.getBoxEconomicNumber() : (entity.getPreCheckin() != null ? (entity.getPreCheckin().getNoEcoCaja() != null && !entity.getPreCheckin().getNoEcoCaja().isBlank() ? entity.getPreCheckin().getNoEcoCaja() : entity.getPreCheckin().getBoxEconomicNumber()) : null))")
-    @Mapping(target = "noEcoCaja", expression = "java(entity.getBoxEconomicNumber() != null && !entity.getBoxEconomicNumber().isBlank() ? entity.getBoxEconomicNumber() : (entity.getPreCheckin() != null ? (entity.getPreCheckin().getNoEcoCaja() != null && !entity.getPreCheckin().getNoEcoCaja().isBlank() ? entity.getPreCheckin().getNoEcoCaja() : entity.getPreCheckin().getBoxEconomicNumber()) : null))")
+    @Mapping(target = "noEcoTractor", expression = "java(entity.getNoEcoTractor() != null && !entity.getNoEcoTractor().isBlank() ? entity.getNoEcoTractor() : (entity.getPreCheckin() != null ? entity.getPreCheckin().getNoEcoTractor() : null))")
+    @Mapping(target = "noEcoCaja", expression = "java(entity.getNoEcoCaja() != null && !entity.getNoEcoCaja().isBlank() ? entity.getNoEcoCaja() : (entity.getPreCheckin() != null ? entity.getPreCheckin().getNoEcoCaja() : null))")
     @Mapping(source = "items", target = "items")
     OutboundResponse toResponse(WarehouseOutboundEntity entity);
 
@@ -51,10 +49,8 @@ public interface WarehouseOutboundMapper {
     @Mapping(source = "forkliftOperator.id", target = "forkliftOperatorId")
     @Mapping(source = "forkliftOperator.fullName", target = "forkliftOperatorName")
     @Mapping(source = "status", target = "status", qualifiedByName = "outboundStatusToString")
-    @Mapping(target = "economicNumber", expression = "java(entity.getEconomicNumber() != null && !entity.getEconomicNumber().isBlank() ? entity.getEconomicNumber() : (entity.getPreCheckin() != null ? (entity.getPreCheckin().getNoEcoTractor() != null && !entity.getPreCheckin().getNoEcoTractor().isBlank() ? entity.getPreCheckin().getNoEcoTractor() : entity.getPreCheckin().getEconomicNumber()) : null))")
-    @Mapping(target = "noEcoTractor", expression = "java(entity.getEconomicNumber() != null && !entity.getEconomicNumber().isBlank() ? entity.getEconomicNumber() : (entity.getPreCheckin() != null ? (entity.getPreCheckin().getNoEcoTractor() != null && !entity.getPreCheckin().getNoEcoTractor().isBlank() ? entity.getPreCheckin().getNoEcoTractor() : entity.getPreCheckin().getEconomicNumber()) : null))")
-    @Mapping(target = "boxEconomicNumber", expression = "java(entity.getBoxEconomicNumber() != null && !entity.getBoxEconomicNumber().isBlank() ? entity.getBoxEconomicNumber() : (entity.getPreCheckin() != null ? (entity.getPreCheckin().getNoEcoCaja() != null && !entity.getPreCheckin().getNoEcoCaja().isBlank() ? entity.getPreCheckin().getNoEcoCaja() : entity.getPreCheckin().getBoxEconomicNumber()) : null))")
-    @Mapping(target = "noEcoCaja", expression = "java(entity.getBoxEconomicNumber() != null && !entity.getBoxEconomicNumber().isBlank() ? entity.getBoxEconomicNumber() : (entity.getPreCheckin() != null ? (entity.getPreCheckin().getNoEcoCaja() != null && !entity.getPreCheckin().getNoEcoCaja().isBlank() ? entity.getPreCheckin().getNoEcoCaja() : entity.getPreCheckin().getBoxEconomicNumber()) : null))")
+    @Mapping(target = "noEcoTractor", expression = "java(entity.getNoEcoTractor() != null && !entity.getNoEcoTractor().isBlank() ? entity.getNoEcoTractor() : (entity.getPreCheckin() != null ? entity.getPreCheckin().getNoEcoTractor() : null))")
+    @Mapping(target = "noEcoCaja", expression = "java(entity.getNoEcoCaja() != null && !entity.getNoEcoCaja().isBlank() ? entity.getNoEcoCaja() : (entity.getPreCheckin() != null ? entity.getPreCheckin().getNoEcoCaja() : null))")
     OutboundSummaryResponse toSummaryResponse(WarehouseOutboundEntity entity);
 
     @Mapping(source = "item.id", target = "itemId")
