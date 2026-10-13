@@ -10,35 +10,39 @@
 
 SET search_path TO wms, public;
 
--- 1. Standardize wms.security_pre_checkins
-ALTER TABLE wms.security_pre_checkins
-    ADD COLUMN IF NOT EXISTS no_eco_caja VARCHAR(100);
+DO $$
+BEGIN
+    -- 1. Standardize wms.security_pre_checkins
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='wms' AND table_name='security_pre_checkins' AND column_name='no_eco_caja') THEN
+        ALTER TABLE wms.security_pre_checkins ADD COLUMN no_eco_caja VARCHAR(100);
+    END IF;
 
-UPDATE wms.security_pre_checkins
-SET no_eco_tractor = economic_number
-WHERE (no_eco_tractor IS NULL OR no_eco_tractor = '') AND economic_number IS NOT NULL AND economic_number <> '';
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='wms' AND table_name='security_pre_checkins' AND column_name='economic_number') THEN
+        EXECUTE 'UPDATE wms.security_pre_checkins SET no_eco_tractor = economic_number WHERE (no_eco_tractor IS NULL OR no_eco_tractor = '''') AND economic_number IS NOT NULL AND economic_number <> ''''';
+        ALTER TABLE wms.security_pre_checkins DROP COLUMN economic_number;
+    END IF;
 
-UPDATE wms.security_pre_checkins
-SET no_eco_caja = box_economic_number
-WHERE (no_eco_caja IS NULL OR no_eco_caja = '') AND box_economic_number IS NOT NULL AND box_economic_number <> '';
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='wms' AND table_name='security_pre_checkins' AND column_name='box_economic_number') THEN
+        EXECUTE 'UPDATE wms.security_pre_checkins SET no_eco_caja = box_economic_number WHERE (no_eco_caja IS NULL OR no_eco_caja = '''') AND box_economic_number IS NOT NULL AND box_economic_number <> ''''';
+        ALTER TABLE wms.security_pre_checkins DROP COLUMN box_economic_number;
+    END IF;
 
-ALTER TABLE wms.security_pre_checkins
-    DROP COLUMN IF EXISTS economic_number,
-    DROP COLUMN IF EXISTS box_economic_number;
+    -- 2. Standardize wms.warehouse_outbounds
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='wms' AND table_name='warehouse_outbounds' AND column_name='no_eco_tractor') THEN
+        ALTER TABLE wms.warehouse_outbounds ADD COLUMN no_eco_tractor VARCHAR(100);
+    END IF;
 
--- 2. Standardize wms.warehouse_outbounds
-ALTER TABLE wms.warehouse_outbounds
-    ADD COLUMN IF NOT EXISTS no_eco_tractor VARCHAR(100),
-    ADD COLUMN IF NOT EXISTS no_eco_caja VARCHAR(100);
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='wms' AND table_name='warehouse_outbounds' AND column_name='no_eco_caja') THEN
+        ALTER TABLE wms.warehouse_outbounds ADD COLUMN no_eco_caja VARCHAR(100);
+    END IF;
 
-UPDATE wms.warehouse_outbounds
-SET no_eco_tractor = economic_number
-WHERE (no_eco_tractor IS NULL OR no_eco_tractor = '') AND economic_number IS NOT NULL AND economic_number <> '';
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='wms' AND table_name='warehouse_outbounds' AND column_name='economic_number') THEN
+        EXECUTE 'UPDATE wms.warehouse_outbounds SET no_eco_tractor = economic_number WHERE (no_eco_tractor IS NULL OR no_eco_tractor = '''') AND economic_number IS NOT NULL AND economic_number <> ''''';
+        ALTER TABLE wms.warehouse_outbounds DROP COLUMN economic_number;
+    END IF;
 
-UPDATE wms.warehouse_outbounds
-SET no_eco_caja = box_economic_number
-WHERE (no_eco_caja IS NULL OR no_eco_caja = '') AND box_economic_number IS NOT NULL AND box_economic_number <> '';
-
-ALTER TABLE wms.warehouse_outbounds
-    DROP COLUMN IF EXISTS economic_number,
-    DROP COLUMN IF EXISTS box_economic_number;
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='wms' AND table_name='warehouse_outbounds' AND column_name='box_economic_number') THEN
+        EXECUTE 'UPDATE wms.warehouse_outbounds SET no_eco_caja = box_economic_number WHERE (no_eco_caja IS NULL OR no_eco_caja = '''') AND box_economic_number IS NOT NULL AND box_economic_number <> ''''';
+        ALTER TABLE wms.warehouse_outbounds DROP COLUMN box_economic_number;
+    END IF;
+END $$;

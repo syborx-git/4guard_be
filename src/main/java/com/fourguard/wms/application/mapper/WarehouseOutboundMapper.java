@@ -33,6 +33,8 @@ public interface WarehouseOutboundMapper {
     @Mapping(source = "status", target = "status", qualifiedByName = "outboundStatusToString")
     @Mapping(target = "noEcoTractor", expression = "java(entity.getNoEcoTractor() != null && !entity.getNoEcoTractor().isBlank() ? entity.getNoEcoTractor() : (entity.getPreCheckin() != null ? entity.getPreCheckin().getNoEcoTractor() : null))")
     @Mapping(target = "noEcoCaja", expression = "java(entity.getNoEcoCaja() != null && !entity.getNoEcoCaja().isBlank() ? entity.getNoEcoCaja() : (entity.getPreCheckin() != null ? entity.getPreCheckin().getNoEcoCaja() : null))")
+    @Mapping(target = "driverSignature", expression = "java(entity.getPreCheckin() != null ? entity.getPreCheckin().getDriverSignature() : null)")
+    @Mapping(target = "driverSignedAt", expression = "java(entity.getPreCheckin() != null ? entity.getPreCheckin().getDriverSignedAt() : null)")
     @Mapping(source = "items", target = "items")
     OutboundResponse toResponse(WarehouseOutboundEntity entity);
 

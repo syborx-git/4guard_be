@@ -348,24 +348,31 @@ public  class SecurityGateService implements SecurityGateUseCase {
         }
 
         // 2. Unificar todas las recepciones activas en planta de
-        // wms.warehouse_receptions
+        // wms.warehouse_receptions (incluye canceladas recientes que no han salido de caseta)
         List<WarehouseReceptionEntity> activeReceptions = warehouseReceptionRepositoryPort.findAll(
                 WarehouseReceptionSpecification.withFilters(organizationId, branchId, null, null));
 
+        OffsetDateTime recentThreshold = OffsetDateTime.now().minusDays(2);
         for (WarehouseReceptionEntity rec : activeReceptions) {
-            if (rec.getStatus() != ReceptionStatus.CANCELLED && shouldIncludeInYardFolio(rec.getFolio(), processedFolios)) {
+            boolean isOldCancelled = rec.getStatus() == ReceptionStatus.CANCELLED &&
+                    ((rec.getCancelledAt() != null && rec.getCancelledAt().isBefore(recentThreshold)) ||
+                     (rec.getCreatedAt() != null && rec.getCreatedAt().isBefore(recentThreshold)));
+            if (!isOldCancelled && shouldIncludeInYardFolio(rec.getFolio(), processedFolios)) {
                 processedFolios.add(rec.getFolio().trim());
                 result.add(mapReceptionToPassResponse(rec));
             }
         }
 
         // 3. Unificar todos los embarques (outbounds) activos en planta de
-        // wms.warehouse_outbounds
+        // wms.warehouse_outbounds (incluye cancelados recientes que no han salido de caseta)
         List<WarehouseOutboundEntity> activeOutbounds = warehouseOutboundRepositoryPort.findAll(
                 WarehouseOutboundSpecification.withFilters(organizationId, branchId, null, null));
 
         for (WarehouseOutboundEntity out : activeOutbounds) {
-            if (out.getStatus() != OutboundStatus.CANCELLED && shouldIncludeInYardFolio(out.getFolio(), processedFolios)) {
+            boolean isOldCancelled = out.getStatus() == OutboundStatus.CANCELLED &&
+                    ((out.getCancelledAt() != null && out.getCancelledAt().isBefore(recentThreshold)) ||
+                     (out.getCreatedAt() != null && out.getCreatedAt().isBefore(recentThreshold)));
+            if (!isOldCancelled && shouldIncludeInYardFolio(out.getFolio(), processedFolios)) {
                 processedFolios.add(out.getFolio().trim());
                 result.add(mapOutboundToPassResponse(out));
             }
@@ -797,7 +804,10 @@ public  class SecurityGateService implements SecurityGateUseCase {
                 .generatedFolio(rec.getFolio())
                 .observations(rec.getObservations())
                 .warehouseStatus(rec.getStatus() != null ? rec.getStatus().name() : "REGISTERED")
-                .isReadyForExit(rec.getStatus() == ReceptionStatus.COMPLETED)
+                .isReadyForExit(rec.getStatus() == ReceptionStatus.COMPLETED || rec.getStatus() == ReceptionStatus.CANCELLED)
+                .cancellationReason(rec.getCancellationReason())
+                .cancelledBy(rec.getCancelledBy())
+                .cancelledAt(rec.getCancelledAt())
                 .createdAt(rec.getCreatedAt())
                 .build();
     }
@@ -838,7 +848,10 @@ public  class SecurityGateService implements SecurityGateUseCase {
                 .generatedFolio(out.getFolio())
                 .observations(out.getObservations())
                 .warehouseStatus(out.getStatus() != null ? out.getStatus().name() : "REGISTERED")
-                .isReadyForExit(out.getStatus() == OutboundStatus.COMPLETED)
+                .isReadyForExit(out.getStatus() == OutboundStatus.COMPLETED || out.getStatus() == OutboundStatus.CANCELLED)
+                .cancellationReason(out.getCancellationReason())
+                .cancelledBy(out.getCancelledBy())
+                .cancelledAt(out.getCancelledAt())
                 .createdAt(out.getCreatedAt())
                 .build();
     }
@@ -850,6 +863,9 @@ public  class SecurityGateService implements SecurityGateUseCase {
     private PassResponse mapToResponseWithWarehouseStatus(SecurityPreCheckinEntity entity) {
         String whStatus = "REGISTRADO";
         boolean readyForExit = false;
+        String dynamicCancellationReason = null;
+        String dynamicCancelledBy = null;
+        OffsetDateTime dynamicCancelledAt = null;
         UUID dynamicRampId = entity.getRamp() != null ? entity.getRamp().getId() : null;
         Integer dynamicRampNumber = entity.getRampNumber();
         String dynamicRampCode = entity.getRampCode();
@@ -861,7 +877,12 @@ public  class SecurityGateService implements SecurityGateUseCase {
                 if (outbound.isPresent()) {
                     WarehouseOutboundEntity out = outbound.get();
                     whStatus = out.getStatus() != null ? out.getStatus().name() : "REGISTERED";
-                    readyForExit = (out.getStatus() == OutboundStatus.COMPLETED);
+                    readyForExit = (out.getStatus() == OutboundStatus.COMPLETED || out.getStatus() == OutboundStatus.CANCELLED);
+                    if (out.getStatus() == OutboundStatus.CANCELLED) {
+                        dynamicCancellationReason = out.getCancellationReason();
+                        dynamicCancelledBy = out.getCancelledBy();
+                        dynamicCancelledAt = out.getCancelledAt();
+                    }
                     if (out.getRamp() != null) {
                         dynamicRampId = out.getRamp().getId();
                         dynamicRampCode = out.getRamp().getCode();
@@ -873,7 +894,12 @@ public  class SecurityGateService implements SecurityGateUseCase {
                 if (reception.isPresent()) {
                     WarehouseReceptionEntity rec = reception.get();
                     whStatus = rec.getStatus() != null ? rec.getStatus().name() : "REGISTERED";
-                    readyForExit = (rec.getStatus() == ReceptionStatus.COMPLETED);
+                    readyForExit = (rec.getStatus() == ReceptionStatus.COMPLETED || rec.getStatus() == ReceptionStatus.CANCELLED);
+                    if (rec.getStatus() == ReceptionStatus.CANCELLED) {
+                        dynamicCancellationReason = rec.getCancellationReason();
+                        dynamicCancelledBy = rec.getCancelledBy();
+                        dynamicCancelledAt = rec.getCancelledAt();
+                    }
                     if (rec.getRamp() != null) {
                         dynamicRampId = rec.getRamp().getId();
                         dynamicRampCode = rec.getRamp().getCode();
@@ -948,6 +974,9 @@ public  class SecurityGateService implements SecurityGateUseCase {
                 .exitedAt(entity.getExitedAt())
                 .warehouseStatus(whStatus)
                 .isReadyForExit(readyForExit)
+                .cancellationReason(dynamicCancellationReason)
+                .cancelledBy(dynamicCancelledBy)
+                .cancelledAt(dynamicCancelledAt)
                 .expiresAt(entity.getExpiresAt())
                 .createdAt(entity.getCreatedAt())
                 .build();

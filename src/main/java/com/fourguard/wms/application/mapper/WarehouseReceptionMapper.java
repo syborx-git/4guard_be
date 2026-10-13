@@ -44,6 +44,8 @@ public interface WarehouseReceptionMapper {
     @Mapping(source = "seals", target = "sealNumbers", qualifiedByName = "mapSealsToStrings")
     @Mapping(target = "noEcoTractor", expression = "java(entity.getPreCheckin() != null ? entity.getPreCheckin().getNoEcoTractor() : null)")
     @Mapping(target = "noEcoCaja", expression = "java(entity.getPreCheckin() != null ? entity.getPreCheckin().getNoEcoCaja() : null)")
+    @Mapping(target = "driverSignature", expression = "java(entity.getPreCheckin() != null ? entity.getPreCheckin().getDriverSignature() : null)")
+    @Mapping(target = "driverSignedAt", expression = "java(entity.getPreCheckin() != null ? entity.getPreCheckin().getDriverSignedAt() : null)")
     @Mapping(source = "lots", target = "lots")
     @Mapping(source = "pallets", target = "pallets")
     @Mapping(target = "totalPallets", expression = "java(entity.getPallets() != null ? entity.getPallets().size() : 0)")

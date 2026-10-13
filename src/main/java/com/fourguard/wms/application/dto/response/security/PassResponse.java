@@ -66,6 +66,11 @@ public class PassResponse {
     private String warehouseStatus;
     private Boolean isReadyForExit;
 
+    // Cancellation info
+    private String cancellationReason;
+    private String cancelledBy;
+    private OffsetDateTime cancelledAt;
+
     private OffsetDateTime expiresAt;
     private OffsetDateTime createdAt;
 }

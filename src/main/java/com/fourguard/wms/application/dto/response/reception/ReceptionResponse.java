@@ -52,6 +52,8 @@ public class ReceptionResponse {
     private String noEcoTractor;
     private String noEcoCaja;
     private List<String> sealNumbers;
+    private String driverSignature;
+    private OffsetDateTime driverSignedAt;
 
     // Parámetros de Descarga / Lote
     private UUID skuId;

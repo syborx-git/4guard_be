@@ -46,6 +46,8 @@ public class OutboundResponse {
     private String boxPlates;
     private String sealNumber;
     private String remisionNo;
+    private String driverSignature;
+    private OffsetDateTime driverSignedAt;
     private String observations;
 
     private Integer totalPallets;
