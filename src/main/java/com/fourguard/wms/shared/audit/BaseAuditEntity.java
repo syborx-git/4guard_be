@@ -27,6 +27,13 @@ import java.time.ZoneOffset;
 @MappedSuperclass
 public abstract class BaseAuditEntity {
 
+    protected BaseAuditEntity(BaseAuditEntityBuilder<?, ?> b) {
+        this.createdAt = b.createdAt;
+        this.updatedAt = b.updatedAt;
+        this.createdBy = b.createdBy;
+        this.updatedBy = b.updatedBy;
+    }
+
     @Column(name = "created_at", updatable = false)
     private OffsetDateTime createdAt;
 

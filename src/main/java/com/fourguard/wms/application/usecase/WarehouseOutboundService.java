@@ -160,10 +160,11 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
             targetStatus = OutboundStatus.COMPLETED;
         }
 
-        // Generate consecutive folio: SAL-YYYY-XXXXXX
-        long seq = outboundRepositoryPort.nextFolioSequenceValue();
-        int year = LocalDate.now().getYear();
-        String folio = String.format("SAL-%d-%06d", year, seq);
+        // Generate consecutive folio per client: SAL-YYYYMMDD-[CLIENT]-[NNNN]
+        long seq = outboundRepositoryPort.nextClientFolioSequenceValue(client.getId());
+        String dateStr = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        String clientShortCode = resolveClientShortCode(client);
+        String folio = String.format("SAL-%s-%s-%04d", dateStr, clientShortCode, seq);
 
         List<InventoryItemEntity> itemsToDispatch = new ArrayList<>();
         if (request.getSelectedItemIds() != null && !request.getSelectedItemIds().isEmpty()) {
@@ -317,6 +318,7 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
         WarehouseOutboundEntity saved = outboundRepositoryPort.save(outbound);
 
         Map<String, String> initialData = new LinkedHashMap<>();
+        initialData.put("remisionNo", remisionNumber);
         initialData.put("folio", folio);
         initialData.put("status", targetStatus.name());
         initialData.put("client", client.getName());
@@ -1132,6 +1134,7 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
     private String translateFieldName(String field) {
         if (field == null || field.isBlank()) return "Dato";
         return switch (field.trim()) {
+            case "remisionNo", "remisionNumber", "docNumber", "doc_number", "remision" -> "No. de Remisión / Documento";
             case "client", "clientId", "clientName" -> "Cliente / Destinatario";
             case "destination", "destinationId", "destinationName", "plant" -> "Planta / Destino";
             case "carrier", "carrierId", "carrierName" -> "Línea Transportista";
@@ -1214,5 +1217,36 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
                 }
             }
         }
+    }
+
+    private String resolveClientShortCode(ClientEntity client) {
+        if (client == null) {
+            return "CLI";
+        }
+        if (client.getShortCode() != null && !client.getShortCode().isBlank()) {
+            return client.getShortCode().trim().toUpperCase();
+        }
+        if (client.getExternalId() != null && !client.getExternalId().isBlank()) {
+            String clean = client.getExternalId().replaceAll("[^a-zA-Z0-9]", "").toUpperCase();
+            if (clean.startsWith("CLI") && clean.length() >= 6) {
+                return clean.substring(3, 6);
+            }
+            if (clean.length() >= 3) {
+                return clean.substring(0, 3);
+            }
+        }
+        if (client.getTaxId() != null && !client.getTaxId().isBlank()) {
+            String clean = client.getTaxId().replaceAll("[^a-zA-Z0-9]", "").toUpperCase();
+            if (clean.length() >= 3) {
+                return clean.substring(0, 3);
+            }
+        }
+        if (client.getName() != null && !client.getName().isBlank()) {
+            String clean = client.getName().replaceAll("[^a-zA-Z0-9]", "").toUpperCase();
+            if (clean.length() >= 3) {
+                return clean.substring(0, 3);
+            }
+        }
+        return "CLI";
     }
 }
