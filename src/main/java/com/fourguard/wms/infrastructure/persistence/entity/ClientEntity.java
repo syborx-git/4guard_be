@@ -41,6 +41,9 @@ public class ClientEntity extends BaseVersionedEntity {
     @Column(name = "tax_id", length = 30)
     private String taxId;
 
+    @Column(name = "short_code", length = 10)
+    private String shortCode;
+
     /** Dirección Fiscal / Corporativa principal. */
     @Column(length = 300)
     private String address;

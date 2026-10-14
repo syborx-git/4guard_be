@@ -35,9 +35,7 @@ public class OutboundSummaryResponse {
     private String forkliftOperatorName;
     private String transportType;
     private String driverName;
-    private String economicNumber;
     private String noEcoTractor;
-    private String boxEconomicNumber;
     private String noEcoCaja;
     private String tractorPlates;
     private String boxPlates;

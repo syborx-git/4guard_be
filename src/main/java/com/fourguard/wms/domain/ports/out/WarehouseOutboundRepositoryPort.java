@@ -27,4 +27,6 @@ public interface WarehouseOutboundRepositoryPort {
     List<WarehouseOutboundEntity> searchOutboundsForReturn(UUID organizationId, String query);
 
     long nextFolioSequenceValue();
+
+    long nextClientFolioSequenceValue(UUID clientId);
 }

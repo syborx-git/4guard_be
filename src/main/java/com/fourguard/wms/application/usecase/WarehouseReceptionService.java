@@ -182,17 +182,9 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
             if (preCheckin != null) {
                 if (request.getNoEcoTractor() != null && !request.getNoEcoTractor().isBlank()) {
                     preCheckin.setNoEcoTractor(request.getNoEcoTractor().trim());
-                    preCheckin.setEconomicNumber(request.getNoEcoTractor().trim());
-                } else if (request.getEconomicNumber() != null && !request.getEconomicNumber().isBlank()) {
-                    preCheckin.setNoEcoTractor(request.getEconomicNumber().trim());
-                    preCheckin.setEconomicNumber(request.getEconomicNumber().trim());
                 }
                 if (request.getNoEcoCaja() != null && !request.getNoEcoCaja().isBlank()) {
                     preCheckin.setNoEcoCaja(request.getNoEcoCaja().trim());
-                    preCheckin.setBoxEconomicNumber(request.getNoEcoCaja().trim());
-                } else if (request.getBoxEconomicNumber() != null && !request.getBoxEconomicNumber().isBlank()) {
-                    preCheckin.setNoEcoCaja(request.getBoxEconomicNumber().trim());
-                    preCheckin.setBoxEconomicNumber(request.getBoxEconomicNumber().trim());
                 }
                 preCheckinJpaRepository.save(preCheckin);
             }
@@ -463,20 +455,14 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
 
         if (entity.getPreCheckin() != null) {
             String ecoTractor = (request.getNoEcoTractor() != null && !request.getNoEcoTractor().isBlank())
-                    ? request.getNoEcoTractor().trim()
-                    : ((request.getEconomicNumber() != null && !request.getEconomicNumber().isBlank())
-                            ? request.getEconomicNumber().trim() : null);
+                    ? request.getNoEcoTractor().trim() : null;
             if (ecoTractor != null) {
                 entity.getPreCheckin().setNoEcoTractor(ecoTractor);
-                entity.getPreCheckin().setEconomicNumber(ecoTractor);
             }
             String ecoCaja = (request.getNoEcoCaja() != null && !request.getNoEcoCaja().isBlank())
-                    ? request.getNoEcoCaja().trim()
-                    : ((request.getBoxEconomicNumber() != null && !request.getBoxEconomicNumber().isBlank())
-                            ? request.getBoxEconomicNumber().trim() : null);
+                    ? request.getNoEcoCaja().trim() : null;
             if (ecoCaja != null) {
                 entity.getPreCheckin().setNoEcoCaja(ecoCaja);
-                entity.getPreCheckin().setBoxEconomicNumber(ecoCaja);
             }
             if (request.getTractorPlates() != null && !request.getTractorPlates().isBlank()) {
                 entity.getPreCheckin().setTractorPlates(request.getTractorPlates().trim().toUpperCase());
@@ -1271,19 +1257,30 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
             }
         }
 
+        String adminFullName = ((admin.getFirstName() != null ? admin.getFirstName().trim() : "") +
+                " " +
+                (admin.getLastName() != null ? admin.getLastName().trim() : "")).trim();
+        if (adminFullName.isBlank()) {
+            adminFullName = admin.getUsername();
+        }
+
         reception.setStatus(ReceptionStatus.CANCELLED);
         reception.setCancelledAt(now);
-        reception.setCancellationReason(request.getReason());
-        reception.setCancelledBy(admin.getFirstName() + " " + admin.getLastName());
+        reception.setCancellationReason(request.getReason() != null ? request.getReason().trim() : "");
+        reception.setCancelledBy(adminFullName);
         reception.setUpdatedBy(currentUser);
 
         WarehouseReceptionEntity saved = receptionRepositoryPort.save(reception);
 
-        logAudit(saved.getId(), "RECEPCION_CANCELADA", admin,
-                Map.of("status", oldStatus),
-                Map.of("status", "CANCELLED",
-                       "cancelledBy", reception.getCancelledBy(),
-                       "reason", request.getReason()));
+        Map<String, Object> beforeState = new HashMap<>();
+        beforeState.put("status", oldStatus);
+
+        Map<String, Object> afterState = new HashMap<>();
+        afterState.put("status", "CANCELLED");
+        afterState.put("cancelledBy", reception.getCancelledBy());
+        afterState.put("reason", reception.getCancellationReason());
+
+        logAudit(saved.getId(), "RECEPCION_CANCELADA", admin, beforeState, afterState);
 
         List<WarehouseReceptionPalletEntity> pallets = palletRepositoryPort.findByReceptionId(saved.getId());
         return buildReceptionResponse(saved, pallets);
@@ -1624,8 +1621,8 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
             return allStorage.get(0);
         }
 
-        // 4. Fallback de alta resiliencia: Si la sucursal no tiene bahías registradas, aprovisionar 'LOC-A-01-N1'
-        String defaultCode = "LOC-A-01-N1";
+        // 4. Fallback de alta resiliencia: Si la sucursal no tiene bahías registradas, aprovisionar 'POS-A-001'
+        String defaultCode = "POS-A-001";
         Optional<LocationEntity> existingDefault = locationRepositoryPort.findByBranchIdAndCode(branch.getId(), defaultCode);
         if (existingDefault.isPresent()) {
             return existingDefault.get();
@@ -1634,14 +1631,14 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
         LocationEntity autoCreated = LocationEntity.builder()
                 .branch(branch)
                 .code(defaultCode)
-                .name("Pasillo A - Rack 01 - Nivel 1")
-                .zone("ZA")
+                .name("Almacén A · Fija 001")
+                .zone("A")
                 .aisle("01")
                 .rack("01")
                 .level(1)
-                .position("P01")
+                .position("001")
                 .type(LocationType.PALLET)
-                .capacityUnits(10)
+                .capacityUnits(22)
                 .currentOccupancy(0)
                 .status(LocationStatus.ACTIVE)
                 .isBlocked(false)

@@ -22,6 +22,7 @@ public interface LocationMapper {
     @Mapping(target = "createdBy", ignore = true)
     @Mapping(target = "updatedBy", ignore = true)
     @Mapping(target = "version", ignore = true)
+    @Mapping(target = "category", ignore = true)
     @Mapping(target = "capacityUnits", expression = "java(request.getCapacityUnits() != null ? request.getCapacityUnits() : 1)")
     LocationEntity toEntity(CreateLocationRequest request);
 
@@ -43,6 +44,7 @@ public interface LocationMapper {
     @Mapping(target = "updatedAt", ignore = true)
     @Mapping(target = "createdBy", ignore = true)
     @Mapping(target = "updatedBy", ignore = true)
+    @Mapping(target = "category", ignore = true)
     @Mapping(target = "version", ignore = true)
     void updateEntityFromDto(UpdateLocationRequest request, @MappingTarget LocationEntity entity);
 }

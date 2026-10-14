@@ -160,10 +160,11 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
             targetStatus = OutboundStatus.COMPLETED;
         }
 
-        // Generate consecutive folio: SAL-YYYY-XXXXXX
-        long seq = outboundRepositoryPort.nextFolioSequenceValue();
-        int year = LocalDate.now().getYear();
-        String folio = String.format("SAL-%d-%06d", year, seq);
+        // Generate consecutive folio per client: SAL-YYYYMMDD-[CLIENT]-[NNNN]
+        long seq = outboundRepositoryPort.nextClientFolioSequenceValue(client.getId());
+        String dateStr = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        String clientShortCode = resolveClientShortCode(client);
+        String folio = String.format("SAL-%s-%s-%04d", dateStr, clientShortCode, seq);
 
         List<InventoryItemEntity> itemsToDispatch = new ArrayList<>();
         if (request.getSelectedItemIds() != null && !request.getSelectedItemIds().isEmpty()) {
@@ -213,15 +214,15 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
 
         String ecoTractor = (request.getNoEcoTractor() != null && !request.getNoEcoTractor().isBlank())
                 ? request.getNoEcoTractor().trim()
-                : (request.getEconomicNumber() != null && !request.getEconomicNumber().isBlank()
-                        ? request.getEconomicNumber().trim()
-                        : (preCheckin != null ? (preCheckin.getNoEcoTractor() != null && !preCheckin.getNoEcoTractor().isBlank() ? preCheckin.getNoEcoTractor().trim() : preCheckin.getEconomicNumber()) : null));
+                : (preCheckin != null && preCheckin.getNoEcoTractor() != null && !preCheckin.getNoEcoTractor().isBlank()
+                        ? preCheckin.getNoEcoTractor().trim()
+                        : null);
 
         String ecoCaja = (request.getNoEcoCaja() != null && !request.getNoEcoCaja().isBlank())
                 ? request.getNoEcoCaja().trim()
-                : (request.getBoxEconomicNumber() != null && !request.getBoxEconomicNumber().isBlank()
-                        ? request.getBoxEconomicNumber().trim()
-                        : (preCheckin != null ? (preCheckin.getNoEcoCaja() != null && !preCheckin.getNoEcoCaja().isBlank() ? preCheckin.getNoEcoCaja().trim() : preCheckin.getBoxEconomicNumber()) : null));
+                : (preCheckin != null && preCheckin.getNoEcoCaja() != null && !preCheckin.getNoEcoCaja().isBlank()
+                        ? preCheckin.getNoEcoCaja().trim()
+                        : null);
 
         WarehouseOutboundEntity outbound = WarehouseOutboundEntity.builder()
                 .organization(organization)
@@ -238,8 +239,8 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
                 .forkliftOperator(operator)
                 .transportType(request.getTransportType() != null ? request.getTransportType().toUpperCase().trim() : "TRAILER")
                 .driverName(request.getDriverName())
-                .economicNumber(ecoTractor)
-                .boxEconomicNumber(ecoCaja)
+                .noEcoTractor(ecoTractor)
+                .noEcoCaja(ecoCaja)
                 .tractorPlates(request.getTractorPlates())
                 .boxPlates(request.getBoxPlates())
                 .sealNumber(request.getSealNumber())
@@ -317,6 +318,7 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
         WarehouseOutboundEntity saved = outboundRepositoryPort.save(outbound);
 
         Map<String, String> initialData = new LinkedHashMap<>();
+        initialData.put("remisionNo", remisionNumber);
         initialData.put("folio", folio);
         initialData.put("status", targetStatus.name());
         initialData.put("client", client.getName());
@@ -518,24 +520,24 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
         }
         String incomingEco = (request.getNoEcoTractor() != null && !request.getNoEcoTractor().isBlank())
                 ? request.getNoEcoTractor().trim()
-                : (request.getEconomicNumber() != null && !request.getEconomicNumber().isBlank() ? request.getEconomicNumber().trim() : null);
+                : null;
         if (incomingEco != null) {
-            String oldEco = outbound.getEconomicNumber() != null ? outbound.getEconomicNumber().trim() : "";
+            String oldEco = outbound.getNoEcoTractor() != null ? outbound.getNoEcoTractor().trim() : "";
             if (!Objects.equals(oldEco, incomingEco) && (!oldEco.isEmpty() || !incomingEco.isEmpty())) {
-                oldValues.put("economicNumber", !oldEco.isEmpty() ? oldEco : "Sin especificar");
-                newValues.put("economicNumber", incomingEco);
-                outbound.setEconomicNumber(incomingEco);
+                oldValues.put("noEcoTractor", !oldEco.isEmpty() ? oldEco : "Sin especificar");
+                newValues.put("noEcoTractor", incomingEco);
+                outbound.setNoEcoTractor(incomingEco);
             }
         }
         String incomingBoxEco = (request.getNoEcoCaja() != null && !request.getNoEcoCaja().isBlank())
                 ? request.getNoEcoCaja().trim()
-                : (request.getBoxEconomicNumber() != null && !request.getBoxEconomicNumber().isBlank() ? request.getBoxEconomicNumber().trim() : null);
+                : null;
         if (incomingBoxEco != null) {
-            String oldBoxEco = outbound.getBoxEconomicNumber() != null ? outbound.getBoxEconomicNumber().trim() : "";
+            String oldBoxEco = outbound.getNoEcoCaja() != null ? outbound.getNoEcoCaja().trim() : "";
             if (!Objects.equals(oldBoxEco, incomingBoxEco) && (!oldBoxEco.isEmpty() || !incomingBoxEco.isEmpty())) {
-                oldValues.put("boxEconomicNumber", !oldBoxEco.isEmpty() ? oldBoxEco : "Sin especificar");
-                newValues.put("boxEconomicNumber", incomingBoxEco);
-                outbound.setBoxEconomicNumber(incomingBoxEco);
+                oldValues.put("noEcoCaja", !oldBoxEco.isEmpty() ? oldBoxEco : "Sin especificar");
+                newValues.put("noEcoCaja", incomingBoxEco);
+                outbound.setNoEcoCaja(incomingBoxEco);
             }
         }
 
@@ -1132,6 +1134,7 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
     private String translateFieldName(String field) {
         if (field == null || field.isBlank()) return "Dato";
         return switch (field.trim()) {
+            case "remisionNo", "remisionNumber", "docNumber", "doc_number", "remision" -> "No. de Remisión / Documento";
             case "client", "clientId", "clientName" -> "Cliente / Destinatario";
             case "destination", "destinationId", "destinationName", "plant" -> "Planta / Destino";
             case "carrier", "carrierId", "carrierName" -> "Línea Transportista";
@@ -1139,8 +1142,8 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
             case "driver", "driverName" -> "Operador del Transporte";
             case "plates", "tractorPlates" -> "Placas del Tracto";
             case "boxPlates" -> "Placas de la Caja";
-            case "economicNumber" -> "No. Económico Tractor";
-            case "boxEconomicNumber" -> "No. Económico Caja";
+            case "economicNumber", "noEcoTractor" -> "No. Económico Tractor";
+            case "boxEconomicNumber", "noEcoCaja" -> "No. Económico Caja";
             case "ramp", "rampId", "rampNumber" -> "Rampa Asignada";
             case "status" -> "Estado Operativo";
             case "reason", "cancellationReason" -> "Motivo / Justificación";
@@ -1214,5 +1217,36 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
                 }
             }
         }
+    }
+
+    private String resolveClientShortCode(ClientEntity client) {
+        if (client == null) {
+            return "CLI";
+        }
+        if (client.getShortCode() != null && !client.getShortCode().isBlank()) {
+            return client.getShortCode().trim().toUpperCase();
+        }
+        if (client.getExternalId() != null && !client.getExternalId().isBlank()) {
+            String clean = client.getExternalId().replaceAll("[^a-zA-Z0-9]", "").toUpperCase();
+            if (clean.startsWith("CLI") && clean.length() >= 6) {
+                return clean.substring(3, 6);
+            }
+            if (clean.length() >= 3) {
+                return clean.substring(0, 3);
+            }
+        }
+        if (client.getTaxId() != null && !client.getTaxId().isBlank()) {
+            String clean = client.getTaxId().replaceAll("[^a-zA-Z0-9]", "").toUpperCase();
+            if (clean.length() >= 3) {
+                return clean.substring(0, 3);
+            }
+        }
+        if (client.getName() != null && !client.getName().isBlank()) {
+            String clean = client.getName().replaceAll("[^a-zA-Z0-9]", "").toUpperCase();
+            if (clean.length() >= 3) {
+                return clean.substring(0, 3);
+            }
+        }
+        return "CLI";
     }
 }

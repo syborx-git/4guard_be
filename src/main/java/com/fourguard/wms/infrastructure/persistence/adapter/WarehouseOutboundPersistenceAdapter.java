@@ -19,7 +19,7 @@ public class WarehouseOutboundPersistenceAdapter implements WarehouseOutboundRep
 
     @Override
     public Optional<WarehouseOutboundEntity> findById(UUID id) {
-        return repository.findById(id);
+        return repository.findByIdWithDetails(id).or(() -> repository.findById(id));
     }
 
     @Override
@@ -59,5 +59,10 @@ public class WarehouseOutboundPersistenceAdapter implements WarehouseOutboundRep
     @Override
     public long nextFolioSequenceValue() {
         return repository.getNextFolioSequenceValue();
+    }
+
+    @Override
+    public long nextClientFolioSequenceValue(UUID clientId) {
+        return repository.getNextClientFolioSequenceValue(clientId);
     }
 }
