@@ -97,14 +97,9 @@ public  class SecurityGateService implements SecurityGateUseCase {
                 .toList();
 
         List<String> transportTypes = List.of(
-                "Caja Seca",
-                "Caja Refrigerada",
-                "Plataforma",
+                "Camioneta",
                 "Tortón",
                 "Tráiler",
-                "Camioneta",
-                "Rabón",
-                "Full / Doble Remolque",
                 "Otro (Especificar)");
 
         List<String> boxDimensions = List.of(
