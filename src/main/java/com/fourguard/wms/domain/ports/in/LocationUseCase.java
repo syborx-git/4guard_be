@@ -38,7 +38,7 @@ public interface LocationUseCase {
 
     /**
      * Returns the occupancy calculation and traffic-light status for all bays in a branch
-     * using the standard 22-pallet capacity threshold.
+     * using the dynamically configured capacity of each location.
      */
     List<com.fourguard.wms.application.dto.response.BayOccupancyResponse> getBayOccupancyList(UUID branchId);
 }

@@ -64,8 +64,12 @@ public class WarehouseMapService implements WarehouseMapUseCase {
             long occupied = locs.stream().filter(l -> l.getCurrentOccupancy() != null && l.getCurrentOccupancy() > 0).count();
             int available = (int) (posCount - blocked - occupied);
 
+            int secCap = (sec.getCapacidadTarimas() != null && sec.getCapacidadTarimas() > 0)
+                ? sec.getCapacidadTarimas()
+                : locs.stream().mapToInt(this::resolvePositionCapacity).sum();
+
             totalPositions += posCount;
-            totalCapacity += (sec.getCapacidadTarimas() != null ? sec.getCapacidadTarimas() : 0);
+            totalCapacity += secCap;
             totalOccupied += (int) occupied;
             totalBlocked += (int) blocked;
 
@@ -80,7 +84,7 @@ public class WarehouseMapService implements WarehouseMapUseCase {
                 .name(sec.getName())
                 .category(sec.getCategory() != null ? sec.getCategory() : "General")
                 .posFijas(sec.getPosFijas() != null ? sec.getPosFijas() : 0)
-                .capacidadTarimas(sec.getCapacidadTarimas() != null ? sec.getCapacidadTarimas() : 0)
+                .capacidadTarimas(secCap)
                 .factorEstiba(sec.getFactorEstiba() != null ? sec.getFactorEstiba() : "22 tarimas/pos")
                 .materials(secMaterials)
                 .notes(sec.getNotes() != null ? sec.getNotes() : "")
@@ -194,7 +198,7 @@ public class WarehouseMapService implements WarehouseMapUseCase {
                 loc.setStatus(LocationStatus.ACTIVE);
                 loc.setIsBlocked(false);
                 loc.setBlockReason(null);
-                loc.setCurrentOccupancy(loc.getCapacityUnits() != null ? loc.getCapacityUnits() : 22);
+                loc.setCurrentOccupancy(resolvePositionCapacity(loc));
                 loc.setUpdatedBy(sanitizedUser);
             }
             default -> throw new IllegalArgumentException("Acción targetAction no soportada: " + request.getTargetAction());
@@ -290,7 +294,17 @@ public class WarehouseMapService implements WarehouseMapUseCase {
         loc.setCategory(locCategory);
         loc.setStatus(LocationStatus.ACTIVE);
         loc.setIsBlocked(false);
-        loc.setCapacityUnits(request.getCapacityTarimas() != null ? request.getCapacityTarimas() : 22);
+
+        int defaultCap = 22;
+        if (section.getFactorEstiba() != null) {
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("\\d+").matcher(section.getFactorEstiba());
+            if (m.find()) {
+                try {
+                    defaultCap = Integer.parseInt(m.group());
+                } catch (NumberFormatException ignored) {}
+            }
+        }
+        loc.setCapacityUnits(request.getCapacityTarimas() != null && request.getCapacityTarimas() > 0 ? request.getCapacityTarimas() : defaultCap);
         loc.setCurrentOccupancy(0);
         loc.setCreatedBy(sanitizedUser);
         loc.setUpdatedBy(sanitizedUser);
@@ -402,7 +416,7 @@ public class WarehouseMapService implements WarehouseMapUseCase {
             .skuDescription(skuDescription)
             .category(l.getCategory() != null ? l.getCategory().name() : "FIXED_STORAGE")
             .status(visualStatus)
-            .capacityTarimas(l.getCapacityUnits() != null ? l.getCapacityUnits() : 22)
+            .capacityTarimas(resolvePositionCapacity(l))
             .currentTarimas(l.getCurrentOccupancy() != null ? l.getCurrentOccupancy() : 0)
             .batchNumber("N/A")
             .lastMovement("Sin movimientos")
@@ -410,5 +424,21 @@ public class WarehouseMapService implements WarehouseMapUseCase {
             .statusReason(l.getStatusReason())
             .isBlocked(Boolean.TRUE.equals(l.getIsBlocked()))
             .build();
+    }
+
+    private int resolvePositionCapacity(LocationEntity l) {
+        if (l == null) return 22;
+        if (l.getCapacityUnits() != null && l.getCapacityUnits() > 0) {
+            return l.getCapacityUnits();
+        }
+        if (l.getSection() != null && l.getSection().getFactorEstiba() != null) {
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("\\d+").matcher(l.getSection().getFactorEstiba());
+            if (m.find()) {
+                try {
+                    return Integer.parseInt(m.group());
+                } catch (NumberFormatException ignored) {}
+            }
+        }
+        return 22;
     }
 }
