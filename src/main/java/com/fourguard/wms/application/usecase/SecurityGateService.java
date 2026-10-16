@@ -97,6 +97,7 @@ public  class SecurityGateService implements SecurityGateUseCase {
                 .toList();
 
         List<String> transportTypes = List.of(
+                "Camioneta",
                 "Tortón",
                 "Tráiler",
                 "Otro (Especificar)");

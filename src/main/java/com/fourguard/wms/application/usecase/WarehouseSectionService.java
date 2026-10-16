@@ -174,7 +174,17 @@ public class WarehouseSectionService implements WarehouseSectionUseCase {
 
         // 3. Generación en lote de posiciones consecutivas en wms.locations
         if (Boolean.TRUE.equals(request.getGenerateLocations()) && request.getPosFijas() != null && request.getPosFijas() > 0) {
-            int capacityPerPos = request.getCapacidadTarimas() / request.getPosFijas();
+            int capacityPerPos = 22;
+            if (request.getFactorEstiba() != null) {
+                java.util.regex.Matcher m = java.util.regex.Pattern.compile("\\d+").matcher(request.getFactorEstiba());
+                if (m.find()) {
+                    try {
+                        capacityPerPos = Integer.parseInt(m.group());
+                    } catch (NumberFormatException ignored) {}
+                }
+            } else if (request.getCapacidadTarimas() != null) {
+                capacityPerPos = request.getCapacidadTarimas() / request.getPosFijas();
+            }
             if (capacityPerPos <= 0) capacityPerPos = 22;
 
             List<LocationEntity> existingLocations = locationJpaRepository.findBySectionId(id);

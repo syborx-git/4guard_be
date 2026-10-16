@@ -24,8 +24,7 @@ public class CreatePositionMapRequest {
     @Builder.Default
     private String category = "FIXED_STORAGE"; // FIXED_STORAGE, TEMPORARY_BUFFER, PRELOAD_STAGING
 
-    @Builder.Default
-    private Integer capacityTarimas = 22;
+    private Integer capacityTarimas;
 
     private String aisle;
     private String rack;

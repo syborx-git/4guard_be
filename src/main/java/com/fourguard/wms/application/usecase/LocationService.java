@@ -315,8 +315,24 @@ public class LocationService implements LocationUseCase {
     }
 
     // =========================================================================
-    // BAY OCCUPANCY & STANDARD 22-PALLET CAPACITY
+    // DYNAMIC BAY OCCUPANCY & CAPACITY MANAGEMENT
     // =========================================================================
+
+    private int resolveLocationCapacity(LocationEntity loc) {
+        if (loc == null) return 22;
+        if (loc.getCapacityUnits() != null && loc.getCapacityUnits() > 0) {
+            return loc.getCapacityUnits();
+        }
+        if (loc.getSection() != null && loc.getSection().getFactorEstiba() != null) {
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("\\d+").matcher(loc.getSection().getFactorEstiba());
+            if (m.find()) {
+                try {
+                    return Integer.parseInt(m.group());
+                } catch (NumberFormatException ignored) {}
+            }
+        }
+        return 22;
+    }
 
     @Override
     @Transactional(readOnly = true)
@@ -336,8 +352,8 @@ public class LocationService implements LocationUseCase {
                                (loc.getStatus() == null || loc.getStatus() == LocationStatus.ACTIVE) &&
                                !Boolean.TRUE.equals(loc.getIsBlocked()))
                 .min((a, b) -> {
-                    int capA = (a.getCapacityUnits() != null && a.getCapacityUnits() > 0) ? a.getCapacityUnits() : 22;
-                    int capB = (b.getCapacityUnits() != null && b.getCapacityUnits() > 0) ? b.getCapacityUnits() : 22;
+                    int capA = resolveLocationCapacity(a);
+                    int capB = resolveLocationCapacity(b);
                     double pctA = (double) (a.getCurrentOccupancy() != null ? a.getCurrentOccupancy() : 0) / capA;
                     double pctB = (double) (b.getCurrentOccupancy() != null ? b.getCurrentOccupancy() : 0) / capB;
                     return Double.compare(pctA, pctB);
@@ -348,7 +364,7 @@ public class LocationService implements LocationUseCase {
         return locations.stream()
                 .filter(loc -> loc.getType() != com.fourguard.wms.domain.enums.LocationType.RAMP)
                 .map(loc -> {
-                    int capacity = (loc.getCapacityUnits() != null && loc.getCapacityUnits() > 0) ? loc.getCapacityUnits() : 22;
+                    int capacity = resolveLocationCapacity(loc);
                     int current = loc.getCurrentOccupancy() != null ? loc.getCurrentOccupancy() : 0;
                     double percentage = Math.round(((double) current / capacity) * 1000.0) / 10.0;
                     if (percentage > 100.0) percentage = 100.0;

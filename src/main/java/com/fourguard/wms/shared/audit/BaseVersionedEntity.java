@@ -23,10 +23,6 @@ import org.hibernate.annotations.DynamicUpdate;
 @DynamicUpdate
 public abstract class BaseVersionedEntity extends BaseAuditEntity {
 
-    protected BaseVersionedEntity(BaseVersionedEntityBuilder<?, ?> b) {
-        super(b);
-        this.version = b.version;
-    }
 
     @Version
     @Column(name = "version")
