@@ -137,6 +137,23 @@ public class ForkliftOperatorController {
         return ResponseEntity.ok(ApiResponse.ok("Estatus actualizado con éxito", response));
     }
 
+    // ─── RESET PIN / PASSWORD ───────────────────────────────────────────────────
+
+    @PostMapping("/{id}/reset-pin")
+    @PreAuthorize("hasAuthority('FORKLIFT_OPERATORS_UPDATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR')")
+    @Operation(summary = "Restablecer PIN de acceso a terminal RF",
+               description = "Actualiza el PIN o contraseña de acceso del montacarguista y marca la bandera change_password_required para que deba cambiarla al iniciar sesión.")
+    public ResponseEntity<ApiResponse<ForkliftOperatorResponse>> resetPin(
+            @PathVariable UUID id,
+            @RequestBody java.util.Map<String, String> body) {
+        String pin = body != null ? body.get("pin") : null;
+        if (pin == null || pin.trim().length() < 4) {
+            throw new ValidationException("El nuevo PIN debe tener al menos 4 caracteres.");
+        }
+        ForkliftOperatorResponse response = forkliftOperatorUseCase.resetPin(id, pin.trim());
+        return ResponseEntity.ok(ApiResponse.ok("PIN restablecido exitosamente", response));
+    }
+
     // ─── AUDIT HISTORY ───────────────────────────────────────────────────────────
 
     @GetMapping("/{id}/audit")

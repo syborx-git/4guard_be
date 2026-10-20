@@ -123,12 +123,7 @@ public class SecurityConfig {
         if (patterns != null && !patterns.isEmpty()) {
             config.setAllowedOriginPatterns(patterns);
         } else {
-            config.setAllowedOriginPatterns(List.of(
-                "http://localhost:*",
-                "http://127.0.0.1:*",
-                "https://*.ngrok-free.dev",
-                "https://*.onrender.com"
-            ));
+            config.setAllowedOriginPatterns(List.of("*"));
         }
 
         config.setAllowedMethods(corsProperties.getAllowedMethods() != null && !corsProperties.getAllowedMethods().isEmpty()
