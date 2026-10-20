@@ -89,11 +89,11 @@ public class WarehouseOutboundEntity extends BaseVersionedEntity {
     @Column(name = "driver_name", nullable = false, length = 150)
     private String driverName;
 
-    @Column(name = "economic_number", length = 30)
-    private String economicNumber;
+    @Column(name = "no_eco_tractor", length = 100)
+    private String noEcoTractor;
 
-    @Column(name = "box_economic_number", length = 30)
-    private String boxEconomicNumber;
+    @Column(name = "no_eco_caja", length = 100)
+    private String noEcoCaja;
 
     @Column(name = "tractor_plates", nullable = false, length = 20)
     private String tractorPlates;
@@ -142,4 +142,5 @@ public class WarehouseOutboundEntity extends BaseVersionedEntity {
     @OneToMany(mappedBy = "outbound", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @Builder.Default
     private List<WarehouseOutboundItemEntity> items = new ArrayList<>();
+
 }

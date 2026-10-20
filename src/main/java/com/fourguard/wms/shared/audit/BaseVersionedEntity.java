@@ -23,6 +23,7 @@ import org.hibernate.annotations.DynamicUpdate;
 @DynamicUpdate
 public abstract class BaseVersionedEntity extends BaseAuditEntity {
 
+
     @Version
     @Column(name = "version")
     private Long version;

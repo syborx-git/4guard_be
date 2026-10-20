@@ -97,6 +97,7 @@ public  class SecurityGateService implements SecurityGateUseCase {
                 .toList();
 
         List<String> transportTypes = List.of(
+                "Camioneta",
                 "Tortón",
                 "Tráiler",
                 "Otro (Especificar)");
@@ -256,8 +257,17 @@ public  class SecurityGateService implements SecurityGateUseCase {
         entity.setDriverPhone(request.getDriverPhone());
         entity.setTractorPlates(
                 request.getTractorPlates() != null ? request.getTractorPlates().toUpperCase().trim() : null);
-        entity.setNoEcoTractor(request.getNoEcoTractor());
+        String ecoTractor = (request.getNoEcoTractor() != null && !request.getNoEcoTractor().isBlank())
+                ? request.getNoEcoTractor().trim()
+                : null;
+        entity.setNoEcoTractor(ecoTractor);
+
         entity.setBoxPlates(request.getBoxPlates() != null ? request.getBoxPlates().toUpperCase().trim() : null);
+        String ecoCaja = (request.getNoEcoCaja() != null && !request.getNoEcoCaja().isBlank())
+                ? request.getNoEcoCaja().trim()
+                : null;
+        entity.setNoEcoCaja(ecoCaja);
+
         entity.setBoxDimensions(request.getBoxDimensions());
         entity.setTransportType(request.getTransportType());
 
@@ -339,24 +349,31 @@ public  class SecurityGateService implements SecurityGateUseCase {
         }
 
         // 2. Unificar todas las recepciones activas en planta de
-        // wms.warehouse_receptions
+        // wms.warehouse_receptions (incluye canceladas recientes que no han salido de caseta)
         List<WarehouseReceptionEntity> activeReceptions = warehouseReceptionRepositoryPort.findAll(
                 WarehouseReceptionSpecification.withFilters(organizationId, branchId, null, null));
 
+        OffsetDateTime recentThreshold = OffsetDateTime.now().minusDays(2);
         for (WarehouseReceptionEntity rec : activeReceptions) {
-            if (rec.getStatus() != ReceptionStatus.CANCELLED && shouldIncludeInYardFolio(rec.getFolio(), processedFolios)) {
+            boolean isOldCancelled = rec.getStatus() == ReceptionStatus.CANCELLED &&
+                    ((rec.getCancelledAt() != null && rec.getCancelledAt().isBefore(recentThreshold)) ||
+                     (rec.getCreatedAt() != null && rec.getCreatedAt().isBefore(recentThreshold)));
+            if (!isOldCancelled && shouldIncludeInYardFolio(rec.getFolio(), processedFolios)) {
                 processedFolios.add(rec.getFolio().trim());
                 result.add(mapReceptionToPassResponse(rec));
             }
         }
 
         // 3. Unificar todos los embarques (outbounds) activos en planta de
-        // wms.warehouse_outbounds
+        // wms.warehouse_outbounds (incluye cancelados recientes que no han salido de caseta)
         List<WarehouseOutboundEntity> activeOutbounds = warehouseOutboundRepositoryPort.findAll(
                 WarehouseOutboundSpecification.withFilters(organizationId, branchId, null, null));
 
         for (WarehouseOutboundEntity out : activeOutbounds) {
-            if (out.getStatus() != OutboundStatus.CANCELLED && shouldIncludeInYardFolio(out.getFolio(), processedFolios)) {
+            boolean isOldCancelled = out.getStatus() == OutboundStatus.CANCELLED &&
+                    ((out.getCancelledAt() != null && out.getCancelledAt().isBefore(recentThreshold)) ||
+                     (out.getCreatedAt() != null && out.getCreatedAt().isBefore(recentThreshold)));
+            if (!isOldCancelled && shouldIncludeInYardFolio(out.getFolio(), processedFolios)) {
                 processedFolios.add(out.getFolio().trim());
                 result.add(mapOutboundToPassResponse(out));
             }
@@ -458,15 +475,9 @@ public  class SecurityGateService implements SecurityGateUseCase {
             entity.setBoxPlates(request.getBoxPlates().toUpperCase().trim());
         if (request.getNoEcoTractor() != null && !request.getNoEcoTractor().isBlank()) {
             entity.setNoEcoTractor(request.getNoEcoTractor().trim());
-            entity.setEconomicNumber(request.getNoEcoTractor().trim());
-        } else if (request.getEconomicNumber() != null && !request.getEconomicNumber().isBlank()) {
-            entity.setNoEcoTractor(request.getEconomicNumber().trim());
-            entity.setEconomicNumber(request.getEconomicNumber().trim());
         }
-        if (request.getBoxEconomicNumber() != null && !request.getBoxEconomicNumber().isBlank()) {
-            entity.setBoxEconomicNumber(request.getBoxEconomicNumber().trim());
-        } else if (request.getNoEcoCaja() != null && !request.getNoEcoCaja().isBlank()) {
-            entity.setBoxEconomicNumber(request.getNoEcoCaja().trim());
+        if (request.getNoEcoCaja() != null && !request.getNoEcoCaja().isBlank()) {
+            entity.setNoEcoCaja(request.getNoEcoCaja().trim());
         }
         if (request.getTransportType() != null)
             entity.setTransportType(request.getTransportType());
@@ -526,26 +537,20 @@ public  class SecurityGateService implements SecurityGateUseCase {
         outReq.setDriverName(entity.getDriverName() != null ? entity.getDriverName() : "Operador Transportista");
         outReq.setTractorPlates(entity.getTractorPlates() != null ? entity.getTractorPlates() : "S/P");
         outReq.setBoxPlates(entity.getBoxPlates() != null ? entity.getBoxPlates() : "S/P");
-        String ecoTractor = (request.getEconomicNumber() != null && !request.getEconomicNumber().isBlank())
-                ? request.getEconomicNumber().trim()
-                : ((request.getNoEcoTractor() != null && !request.getNoEcoTractor().isBlank())
-                        ? request.getNoEcoTractor().trim()
-                        : ((entity.getEconomicNumber() != null && !entity.getEconomicNumber().isBlank())
-                                ? entity.getEconomicNumber().trim()
-                                : ((entity.getNoEcoTractor() != null && !entity.getNoEcoTractor().isBlank())
-                                        ? entity.getNoEcoTractor().trim()
-                                        : null)));
+        String ecoTractor = (request.getNoEcoTractor() != null && !request.getNoEcoTractor().isBlank())
+                ? request.getNoEcoTractor().trim()
+                : ((entity.getNoEcoTractor() != null && !entity.getNoEcoTractor().isBlank())
+                        ? entity.getNoEcoTractor().trim()
+                        : null);
 
-        String ecoCaja = (request.getBoxEconomicNumber() != null && !request.getBoxEconomicNumber().isBlank())
-                ? request.getBoxEconomicNumber().trim()
-                : ((request.getNoEcoCaja() != null && !request.getNoEcoCaja().isBlank())
-                        ? request.getNoEcoCaja().trim()
-                        : ((entity.getBoxEconomicNumber() != null && !entity.getBoxEconomicNumber().isBlank())
-                                ? entity.getBoxEconomicNumber().trim()
-                                : null));
+        String ecoCaja = (request.getNoEcoCaja() != null && !request.getNoEcoCaja().isBlank())
+                ? request.getNoEcoCaja().trim()
+                : ((entity.getNoEcoCaja() != null && !entity.getNoEcoCaja().isBlank())
+                        ? entity.getNoEcoCaja().trim()
+                        : null);
 
-        outReq.setEconomicNumber(ecoTractor);
-        outReq.setBoxEconomicNumber(ecoCaja);
+        outReq.setNoEcoTractor(ecoTractor);
+        outReq.setNoEcoCaja(ecoCaja);
         String outboundSeal = (entity.getSealNumbers() != null && !entity.getSealNumbers().isEmpty())
                 ? String.join(", ", entity.getSealNumbers())
                 : "PENDIENTE_ANDEN";
@@ -587,27 +592,19 @@ public  class SecurityGateService implements SecurityGateUseCase {
         inReq.setObservations(entity.getObservations());
         inReq.setTransportType(entity.getTransportType());
 
-        String ecoTractor = (request.getEconomicNumber() != null && !request.getEconomicNumber().isBlank())
-                ? request.getEconomicNumber().trim()
-                : ((request.getNoEcoTractor() != null && !request.getNoEcoTractor().isBlank())
-                        ? request.getNoEcoTractor().trim()
-                        : ((entity.getEconomicNumber() != null && !entity.getEconomicNumber().isBlank())
-                                ? entity.getEconomicNumber().trim()
-                                : ((entity.getNoEcoTractor() != null && !entity.getNoEcoTractor().isBlank())
-                                        ? entity.getNoEcoTractor().trim()
-                                        : null)));
+        String ecoTractor = (request.getNoEcoTractor() != null && !request.getNoEcoTractor().isBlank())
+                ? request.getNoEcoTractor().trim()
+                : ((entity.getNoEcoTractor() != null && !entity.getNoEcoTractor().isBlank())
+                        ? entity.getNoEcoTractor().trim()
+                        : null);
 
-        String ecoCaja = (request.getBoxEconomicNumber() != null && !request.getBoxEconomicNumber().isBlank())
-                ? request.getBoxEconomicNumber().trim()
-                : ((request.getNoEcoCaja() != null && !request.getNoEcoCaja().isBlank())
-                        ? request.getNoEcoCaja().trim()
-                        : ((entity.getBoxEconomicNumber() != null && !entity.getBoxEconomicNumber().isBlank())
-                                ? entity.getBoxEconomicNumber().trim()
-                                : null));
+        String ecoCaja = (request.getNoEcoCaja() != null && !request.getNoEcoCaja().isBlank())
+                ? request.getNoEcoCaja().trim()
+                : ((entity.getNoEcoCaja() != null && !entity.getNoEcoCaja().isBlank())
+                        ? entity.getNoEcoCaja().trim()
+                        : null);
 
         inReq.setNoEcoTractor(ecoTractor);
-        inReq.setEconomicNumber(ecoTractor);
-        inReq.setBoxEconomicNumber(ecoCaja);
         inReq.setNoEcoCaja(ecoCaja);
 
         inReq.setPreCheckinId(entity.getId());
@@ -686,10 +683,10 @@ public  class SecurityGateService implements SecurityGateUseCase {
                     .clientName(rec.getClient() != null ? rec.getClient().getName() : null)
                     .carrier(rec.getCarrier())
                     .carrierLine(rec.getCarrier() != null ? rec.getCarrier().getName() : null)
-                    .driverName(rec.getDriverName())
-                    .tractorPlates(rec.getTractorPlates())
-                    .boxPlates(rec.getBoxPlates())
-                    .docNumber(rec.getDocNumber())
+                    .driverName(safeTruncate(rec.getDriverName(), 200))
+                    .tractorPlates(safeTruncate(rec.getTractorPlates(), 50))
+                    .boxPlates(safeTruncate(rec.getBoxPlates(), 50))
+                    .docNumber(safeTruncate(rec.getDocNumber(), 100))
                     .docDate(rec.getDocDate())
                     .receptionTime(rec.getReceptionTime())
                     .ramp(rec.getRamp())
@@ -725,13 +722,13 @@ public  class SecurityGateService implements SecurityGateUseCase {
                     .clientName(out.getClient() != null ? out.getClient().getName() : null)
                     .carrier(out.getCarrier())
                     .carrierLine(out.getCarrier() != null ? out.getCarrier().getName() : null)
-                    .driverName(out.getDriverName())
-                    .tractorPlates(out.getTractorPlates())
-                    .boxPlates(out.getBoxPlates())
-                    .transportType(out.getTransportType())
-                    .economicNumber(out.getEconomicNumber())
-                    .boxEconomicNumber(out.getBoxEconomicNumber())
-                    .docNumber(out.getRemisionNo())
+                    .driverName(safeTruncate(out.getDriverName(), 200))
+                    .tractorPlates(safeTruncate(out.getTractorPlates(), 50))
+                    .boxPlates(safeTruncate(out.getBoxPlates(), 50))
+                    .transportType(safeTruncate(out.getTransportType(), 100))
+                    .noEcoTractor(safeTruncate(out.getNoEcoTractor(), 100))
+                    .noEcoCaja(safeTruncate(out.getNoEcoCaja(), 100))
+                    .docNumber(safeTruncate(out.getRemisionNo(), 100))
                     .ramp(out.getRamp())
                     .rampNumber(parseRampNumber(out.getRamp()))
                     .rampCode(out.getRamp() != null ? out.getRamp().getCode() : null)
@@ -796,6 +793,8 @@ public  class SecurityGateService implements SecurityGateUseCase {
                 .driverName(rec.getDriverName())
                 .tractorPlates(rec.getTractorPlates())
                 .boxPlates(rec.getBoxPlates())
+                .noEcoTractor(rec.getPreCheckin() != null ? rec.getPreCheckin().getNoEcoTractor() : null)
+                .noEcoCaja(rec.getPreCheckin() != null ? rec.getPreCheckin().getNoEcoCaja() : null)
                 .sealNumbers(seals)
                 .docNumber(rec.getDocNumber())
                 .docDate(docDate)
@@ -806,7 +805,10 @@ public  class SecurityGateService implements SecurityGateUseCase {
                 .generatedFolio(rec.getFolio())
                 .observations(rec.getObservations())
                 .warehouseStatus(rec.getStatus() != null ? rec.getStatus().name() : "REGISTERED")
-                .isReadyForExit(rec.getStatus() == ReceptionStatus.COMPLETED)
+                .isReadyForExit(rec.getStatus() == ReceptionStatus.COMPLETED || rec.getStatus() == ReceptionStatus.CANCELLED)
+                .cancellationReason(rec.getCancellationReason())
+                .cancelledBy(rec.getCancelledBy())
+                .cancelledAt(rec.getCancelledAt())
                 .createdAt(rec.getCreatedAt())
                 .build();
     }
@@ -835,8 +837,8 @@ public  class SecurityGateService implements SecurityGateUseCase {
                 .tractorPlates(out.getTractorPlates())
                 .boxPlates(out.getBoxPlates())
                 .transportType(out.getTransportType())
-                .economicNumber(out.getEconomicNumber())
-                .boxEconomicNumber(out.getBoxEconomicNumber())
+                .noEcoTractor(out.getNoEcoTractor() != null ? out.getNoEcoTractor() : (out.getPreCheckin() != null ? out.getPreCheckin().getNoEcoTractor() : null))
+                .noEcoCaja(out.getNoEcoCaja() != null ? out.getNoEcoCaja() : (out.getPreCheckin() != null ? out.getPreCheckin().getNoEcoCaja() : null))
                 .sealNumbers(seals)
                 .docNumber(out.getRemisionNo())
                 .docDate(docDate)
@@ -847,7 +849,10 @@ public  class SecurityGateService implements SecurityGateUseCase {
                 .generatedFolio(out.getFolio())
                 .observations(out.getObservations())
                 .warehouseStatus(out.getStatus() != null ? out.getStatus().name() : "REGISTERED")
-                .isReadyForExit(out.getStatus() == OutboundStatus.COMPLETED)
+                .isReadyForExit(out.getStatus() == OutboundStatus.COMPLETED || out.getStatus() == OutboundStatus.CANCELLED)
+                .cancellationReason(out.getCancellationReason())
+                .cancelledBy(out.getCancelledBy())
+                .cancelledAt(out.getCancelledAt())
                 .createdAt(out.getCreatedAt())
                 .build();
     }
@@ -859,6 +864,9 @@ public  class SecurityGateService implements SecurityGateUseCase {
     private PassResponse mapToResponseWithWarehouseStatus(SecurityPreCheckinEntity entity) {
         String whStatus = "REGISTRADO";
         boolean readyForExit = false;
+        String dynamicCancellationReason = null;
+        String dynamicCancelledBy = null;
+        OffsetDateTime dynamicCancelledAt = null;
         UUID dynamicRampId = entity.getRamp() != null ? entity.getRamp().getId() : null;
         Integer dynamicRampNumber = entity.getRampNumber();
         String dynamicRampCode = entity.getRampCode();
@@ -870,7 +878,12 @@ public  class SecurityGateService implements SecurityGateUseCase {
                 if (outbound.isPresent()) {
                     WarehouseOutboundEntity out = outbound.get();
                     whStatus = out.getStatus() != null ? out.getStatus().name() : "REGISTERED";
-                    readyForExit = (out.getStatus() == OutboundStatus.COMPLETED);
+                    readyForExit = (out.getStatus() == OutboundStatus.COMPLETED || out.getStatus() == OutboundStatus.CANCELLED);
+                    if (out.getStatus() == OutboundStatus.CANCELLED) {
+                        dynamicCancellationReason = out.getCancellationReason();
+                        dynamicCancelledBy = out.getCancelledBy();
+                        dynamicCancelledAt = out.getCancelledAt();
+                    }
                     if (out.getRamp() != null) {
                         dynamicRampId = out.getRamp().getId();
                         dynamicRampCode = out.getRamp().getCode();
@@ -882,7 +895,12 @@ public  class SecurityGateService implements SecurityGateUseCase {
                 if (reception.isPresent()) {
                     WarehouseReceptionEntity rec = reception.get();
                     whStatus = rec.getStatus() != null ? rec.getStatus().name() : "REGISTERED";
-                    readyForExit = (rec.getStatus() == ReceptionStatus.COMPLETED);
+                    readyForExit = (rec.getStatus() == ReceptionStatus.COMPLETED || rec.getStatus() == ReceptionStatus.CANCELLED);
+                    if (rec.getStatus() == ReceptionStatus.CANCELLED) {
+                        dynamicCancellationReason = rec.getCancellationReason();
+                        dynamicCancelledBy = rec.getCancelledBy();
+                        dynamicCancelledAt = rec.getCancelledAt();
+                    }
                     if (rec.getRamp() != null) {
                         dynamicRampId = rec.getRamp().getId();
                         dynamicRampCode = rec.getRamp().getCode();
@@ -931,16 +949,8 @@ public  class SecurityGateService implements SecurityGateUseCase {
                 .driverLicense(entity.getDriverLicense())
                 .driverPhone(entity.getDriverPhone())
                 .transportType(entity.getTransportType())
-                .economicNumber(
-                        (entity.getEconomicNumber() != null && !entity.getEconomicNumber().isBlank())
-                                ? entity.getEconomicNumber().trim()
-                                : ((entity.getNoEcoTractor() != null && !entity.getNoEcoTractor().isBlank())
-                                        ? entity.getNoEcoTractor().trim()
-                                        : null))
-                .boxEconomicNumber(
-                        (entity.getBoxEconomicNumber() != null && !entity.getBoxEconomicNumber().isBlank())
-                                ? entity.getBoxEconomicNumber().trim()
-                                : null)
+                .noEcoTractor(entity.getNoEcoTractor() != null ? entity.getNoEcoTractor().trim() : null)
+                .noEcoCaja(entity.getNoEcoCaja() != null ? entity.getNoEcoCaja().trim() : null)
                 .tractorPlates(entity.getTractorPlates())
                 .boxPlates(entity.getBoxPlates())
                 .boxDimensions(entity.getBoxDimensions())
@@ -965,6 +975,9 @@ public  class SecurityGateService implements SecurityGateUseCase {
                 .exitedAt(entity.getExitedAt())
                 .warehouseStatus(whStatus)
                 .isReadyForExit(readyForExit)
+                .cancellationReason(dynamicCancellationReason)
+                .cancelledBy(dynamicCancelledBy)
+                .cancelledAt(dynamicCancelledAt)
                 .expiresAt(entity.getExpiresAt())
                 .createdAt(entity.getCreatedAt())
                 .build();
@@ -998,5 +1011,11 @@ public  class SecurityGateService implements SecurityGateUseCase {
         String datePart = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         String randomPart = UUID.randomUUID().toString().substring(0, 6).toUpperCase();
         return String.format("PASS-%s-%s", datePart, randomPart);
+    }
+
+    private String safeTruncate(String val, int maxLen) {
+        if (val == null) return null;
+        String trimmed = val.trim();
+        return trimmed.length() > maxLen ? trimmed.substring(0, maxLen) : trimmed;
     }
 }

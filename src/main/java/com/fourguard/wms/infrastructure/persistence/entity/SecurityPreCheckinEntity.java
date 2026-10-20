@@ -103,14 +103,11 @@ public class SecurityPreCheckinEntity extends BaseVersionedEntity {
     @Column(name = "transport_type", length = 100)
     private String transportType;
 
-    @Column(name = "economic_number", length = 100)
-    private String economicNumber;
-
     @Column(name = "no_eco_tractor", length = 100)
     private String noEcoTractor;
 
-    @Column(name = "box_economic_number", length = 100)
-    private String boxEconomicNumber;
+    @Column(name = "no_eco_caja", length = 100)
+    private String noEcoCaja;
 
     @Column(name = "tractor_plates", length = 50)
     private String tractorPlates;
@@ -201,11 +198,4 @@ public class SecurityPreCheckinEntity extends BaseVersionedEntity {
     @Column(name = "expires_at", nullable = false)
     private OffsetDateTime expiresAt;
 
-    public String getNoEcoCaja() {
-        return this.boxEconomicNumber;
-    }
-
-    public void setNoEcoCaja(String noEcoCaja) {
-        this.boxEconomicNumber = noEcoCaja;
-    }
 }

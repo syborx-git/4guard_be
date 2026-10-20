@@ -108,10 +108,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             }
         } catch (ExpiredJwtException e) {
             log.warn("JWT token has expired: {}", e.getMessage());
-            // No seteamos el contexto de seguridad. La cadena continuará y Spring Security
-            // bloqueará los endpoints protegidos retornando un 401 Unauthorized limpio en vez de un 500.
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json");
+            response.getWriter().write("{\"success\":false,\"message\":\"No autenticado o token expirado\",\"data\":null}");
+            return;
         } catch (SignatureException | MalformedJwtException | UnsupportedJwtException | IllegalArgumentException e) {
             log.warn("Invalid JWT token: {}", e.getMessage());
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json");
+            response.getWriter().write("{\"success\":false,\"message\":\"Token JWT inválido\",\"data\":null}");
+            return;
         }
 
         filterChain.doFilter(request, response);

@@ -13,10 +13,13 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 import java.util.*;
 
 @Service
-@RequiredArgsConstructor
 public class AuditService {
 
     private final AuditLogRepositoryPort auditLogRepositoryPort;
+
+    public AuditService(AuditLogRepositoryPort auditLogRepositoryPort) {
+        this.auditLogRepositoryPort = auditLogRepositoryPort;
+    }
 
     /**
      * Persists a relational audit log entry without JSONB.

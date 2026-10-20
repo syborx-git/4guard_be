@@ -177,6 +177,7 @@
                 <configuration>
                     <source>${java.version}</source>
                     <target>${java.version}</target>
+                    <release>${java.version}</release>
                     <!-- Order matters: Lombok → binding → MapStruct -->
                     <annotationProcessorPaths>
                         <path>

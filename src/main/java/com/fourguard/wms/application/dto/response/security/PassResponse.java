@@ -33,8 +33,8 @@ public class PassResponse {
     private String driverLicense;
     private String driverPhone;
     private String transportType;
-    private String economicNumber;
-    private String boxEconomicNumber;
+    private String noEcoTractor;
+    private String noEcoCaja;
     private String tractorPlates;
     private String boxPlates;
     private String boxDimensions;
@@ -65,6 +65,11 @@ public class PassResponse {
     private OffsetDateTime exitedAt;
     private String warehouseStatus;
     private Boolean isReadyForExit;
+
+    // Cancellation info
+    private String cancellationReason;
+    private String cancelledBy;
+    private OffsetDateTime cancelledAt;
 
     private OffsetDateTime expiresAt;
     private OffsetDateTime createdAt;

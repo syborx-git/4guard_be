@@ -187,13 +187,13 @@ public class LocationController {
     }
 
     // =========================================================================
-    // BAY OCCUPANCY & SUGGESTION (22-PALLET STANDARD)
+    // DYNAMIC BAY OCCUPANCY & CAPACITY MANAGEMENT
     // =========================================================================
 
     @GetMapping("/bays/occupancy")
     @PreAuthorize("hasAuthority('LOCATIONS_READ') or hasAuthority('LAYOUT_READ') or hasAuthority('RECEIVING_READ') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Matriz de ocupación y semáforo de bahías",
-               description = "Calcula el porcentaje de ocupación con estándar de 22 pallets y semáforo verde/ámbar/rojo.")
+               description = "Calcula el porcentaje de ocupación y semáforo verde/ámbar/rojo con base en la capacidad configurada de cada bahía.")
     public ResponseEntity<ApiResponse<List<com.fourguard.wms.application.dto.response.BayOccupancyResponse>>> getBayOccupancy(
             @RequestParam(required = false) UUID branchId) {
         List<com.fourguard.wms.application.dto.response.BayOccupancyResponse> response = locationUseCase.getBayOccupancyList(branchId);
