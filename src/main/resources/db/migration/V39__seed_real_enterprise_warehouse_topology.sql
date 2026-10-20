@@ -220,36 +220,54 @@ BEGIN
             IF v_target_id IS NOT NULL THEN
                 -- A) Reasignar recepciones
                 UPDATE wms.warehouse_receptions 
-                SET storage_location_id = v_target_id, storage_location_code = v_target_code 
-                WHERE storage_location_id = r.id OR storage_location_code = r.code;
+                SET storage_location_id = v_target_id 
+                WHERE storage_location_id = r.id;
 
-                -- B) Reasignar pallets
-                UPDATE wms.pallets 
-                SET location_id = v_target_id, current_location = v_target_code 
-                WHERE location_id = r.id OR current_location = r.code;
+                -- B) Reasignar inventario (tarimas / pallets en almacén)
+                UPDATE wms.inventory_items 
+                SET location_id = v_target_id 
+                WHERE location_id = r.id;
 
                 -- C) Reasignar traspasos origen y destino
                 UPDATE wms.warehouse_transfers 
-                SET source_location_id = v_target_id 
-                WHERE source_location_id = r.id;
+                SET origin_location_id = v_target_id 
+                WHERE origin_location_id = r.id;
 
                 UPDATE wms.warehouse_transfers 
-                SET target_location_id = v_target_id 
-                WHERE target_location_id = r.id;
+                SET destination_location_id = v_target_id 
+                WHERE destination_location_id = r.id;
 
-                -- D) Reasignar transacciones de inventario si la tabla existe
+                -- D) Reasignar movimientos de inventario origen y destino
+                UPDATE wms.inventory_movements 
+                SET from_location_id = v_target_id 
+                WHERE from_location_id = r.id;
+
+                UPDATE wms.inventory_movements 
+                SET to_location_id = v_target_id 
+                WHERE to_location_id = r.id;
+
+                -- E) Reasignar salidas y caseta si referencian la ubicación
+                UPDATE wms.warehouse_outbounds 
+                SET ramp_id = v_target_id 
+                WHERE ramp_id = r.id;
+
+                UPDATE wms.security_pre_checkins 
+                SET ramp_id = v_target_id 
+                WHERE ramp_id = r.id;
+
+                -- F) Reasignar transacciones de inventario si la tabla existe
                 IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'wms' AND table_name = 'inventory_transactions') THEN
                     EXECUTE 'UPDATE wms.inventory_transactions SET location_id = $1 WHERE location_id = $2' 
                     USING v_target_id, r.id;
                 END IF;
 
-                -- E) Reasignar lotes de inventario si la tabla existe
+                -- G) Reasignar lotes de inventario si la tabla existe
                 IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'wms' AND table_name = 'inventory_batches') THEN
                     EXECUTE 'UPDATE wms.inventory_batches SET location_id = $1 WHERE location_id = $2' 
                     USING v_target_id, r.id;
                 END IF;
 
-                -- F) Sumar ocupación si la ubicación legacy tenía inventario
+                -- H) Sumar ocupación si la ubicación legacy tenía inventario
                 IF r.current_occupancy IS NOT NULL AND r.current_occupancy > 0 THEN
                     UPDATE wms.locations 
                     SET current_occupancy = COALESCE(current_occupancy, 0) + r.current_occupancy 
