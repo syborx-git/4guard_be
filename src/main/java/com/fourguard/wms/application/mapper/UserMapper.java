@@ -106,6 +106,8 @@ public interface UserMapper {
     @Mapping(target = "permissions",       expression = "java(extractPermissions(entity))")
     @Mapping(target = "organizationId",   source = "organization.id")
     @Mapping(target = "organizationName", source = "organization.name")
+    @Mapping(target = "branchId",         source = "branch.id")
+    @Mapping(target = "branchName",       source = "branch.name")
     UserInfoResponse toUserInfoResponse(UserEntity entity);
 
     // ── Default helpers ───────────────────────────────────────────────────────

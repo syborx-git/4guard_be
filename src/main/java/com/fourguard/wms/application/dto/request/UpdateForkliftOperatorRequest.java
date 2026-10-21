@@ -48,17 +48,18 @@ public class UpdateForkliftOperatorRequest {
     @Schema(description = "Apellido materno del montacarguista", example = "Hernández")
     String lastNameMaternal;
 
-    @NotBlank(message = "El número de licencia DC-3 es requerido")
     @Size(max = 50, message = "El número de licencia DC-3 no puede superar 50 caracteres")
-    @Schema(description = "Número de certificación DC-3 registrado ante STPS", example = "LIC-MC-9921")
+    @Schema(description = "Número de certificación DC-3 registrado ante STPS (opcional)", example = "LIC-MC-9921")
     String licenseNumberDc3;
 
-    @NotNull(message = "La fecha de vencimiento de la licencia es requerida")
-    @Schema(description = "Fecha de vencimiento de la certificación DC-3 (YYYY-MM-DD)", example = "2027-06-30")
+    @Schema(description = "Fecha de vencimiento de la certificación DC-3 (opcional)", example = "2027-06-30")
     LocalDate licenseExpirationDate;
 
-    @Schema(description = "UUID del turno asignado del catálogo maestro de turnos", example = "c12f0907-9fa5-4bdf-87db-2eb5e7683940")
+    @Schema(description = "UUID del turno asignado del catálogo maestro de turnos (opcional)", example = "c12f0907-9fa5-4bdf-87db-2eb5e7683940")
     UUID shiftId;
+
+    @Schema(description = "Nuevo PIN de acceso para restablecer credenciales del operador (opcional)", example = "5678")
+    String resetPin;
 
     @Schema(description = "Versión actual del registro para optimistic locking", example = "1")
     Long version;

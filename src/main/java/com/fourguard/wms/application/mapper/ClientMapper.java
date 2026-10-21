@@ -35,6 +35,7 @@ public interface ClientMapper {
     @Mapping(target = "updatedBy",       ignore = true)
     @Mapping(target = "version",         ignore = true)
     @Mapping(target = "status",          ignore = true)
+    @Mapping(target = "shortCode",       ignore = true)
     ClientEntity toEntity(CreateClientRequest request);
 
     @AfterMapping
@@ -54,6 +55,7 @@ public interface ClientMapper {
     @Mapping(target = "updatedBy",       ignore = true)
     @Mapping(target = "version",         ignore = true)
     @Mapping(target = "status",          ignore = true)
+    @Mapping(target = "shortCode",       ignore = true)
     void updateEntityFromDto(UpdateClientRequest request, @MappingTarget ClientEntity entity);
 
     @AfterMapping

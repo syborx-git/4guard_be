@@ -56,6 +56,10 @@ public interface ForkliftOperatorMapper {
     @Mapping(source = "shift.id",          target = "shiftId")
     @Mapping(source = "licenseStatus",     target = "licenseStatus", qualifiedByName = "licenseStatusToString")
     @Mapping(source = "status",            target = "status",        qualifiedByName = "operatorStatusToString")
+    @Mapping(source = "user.id",           target = "userId")
+    @Mapping(source = "user.username",     target = "username")
+    @Mapping(target = "hasAccess",         expression = "java(entity.getUser() != null)")
+    @Mapping(source = "user.changePasswordRequired", target = "changePasswordRequired")
     ForkliftOperatorResponse toResponse(ForkliftOperatorEntity entity);
 
     @Named("licenseStatusToString")

@@ -8,6 +8,7 @@ import com.fourguard.wms.application.dto.response.audit.ForkliftOperatorAuditRes
 import com.fourguard.wms.application.mapper.ForkliftOperatorMapper;
 import com.fourguard.wms.domain.enums.ForkliftOperatorStatus;
 import com.fourguard.wms.domain.enums.LicenseStatus;
+import com.fourguard.wms.domain.enums.UserStatus;
 import com.fourguard.wms.domain.exception.EntityNotFoundException;
 import com.fourguard.wms.domain.exception.ValidationException;
 import com.fourguard.wms.domain.ports.in.ForkliftOperatorUseCase;
@@ -15,18 +16,21 @@ import com.fourguard.wms.domain.ports.out.AuditLogRepositoryPort;
 import com.fourguard.wms.domain.ports.out.BranchRepositoryPort;
 import com.fourguard.wms.domain.ports.out.ForkliftOperatorRepositoryPort;
 import com.fourguard.wms.domain.ports.out.OrganizationRepositoryPort;
+import com.fourguard.wms.domain.ports.out.RoleRepositoryPort;
 import com.fourguard.wms.domain.ports.out.ShiftRepositoryPort;
 import com.fourguard.wms.domain.ports.out.UserRepositoryPort;
 import com.fourguard.wms.infrastructure.persistence.entity.AuditLogEntity;
 import com.fourguard.wms.infrastructure.persistence.entity.BranchEntity;
 import com.fourguard.wms.infrastructure.persistence.entity.ForkliftOperatorEntity;
 import com.fourguard.wms.infrastructure.persistence.entity.OrganizationEntity;
+import com.fourguard.wms.infrastructure.persistence.entity.RoleEntity;
 import com.fourguard.wms.infrastructure.persistence.entity.ShiftEntity;
 import com.fourguard.wms.infrastructure.persistence.entity.UserEntity;
 import com.fourguard.wms.shared.audit.AuditService;
 import com.fourguard.wms.shared.audit.SecurityAuditHelper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,11 +49,11 @@ import java.util.stream.Collectors;
  * <ul>
  * <li>{@code fullName} is always derived from firstName + lastNamePaternal +
  * lastNameMaternal.</li>
- * <li>{@code licenseStatus} is always recomputed from
- * {@code licenseExpirationDate}.</li>
- * <li>DC-3 license number must be unique within the organization.</li>
+ * <li>{@code licenseStatus} is recomputed from {@code licenseExpirationDate}.</li>
+ * <li>DC-3 license number, when provided, must be unique within the organization.</li>
  * <li>Every write operation is recorded in {@code wms.audit_logs} with
  * field-level deltas.</li>
+ * <li>Optional instant creation/management of operator terminal RF access account.</li>
  * </ul>
  */
 @Service
@@ -62,12 +66,14 @@ public class ForkliftOperatorService implements ForkliftOperatorUseCase {
     private final ForkliftOperatorRepositoryPort operatorRepositoryPort;
     private final OrganizationRepositoryPort organizationRepositoryPort;
     private final UserRepositoryPort userRepositoryPort;
+    private final RoleRepositoryPort roleRepositoryPort;
     private final AuditLogRepositoryPort auditLogRepositoryPort;
     private final ShiftRepositoryPort shiftRepositoryPort;
     private final BranchRepositoryPort branchRepositoryPort;
     private final ForkliftOperatorMapper mapper;
     private final SecurityAuditHelper securityAuditHelper;
     private final AuditService auditService;
+    private final PasswordEncoder passwordEncoder;
 
     // ─── CREATE ─────────────────────────────────────────────────────────────────
 
@@ -80,19 +86,23 @@ public class ForkliftOperatorService implements ForkliftOperatorUseCase {
                 .orElseThrow(() -> new EntityNotFoundException(
                         "Organización no encontrada con ID: " + request.getOrganizationId()));
 
-        // Validate DC-3 uniqueness
-        if (operatorRepositoryPort.existsByOrganizationIdAndLicenseNumberDc3(
-                request.getOrganizationId(), request.getLicenseNumberDc3())) {
-            throw new ValidationException(
-                    "Ya existe un montacarguista con la licencia DC-3 '" + request.getLicenseNumberDc3()
-                            + "' en esta organización.");
+        // Validate DC-3 uniqueness only if provided
+        if (request.getLicenseNumberDc3() != null && !request.getLicenseNumberDc3().isBlank()) {
+            if (operatorRepositoryPort.existsByOrganizationIdAndLicenseNumberDc3(
+                    request.getOrganizationId(), request.getLicenseNumberDc3())) {
+                throw new ValidationException(
+                        "Ya existe un montacarguista con la licencia DC-3 '" + request.getLicenseNumberDc3()
+                                + "' en esta organización.");
+            }
         }
 
         ForkliftOperatorEntity entity = mapper.toEntity(request);
         entity.setOrganization(organization);
+        if (entity.getJobTitle() == null || entity.getJobTitle().isBlank()) {
+            entity.setJobTitle("Montacarguista");
+        }
 
-        // Auto-generate code: find the next available unique code (MC-001, MC-002,
-        // etc.)
+        // Auto-generate code: find the next available unique code (MC-001, MC-002, etc.)
         int seq = 1;
         String generatedCode;
         do {
@@ -110,6 +120,43 @@ public class ForkliftOperatorService implements ForkliftOperatorUseCase {
         resolveShift(request.getShiftId(), entity);
         resolveBranch(request.getBranchId(), entity);
 
+        // RF Terminal User Account provision
+        if (Boolean.TRUE.equals(request.getCreateAccess()) || (request.getPin() != null && !request.getPin().isBlank())) {
+            String desiredUsername = (request.getUsername() != null && !request.getUsername().isBlank())
+                    ? request.getUsername().trim()
+                    : generatedCode;
+            if (userRepositoryPort.existsByUsername(desiredUsername)) {
+                throw new ValidationException("El nombre de usuario '" + desiredUsername + "' ya existe en el sistema.");
+            }
+            String internalEmail = (desiredUsername + "@4guard.local").toLowerCase();
+            if (userRepositoryPort.existsByEmail(internalEmail)) {
+                internalEmail = (desiredUsername + "." + System.currentTimeMillis() + "@4guard.local").toLowerCase();
+            }
+
+            RoleEntity opRole = roleRepositoryPort.findByName("WAREHOUSE_OPERATOR")
+                    .or(() -> roleRepositoryPort.findByName("FORKLIFT_OPERATOR"))
+                    .orElseThrow(() -> new EntityNotFoundException("Rol WAREHOUSE_OPERATOR no encontrado"));
+
+            String rawPin = (request.getPin() != null && !request.getPin().isBlank()) ? request.getPin().trim() : "1234";
+
+            UserEntity user = UserEntity.builder()
+                    .username(desiredUsername)
+                    .email(internalEmail)
+                    .password(passwordEncoder.encode(rawPin))
+                    .firstName(request.getFirstName())
+                    .lastName((request.getLastNamePaternal() + " " + (request.getLastNameMaternal() != null ? request.getLastNameMaternal() : "")).trim())
+                    .organization(organization)
+                    .branch(entity.getBranch())
+                    .role(opRole)
+                    .status(UserStatus.ACTIVE)
+                    .isEnabled(true)
+                    .changePasswordRequired(true)
+                    .build();
+
+            UserEntity savedUser = userRepositoryPort.save(user);
+            entity.setUser(savedUser);
+        }
+
         String currentUser = securityAuditHelper.getCurrentUsername();
         entity.setCreatedBy(currentUser);
         entity.setUpdatedBy(currentUser);
@@ -118,7 +165,7 @@ public class ForkliftOperatorService implements ForkliftOperatorUseCase {
 
         logAudit(currentUser, "FORKLIFT_OPERATOR_CREATED", saved.getId(), null, saved);
 
-        log.info("Forklift operator created: {} ({})", saved.getFullName(), saved.getCode());
+        log.info("Forklift operator created: {} ({}) with access: {}", saved.getFullName(), saved.getCode(), saved.getUser() != null);
         return mapper.toResponse(saved);
     }
 
@@ -133,19 +180,24 @@ public class ForkliftOperatorService implements ForkliftOperatorUseCase {
                 .orElseThrow(() -> new EntityNotFoundException(
                         "Montacarguista no encontrado con ID: " + request.getId()));
 
-        // DC-3 uniqueness (excluding self)
-        if (!existing.getLicenseNumberDc3().equalsIgnoreCase(request.getLicenseNumberDc3())) {
-            if (operatorRepositoryPort.existsByOrganizationIdAndLicenseNumberDc3AndIdNot(
-                    request.getOrganizationId(), request.getLicenseNumberDc3(), request.getId())) {
-                throw new ValidationException(
-                        "Ya existe otro montacarguista con la licencia DC-3 '" + request.getLicenseNumberDc3()
-                                + "' en esta organización.");
+        // DC-3 uniqueness (excluding self, only if provided)
+        if (request.getLicenseNumberDc3() != null && !request.getLicenseNumberDc3().isBlank()) {
+            if (existing.getLicenseNumberDc3() == null || !existing.getLicenseNumberDc3().equalsIgnoreCase(request.getLicenseNumberDc3())) {
+                if (operatorRepositoryPort.existsByOrganizationIdAndLicenseNumberDc3AndIdNot(
+                        request.getOrganizationId(), request.getLicenseNumberDc3(), request.getId())) {
+                    throw new ValidationException(
+                            "Ya existe otro montacarguista con la licencia DC-3 '" + request.getLicenseNumberDc3()
+                                    + "' en esta organización.");
+                }
             }
         }
 
         ForkliftOperatorEntity snapshot = cloneEntity(existing);
 
         mapper.updateEntityFromDto(request, existing);
+        if (existing.getJobTitle() == null || existing.getJobTitle().isBlank()) {
+            existing.setJobTitle("Montacarguista");
+        }
 
         // Recompute derived fields
         existing.setFullName(
@@ -155,6 +207,11 @@ public class ForkliftOperatorService implements ForkliftOperatorUseCase {
         // Optional associations
         resolveShift(request.getShiftId(), existing);
         resolveBranch(request.getBranchId(), existing);
+
+        // Reset PIN if requested in update payload
+        if (request.getResetPin() != null && !request.getResetPin().isBlank()) {
+            applyPinReset(existing, request.getResetPin().trim());
+        }
 
         String currentUser = securityAuditHelper.getCurrentUsername();
         existing.setUpdatedBy(currentUser);
@@ -308,12 +365,73 @@ public class ForkliftOperatorService implements ForkliftOperatorUseCase {
                 .collect(Collectors.toList());
     }
 
+    // ─── RESET PIN ──────────────────────────────────────────────────────────────
+
+    @Override
+    @Transactional
+    public ForkliftOperatorResponse resetPin(UUID id, String newPin) {
+        log.info("Resetting RF terminal PIN for forklift operator: {}", id);
+        ForkliftOperatorEntity operator = operatorRepositoryPort.findActiveById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Montacarguista no encontrado con ID: " + id));
+
+        ForkliftOperatorEntity snapshot = cloneEntity(operator);
+        applyPinReset(operator, newPin);
+
+        String currentUser = securityAuditHelper.getCurrentUsername();
+        operator.setUpdatedBy(currentUser);
+        ForkliftOperatorEntity saved = operatorRepositoryPort.save(operator);
+
+        logAudit(currentUser, "FORKLIFT_OPERATOR_PIN_RESET", saved.getId(), snapshot, saved);
+        log.info("PIN reset successfully for forklift operator: {} ({})", saved.getFullName(), saved.getCode());
+        return mapper.toResponse(saved);
+    }
+
+    private void applyPinReset(ForkliftOperatorEntity operator, String rawPin) {
+        if (operator.getUser() != null) {
+            UserEntity user = operator.getUser();
+            user.setPassword(passwordEncoder.encode(rawPin));
+            user.setChangePasswordRequired(true);
+            user.setIsEnabled(true);
+            userRepositoryPort.save(user);
+        } else {
+            String desiredUsername = operator.getCode();
+            if (userRepositoryPort.existsByUsername(desiredUsername)) {
+                desiredUsername = operator.getCode() + "_" + operator.getId().toString().substring(0, 4);
+            }
+            String internalEmail = (desiredUsername + "@4guard.local").toLowerCase();
+            if (userRepositoryPort.existsByEmail(internalEmail)) {
+                internalEmail = (desiredUsername + "." + System.currentTimeMillis() + "@4guard.local").toLowerCase();
+            }
+
+            RoleEntity opRole = roleRepositoryPort.findByName("WAREHOUSE_OPERATOR")
+                    .or(() -> roleRepositoryPort.findByName("FORKLIFT_OPERATOR"))
+                    .orElseThrow(() -> new EntityNotFoundException("Rol WAREHOUSE_OPERATOR no encontrado"));
+
+            UserEntity newUser = UserEntity.builder()
+                    .username(desiredUsername)
+                    .email(internalEmail)
+                    .password(passwordEncoder.encode(rawPin))
+                    .firstName(operator.getFirstName())
+                    .lastName((operator.getLastNamePaternal() + " " + (operator.getLastNameMaternal() != null ? operator.getLastNameMaternal() : "")).trim())
+                    .organization(operator.getOrganization())
+                    .branch(operator.getBranch())
+                    .role(opRole)
+                    .status(UserStatus.ACTIVE)
+                    .isEnabled(true)
+                    .changePasswordRequired(true)
+                    .build();
+
+            UserEntity savedUser = userRepositoryPort.save(newUser);
+            operator.setUser(savedUser);
+        }
+    }
+
     // ─── PRIVATE HELPERS ─────────────────────────────────────────────────────────
 
     /** Computes the license status from the expiration date. */
     private LicenseStatus computeLicenseStatus(LocalDate expirationDate) {
         if (expirationDate == null)
-            return LicenseStatus.VENCIDA;
+            return LicenseStatus.VIGENTE;
         long daysRemaining = java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(), expirationDate);
         if (daysRemaining < 0)
             return LicenseStatus.VENCIDA;
@@ -372,6 +490,7 @@ public class ForkliftOperatorService implements ForkliftOperatorUseCase {
                 .shift(source.getShift())
                 .shiftName(source.getShiftName())
                 .status(source.getStatus())
+                .user(source.getUser())
                 .version(source.getVersion())
                 .createdAt(source.getCreatedAt())
                 .createdBy(source.getCreatedBy())
@@ -428,6 +547,11 @@ public class ForkliftOperatorService implements ForkliftOperatorUseCase {
                 entity.getLicenseExpirationDate() != null ? entity.getLicenseExpirationDate().toString() : null);
         state.put("licenseStatus", entity.getLicenseStatus() != null ? entity.getLicenseStatus().name() : null);
         state.put("status", entity.getStatus() != null ? entity.getStatus().name() : null);
+        try {
+            state.put("userId", entity.getUser() != null ? entity.getUser().getId().toString() : null);
+            state.put("username", entity.getUser() != null ? entity.getUser().getUsername() : null);
+        } catch (Exception ignored) {
+        }
         try {
             state.put("shiftId", entity.getShift() != null ? entity.getShift().getId().toString() : null);
         } catch (Exception ignored) {

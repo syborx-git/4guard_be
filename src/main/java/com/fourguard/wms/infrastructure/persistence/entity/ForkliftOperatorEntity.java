@@ -17,8 +17,7 @@ import java.util.UUID;
  */
 @Entity
 @Table(name = "forklift_operators", schema = "wms", uniqueConstraints = {
-        @UniqueConstraint(name = "uk_forklift_operator_code", columnNames = { "organization_id", "code" }),
-        @UniqueConstraint(name = "uk_forklift_operator_dc3", columnNames = { "organization_id", "license_number_dc3" })
+        @UniqueConstraint(name = "uk_forklift_operator_code", columnNames = { "organization_id", "code" })
 })
 @Getter
 @Setter
@@ -38,6 +37,11 @@ public class ForkliftOperatorEntity extends BaseVersionedEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "branch_id")
     private BranchEntity branch;
+
+    /** Associated system user account for RF Terminal / tablet access */
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private UserEntity user;
 
     /** Operational code, auto-generated */
     @Column(nullable = false, length = 30)
@@ -66,16 +70,15 @@ public class ForkliftOperatorEntity extends BaseVersionedEntity {
     @Column(name = "full_name", nullable = false, length = 310)
     private String fullName;
 
-    /** STPS / DC-3 certification number. Must be unique within the organization. */
-    @Column(name = "license_number_dc3", nullable = false, length = 50)
+    /** STPS / DC-3 certification number (optional). */
+    @Column(name = "license_number_dc3", length = 50)
     private String licenseNumberDc3;
 
-    @Column(name = "license_expiration_date", nullable = false)
+    @Column(name = "license_expiration_date")
     private LocalDate licenseExpirationDate;
 
     /**
-     * Computed license validity status. Recalculated on every save by
-     * {@code ForkliftOperatorService}.
+     * Computed license validity status.
      */
     @Enumerated(EnumType.STRING)
     @Column(name = "license_status", nullable = false, length = 20)
