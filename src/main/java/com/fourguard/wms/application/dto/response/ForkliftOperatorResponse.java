@@ -48,6 +48,12 @@ public class ForkliftOperatorResponse {
     /** ACTIVO | INACTIVO */
     private final String status;
 
+    /** Associated system user details for RF access */
+    private final UUID   userId;
+    private final String username;
+    private final Boolean hasAccess;
+    private final Boolean changePasswordRequired;
+
     private final Long version;
     private final String createdBy;
     private final String updatedBy;

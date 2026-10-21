@@ -26,10 +26,7 @@ public class CorsProperties {
     ));
 
     private List<String> allowedOriginPatterns = new ArrayList<>(List.of(
-            "http://localhost:*",
-            "http://127.0.0.1:*",
-            "https://*.ngrok-free.dev",
-            "https://*.onrender.com"
+            "*"
     ));
 
     private List<String> allowedMethods = new ArrayList<>(

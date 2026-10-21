@@ -20,5 +20,7 @@ public class UserInfoResponse {
     private final Boolean changePasswordRequired;
     private final UUID   organizationId;
     private final String organizationName;
+    private final UUID   branchId;
+    private final String branchName;
 }
 

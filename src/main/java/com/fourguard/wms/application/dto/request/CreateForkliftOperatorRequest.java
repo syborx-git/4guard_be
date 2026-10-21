@@ -44,15 +44,22 @@ public class CreateForkliftOperatorRequest {
     @Schema(description = "Apellido materno del montacarguista", example = "Hernández")
     String lastNameMaternal;
 
-    @NotBlank(message = "El número de licencia DC-3 es requerido")
     @Size(max = 50, message = "El número de licencia DC-3 no puede superar 50 caracteres")
-    @Schema(description = "Número de certificación DC-3 registrado ante STPS", example = "LIC-MC-9921")
+    @Schema(description = "Número de certificación DC-3 registrado ante STPS (opcional)", example = "LIC-MC-9921")
     String licenseNumberDc3;
 
-    @NotNull(message = "La fecha de vencimiento de la licencia es requerida")
-    @Schema(description = "Fecha de vencimiento de la certificación DC-3 (YYYY-MM-DD)", example = "2027-06-30")
+    @Schema(description = "Fecha de vencimiento de la certificación DC-3 (opcional)", example = "2027-06-30")
     LocalDate licenseExpirationDate;
 
-    @Schema(description = "UUID del turno asignado del catálogo maestro de turnos", example = "c12f0907-9fa5-4bdf-87db-2eb5e7683940")
+    @Schema(description = "UUID del turno asignado del catálogo maestro de turnos (opcional)", example = "c12f0907-9fa5-4bdf-87db-2eb5e7683940")
     UUID shiftId;
+
+    @Schema(description = "Indica si se creará automáticamente una cuenta de acceso a la Tableta RF", example = "true")
+    Boolean createAccess;
+
+    @Schema(description = "Nombre de usuario para el acceso (opcional, si se omite se autogenera con el código)", example = "MC-001")
+    String username;
+
+    @Schema(description = "PIN inicial de acceso para tableta RF (4 a 6 dígitos)", example = "1234")
+    String pin;
 }

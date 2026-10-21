@@ -51,6 +51,15 @@ public interface ForkliftOperatorUseCase {
      */
     ForkliftOperatorResponse updateOperatorStatus(UUID id, UpdateForkliftOperatorStatusRequest request);
 
+    /**
+     * Resets the operator's RF Terminal access PIN/password.
+     * Sets changePasswordRequired to true so the operator updates it on next login.
+     *
+     * @param id     UUID of the operator.
+     * @param newPin Temporary PIN or password assigned by the supervisor.
+     */
+    ForkliftOperatorResponse resetPin(UUID id, String newPin);
+
     /** Returns the relational audit log history for a Forklift Operator. */
     List<ForkliftOperatorAuditResponse> getOperatorAuditLogs(UUID id);
 }
