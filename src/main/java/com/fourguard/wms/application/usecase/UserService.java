@@ -218,7 +218,7 @@ public class UserService implements CreateUserUseCase, GetUserUseCase, UpdateUse
                                 .map(u -> u.getUsername())
                                 .orElse("UNKNOWN");
                     }
-                    List<UserAuditResponse.AuditDetailResponse> detailResponses = logEntry.getDetails().stream()
+                    List<UserAuditResponse.AuditDetailResponse> detailResponses = (logEntry.getDetails() != null ? logEntry.getDetails() : java.util.Collections.<com.fourguard.wms.infrastructure.persistence.entity.AuditLogDetailEntity>emptyList()).stream()
                             .map(d -> UserAuditResponse.AuditDetailResponse.builder()
                                     .fieldName(d.getFieldName())
                                     .oldValue(d.getOldValue())
