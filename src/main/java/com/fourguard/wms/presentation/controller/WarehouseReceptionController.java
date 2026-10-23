@@ -83,8 +83,12 @@ public class WarehouseReceptionController {
             @RequestParam UUID organizationId,
             @RequestParam(required = false) UUID branchId,
             @RequestParam(required = false, defaultValue = "ALL") String status,
-            @RequestParam(required = false) String search) {
-        List<ReceptionSummaryResponse> list = receptionUseCase.getReceptions(organizationId, branchId, status, search);
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) UUID shiftSessionId,
+            @RequestParam(required = false, defaultValue = "ALL") String scope) {
+        List<ReceptionSummaryResponse> list = receptionUseCase.getReceptions(
+                organizationId, branchId, status, search, shiftSessionId,
+                com.fourguard.wms.domain.enums.MovementScope.from(scope));
         return ResponseEntity.ok(ApiResponse.ok("Listado de recepciones obtenido con éxito", list));
     }
 

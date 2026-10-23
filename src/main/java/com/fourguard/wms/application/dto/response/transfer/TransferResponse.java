@@ -46,6 +46,7 @@ public class TransferResponse {
     private OffsetDateTime cancelledAt;
     private String cancellationReason;
     private String cancelledBy;
+    private UUID shiftSessionId;
 
     private Long version;
     private OffsetDateTime createdAt;

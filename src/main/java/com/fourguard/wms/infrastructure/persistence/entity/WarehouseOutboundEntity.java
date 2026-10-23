@@ -139,6 +139,9 @@ public class WarehouseOutboundEntity extends BaseVersionedEntity {
     @Column(name = "cancelled_by", length = 100)
     private String cancelledBy;
 
+    @Column(name = "shift_session_id", columnDefinition = "UUID")
+    private UUID shiftSessionId;
+
     @OneToMany(mappedBy = "outbound", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @Builder.Default
     private List<WarehouseOutboundItemEntity> items = new ArrayList<>();

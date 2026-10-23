@@ -48,6 +48,7 @@ public class WarehouseTransferService implements WarehouseTransferUseCase {
     private final SecurityAuditHelper securityAuditHelper;
     private final PasswordEncoder passwordEncoder;
     private final WarehouseTransferMapper transferMapper;
+    private final ShiftSessionService shiftSessionService;
 
     @Override
     @Transactional
@@ -240,6 +241,7 @@ public class WarehouseTransferService implements WarehouseTransferUseCase {
                 .totalPieces(BigDecimal.valueOf(totalPieces))
                 .distinctSkus(distinctSkuIds.isEmpty() ? 1 : distinctSkuIds.size())
                 .createdBy(creator)
+                .shiftSessionId(shiftSessionService.getOrOpenActiveSession(branch.getId()).getId())
                 .build();
 
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
@@ -315,7 +317,7 @@ public class WarehouseTransferService implements WarehouseTransferUseCase {
     @Override
     @Transactional(readOnly = true)
     public List<TransferSummaryResponse> getTransfers(UUID organizationId, UUID branchId, String status,
-            String search) {
+            String search, UUID shiftSessionId, com.fourguard.wms.domain.enums.MovementScope scope) {
         TransferStatus trStatus = null;
         if (status != null && !status.isBlank() && !"ALL".equalsIgnoreCase(status)) {
             try {
@@ -326,7 +328,8 @@ public class WarehouseTransferService implements WarehouseTransferUseCase {
         String cleanSearch = (search != null && !search.isBlank()) ? search.trim() : null;
 
         List<WarehouseTransferEntity> list = transferRepositoryPort.findAll(
-                WarehouseTransferSpecification.withFilters(organizationId, branchId, trStatus, cleanSearch));
+                WarehouseTransferSpecification.withFilters(
+                        organizationId, branchId, trStatus, cleanSearch, shiftSessionId, scope));
         return list.stream().map(transferMapper::toSummaryResponse).collect(Collectors.toList());
     }
 

@@ -178,6 +178,9 @@ public class WarehouseReceptionEntity extends BaseVersionedEntity {
     @Column(name = "cancelled_by", length = 100)
     private String cancelledBy;
 
+    @Column(name = "shift_session_id", columnDefinition = "UUID")
+    private UUID shiftSessionId;
+
     // ── Relaciones Hijas ────────────────────────────────────────────────────
     @OneToMany(mappedBy = "reception", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @Builder.Default

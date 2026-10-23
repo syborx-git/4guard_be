@@ -51,6 +51,18 @@ public interface ShiftJpaRepository extends JpaRepository<ShiftEntity, UUID> {
     );
 
     @Query("""
+        SELECT DISTINCT s FROM ShiftEntity s
+        LEFT JOIN FETCH s.operatingDays
+        WHERE s.isDeleted = false
+          AND s.status = com.fourguard.wms.domain.enums.ShiftStatus.ACTIVE
+          AND (
+                s.branch.id = :branchId
+                OR (s.scopeType = com.fourguard.wms.domain.enums.ShiftScopeType.GLOBAL AND s.branch IS NULL)
+              )
+    """)
+    List<ShiftEntity> findActiveForBranchResolution(@Param("branchId") UUID branchId);
+
+    @Query("""
         SELECT DISTINCT s FROM ShiftEntity s LEFT JOIN s.operatingDays d
         WHERE s.isDeleted = false
           AND (CAST(:branchId AS string) IS NULL OR s.branch.id = :branchId)

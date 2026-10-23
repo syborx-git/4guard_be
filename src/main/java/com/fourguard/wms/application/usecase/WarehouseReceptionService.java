@@ -4,8 +4,10 @@ import com.fourguard.wms.application.dto.request.reception.*;
 import com.fourguard.wms.application.dto.response.reception.*;
 import com.fourguard.wms.application.mapper.WarehouseReceptionMapper;
 import com.fourguard.wms.domain.enums.InventoryState;
+import com.fourguard.wms.domain.enums.LocationCategory;
 import com.fourguard.wms.domain.enums.LocationStatus;
 import com.fourguard.wms.domain.enums.LocationType;
+import com.fourguard.wms.domain.enums.MovementScope;
 import com.fourguard.wms.domain.enums.MovementType;
 import com.fourguard.wms.domain.enums.OutboundStatus;
 import com.fourguard.wms.domain.enums.PalletType;
@@ -58,6 +60,7 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
     private final WarehouseReceptionMapper receptionMapper;
     private final WarehouseOutboundRepositoryPort outboundRepositoryPort;
     private final com.fourguard.wms.infrastructure.persistence.repository.SecurityPreCheckinJpaRepository preCheckinJpaRepository;
+    private final ShiftSessionService shiftSessionService;
 
     @Override
     @Transactional
@@ -226,6 +229,7 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
                 .reentryNotes(request.getReentryNotes())
                 .createdBy(currentUser)
                 .updatedBy(currentUser)
+                .shiftSessionId(shiftSessionService.getOrOpenActiveSession(branch.getId()).getId())
                 .build();
 
         if (request.getSealNumbers() == null || request.getSealNumbers().isEmpty() ||
@@ -419,16 +423,38 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
         String currentUser = securityAuditHelper.getCurrentUsername();
         entity.setUpdatedBy(currentUser);
 
+        LocationEntity resolvedLoc = null;
         if (request.getStorageLocationId() != null) {
-            LocationEntity storageLoc = locationRepositoryPort.findById(request.getStorageLocationId()).orElse(null);
-            if (storageLoc != null) {
-                entity.setStorageLocation(storageLoc);
-            }
-        } else if (request.getStorageLocationCode() != null && !request.getStorageLocationCode().isBlank() && entity.getBranch() != null) {
-            locationRepositoryPort.findByBranchIdAndCode(entity.getBranch().getId(), request.getStorageLocationCode().trim())
-                    .ifPresent(entity::setStorageLocation);
+            resolvedLoc = locationRepositoryPort.findById(request.getStorageLocationId()).orElse(null);
         }
-        if (entity.getStorageLocation() == null && entity.getBranch() != null) {
+        if (resolvedLoc == null && request.getStorageLocationCode() != null && !request.getStorageLocationCode().isBlank() && entity.getBranch() != null) {
+            String codeClean = request.getStorageLocationCode().trim().toUpperCase();
+            resolvedLoc = locationRepositoryPort.findByBranchIdAndCode(entity.getBranch().getId(), codeClean).orElse(null);
+            if (resolvedLoc == null && (codeClean.startsWith("STAGING-") || codeClean.startsWith("BUFFER-") || codeClean.startsWith("POS-") || codeClean.startsWith("LOC-RAMP-"))) {
+                LocationEntity newLoc = LocationEntity.builder()
+                        .branch(entity.getBranch())
+                        .code(codeClean)
+                        .name("Buffer Temporal " + codeClean)
+                        .zone("STAGING")
+                        .category(LocationCategory.TEMPORARY_BUFFER)
+                        .type(LocationType.PALLET)
+                        .capacityUnits(22)
+                        .currentOccupancy(0)
+                        .status(LocationStatus.ACTIVE)
+                        .isBlocked(false)
+                        .createdBy("SYSTEM")
+                        .updatedBy("SYSTEM")
+                        .build();
+                try {
+                    resolvedLoc = locationRepositoryPort.save(newLoc);
+                } catch (Exception ex) {
+                    resolvedLoc = locationRepositoryPort.findByBranchIdAndCode(entity.getBranch().getId(), codeClean).orElse(null);
+                }
+            }
+        }
+        if (resolvedLoc != null) {
+            entity.setStorageLocation(resolvedLoc);
+        } else if (entity.getStorageLocation() == null && entity.getBranch() != null) {
             LocationEntity autoStorage = allocateOptimalStorageLocation(entity.getBranch(), entity.getSku());
             entity.setStorageLocation(autoStorage);
         }
@@ -700,7 +726,8 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
 
     @Override
     @Transactional(readOnly = true)
-    public List<ReceptionSummaryResponse> getReceptions(UUID organizationId, UUID branchId, String status, String search) {
+    public List<ReceptionSummaryResponse> getReceptions(UUID organizationId, UUID branchId, String status, String search,
+                                                        UUID shiftSessionId, MovementScope scope) {
         ReceptionStatus recStatus = null;
         if (status != null && !status.isBlank() && !"ALL".equalsIgnoreCase(status)) {
             try {
@@ -710,7 +737,8 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
         String cleanSearch = (search != null && !search.isBlank()) ? search.trim() : null;
 
         List<WarehouseReceptionEntity> entities = receptionRepositoryPort.findAll(
-                WarehouseReceptionSpecification.withFilters(organizationId, branchId, recStatus, cleanSearch));
+                WarehouseReceptionSpecification.withFilters(
+                        organizationId, branchId, recStatus, cleanSearch, shiftSessionId, scope));
 
         if (entities.isEmpty()) {
             return Collections.emptyList();
