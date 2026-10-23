@@ -62,6 +62,7 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
     private final WarehouseOutboundMapper outboundMapper;
     private final com.fourguard.wms.infrastructure.persistence.repository.WarehouseReceptionPalletJpaRepository receptionPalletJpaRepository;
     private final com.fourguard.wms.infrastructure.persistence.repository.SecurityPreCheckinJpaRepository preCheckinJpaRepository;
+    private final ShiftSessionService shiftSessionService;
 
     @Override
     @Transactional
@@ -249,6 +250,7 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
                 .totalPallets(itemsToDispatch.size())
                 .totalPieces(BigDecimal.valueOf(totalPieces))
                 .distinctSkus(distinctSkuIds.size())
+                .shiftSessionId(shiftSessionService.getOrOpenActiveSession(branch.getId()).getId())
                 .build();
 
         String loggedUser = securityAuditHelper.getCurrentUsername();
@@ -366,7 +368,8 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
 
     @Override
     @Transactional(readOnly = true)
-    public List<OutboundSummaryResponse> getOutbounds(UUID organizationId, UUID branchId, String status, String search) {
+    public List<OutboundSummaryResponse> getOutbounds(UUID organizationId, UUID branchId, String status, String search,
+                                                      UUID shiftSessionId, com.fourguard.wms.domain.enums.MovementScope scope) {
         OutboundStatus obStatus = null;
         if (status != null && !status.isBlank() && !"ALL".equalsIgnoreCase(status)) {
             try {
@@ -376,7 +379,8 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
         String cleanSearch = (search != null && !search.isBlank()) ? search.trim() : null;
 
         List<WarehouseOutboundEntity> list = outboundRepositoryPort.findAll(
-                WarehouseOutboundSpecification.withFilters(organizationId, branchId, obStatus, cleanSearch));
+                WarehouseOutboundSpecification.withFilters(
+                        organizationId, branchId, obStatus, cleanSearch, shiftSessionId, scope));
         return list.stream().map(outboundMapper::toSummaryResponse).collect(Collectors.toList());
     }
 

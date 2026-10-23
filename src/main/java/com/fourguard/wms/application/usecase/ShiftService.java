@@ -4,6 +4,7 @@ import com.fourguard.wms.application.dto.request.CreateShiftRequest;
 import com.fourguard.wms.application.dto.request.ShiftFilterRequest;
 import com.fourguard.wms.application.dto.request.UpdateShiftRequest;
 import com.fourguard.wms.application.dto.request.UpdateShiftStatusRequest;
+import com.fourguard.wms.application.dto.response.ActiveShiftResponse;
 import com.fourguard.wms.application.dto.response.ShiftResponse;
 import com.fourguard.wms.application.dto.response.audit.ShiftAuditResponse;
 import com.fourguard.wms.application.mapper.ShiftMapper;
@@ -25,12 +26,17 @@ import com.fourguard.wms.shared.audit.AuditService;
 import com.fourguard.wms.shared.audit.SecurityAuditHelper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -206,6 +212,63 @@ public class ShiftService implements ShiftUseCase {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public ActiveShiftResponse getActiveShift(UUID branchId) {
+        if (branchId == null) {
+            throw new ValidationException("La sucursal (branchId) es requerida para resolver el turno vigente.");
+        }
+
+        BranchEntity branch = branchRepositoryPort.findById(branchId)
+                .orElseThrow(() -> new EntityNotFoundException("Sucursal no encontrada con ID: " + branchId));
+
+        UserEntity actor = userRepositoryPort.findByUsername(securityAuditHelper.getCurrentUsername()).orElse(null);
+        if (actor != null && actor.getOrganization() != null && branch.getOrganization() != null
+                && !actor.getOrganization().getId().equals(branch.getOrganization().getId())) {
+            throw new AccessDeniedException("La sucursal solicitada no pertenece a la organización del usuario.");
+        }
+
+        ZoneId zone = resolveZone(branch.getTimezone());
+        ZonedDateTime now = ZonedDateTime.now(zone);
+        List<ShiftEntity> candidates = shiftRepositoryPort.findActiveForBranchResolution(branchId);
+
+        ShiftEntity matched = null;
+        ZonedDateTime matchedStart = null;
+        for (ShiftEntity candidate : candidates) {
+            ZonedDateTime windowStart = resolveWindowStart(candidate, now, zone);
+            if (windowStart == null) {
+                continue;
+            }
+            boolean later = matchedStart == null || windowStart.isAfter(matchedStart);
+            boolean sameMomentButBranchScoped = matchedStart != null
+                    && windowStart.isEqual(matchedStart)
+                    && candidate.getBranch() != null
+                    && (matched == null || matched.getBranch() == null);
+            if (later || sameMomentButBranchScoped) {
+                matched = candidate;
+                matchedStart = windowStart;
+            }
+        }
+
+        return ActiveShiftResponse.builder()
+                .sessionId(null)
+                .shiftId(matched != null ? matched.getId() : null)
+                .shiftCode(matched != null ? matched.getCode() : null)
+                .shiftName(matched != null ? matched.getName() : null)
+                .startTime(matched != null ? matched.getStartTime() : null)
+                .endTime(matched != null ? matched.getEndTime() : null)
+                .isOvernight(matched != null ? matched.getIsOvernight() : null)
+                .toleranceMinutes(matched != null ? matched.getToleranceMinutes() : null)
+                .businessDate(now.toLocalDate())
+                .branchId(branch.getId())
+                .branchName(branch.getName())
+                .timezone(zone.getId())
+                .configured(!candidates.isEmpty())
+                .source(matched != null ? "AUTO" : "FALLBACK")
+                .resolvedAt(now.toOffsetDateTime())
+                .build();
+    }
+
+    @Override
     @Transactional
     public void deleteShift(UUID id) {
         log.info("Deleting shift ID: {}", id);
@@ -261,6 +324,53 @@ public class ShiftService implements ShiftUseCase {
                             .build();
                 })
                 .collect(Collectors.toList());
+    }
+
+    // ── Active Shift Resolution Helpers ───────────────────────────────────────
+
+    private ZoneId resolveZone(String timezone) {
+        try {
+            return (timezone != null && !timezone.isBlank()) ? ZoneId.of(timezone) : ZoneId.of("UTC");
+        } catch (Exception ex) {
+            log.warn("Zona horaria inválida '{}'; se usará UTC", timezone);
+            return ZoneId.of("UTC");
+        }
+    }
+
+    /**
+     * Devuelve el inicio de la ventana del turno que contiene el instante dado,
+     * considerando días operativos, cruce de medianoche y tolerancia.
+     * Retorna null si el turno no está vigente.
+     */
+    private ZonedDateTime resolveWindowStart(ShiftEntity shift, ZonedDateTime now, ZoneId zone) {
+        if (shift.getStartTime() == null || shift.getEndTime() == null) {
+            return null;
+        }
+        Set<String> days = shift.getOperatingDays();
+        if (days == null || days.isEmpty()) {
+            return null;
+        }
+
+        boolean overnight = Boolean.TRUE.equals(shift.getIsOvernight())
+                || !shift.getEndTime().isAfter(shift.getStartTime());
+        int tolerance = shift.getToleranceMinutes() != null ? shift.getToleranceMinutes() : 0;
+        LocalDate today = now.toLocalDate();
+
+        // Se revisa la fecha de negocio de hoy y la de ayer (para turnos nocturnos).
+        for (LocalDate businessDay : List.of(today.minusDays(1), today)) {
+            if (!days.contains(businessDay.getDayOfWeek().name())) {
+                continue;
+            }
+            ZonedDateTime start = ZonedDateTime.of(businessDay, shift.getStartTime(), zone);
+            ZonedDateTime end = ZonedDateTime
+                    .of(overnight ? businessDay.plusDays(1) : businessDay, shift.getEndTime(), zone)
+                    .plusMinutes(tolerance);
+
+            if (!now.isBefore(start) && !now.isAfter(end)) {
+                return start;
+            }
+        }
+        return null;
     }
 
     // ── Audit Helpers ─────────────────────────────────────────────────────────

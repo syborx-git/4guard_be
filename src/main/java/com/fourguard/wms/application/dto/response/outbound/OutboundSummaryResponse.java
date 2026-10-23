@@ -51,4 +51,5 @@ public class OutboundSummaryResponse {
     private OffsetDateTime completedAt;
     private OffsetDateTime createdAt;
     private String createdBy;
+    private UUID shiftSessionId;
 }

@@ -1,8 +1,10 @@
 package com.fourguard.wms.shared.audit;
 
 import com.fourguard.wms.domain.ports.out.AuditLogRepositoryPort;
+import com.fourguard.wms.domain.ports.out.ShiftSessionRepositoryPort;
 import com.fourguard.wms.infrastructure.persistence.entity.AuditLogDetailEntity;
 import com.fourguard.wms.infrastructure.persistence.entity.AuditLogEntity;
+import com.fourguard.wms.infrastructure.persistence.entity.ShiftSessionEntity;
 import com.fourguard.wms.infrastructure.persistence.entity.UserEntity;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Service;
@@ -15,9 +17,12 @@ import java.util.*;
 public class AuditService {
 
     private final AuditLogRepositoryPort auditLogRepositoryPort;
+    private final ShiftSessionRepositoryPort shiftSessionRepositoryPort;
 
-    public AuditService(AuditLogRepositoryPort auditLogRepositoryPort) {
+    public AuditService(AuditLogRepositoryPort auditLogRepositoryPort,
+                        ShiftSessionRepositoryPort shiftSessionRepositoryPort) {
         this.auditLogRepositoryPort = auditLogRepositoryPort;
+        this.shiftSessionRepositoryPort = shiftSessionRepositoryPort;
     }
 
     /**
@@ -59,6 +64,15 @@ public class AuditService {
             }
         } catch (Exception ignored) {}
 
+        UUID shiftSessionId = null;
+        if (branchId != null) {
+            try {
+                shiftSessionId = shiftSessionRepositoryPort.findOpenByBranchId(branchId)
+                        .map(ShiftSessionEntity::getId)
+                        .orElse(null);
+            } catch (Exception ignored) {}
+        }
+
         AuditLogEntity logEntry = AuditLogEntity.builder()
                 .organizationId(orgId)
                 .branchId(branchId)
@@ -68,6 +82,7 @@ public class AuditService {
                 .entityId(entityId)
                 .ipAddress(ipAddress)
                 .userAgent(userAgent)
+                .shiftSessionId(shiftSessionId)
                 .build();
 
         List<AuditLogDetailEntity> details = buildDetails(logEntry, beforeState, afterState);

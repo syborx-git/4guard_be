@@ -68,4 +68,5 @@ public class ReceptionSummaryResponse {
     private OffsetDateTime completedAt;
     private OffsetDateTime cancelledAt;
     private String capturedBy;
+    private UUID shiftSessionId;
 }

@@ -52,6 +52,11 @@ public class ShiftPersistenceAdapter implements ShiftRepositoryPort {
     }
 
     @Override
+    public List<ShiftEntity> findActiveForBranchResolution(UUID branchId) {
+        return repository.findActiveForBranchResolution(branchId);
+    }
+
+    @Override
     public boolean existsByCodeAndBranchId(String code, UUID branchId) {
         return repository.existsByCodeAndBranchIdAndIsDeletedFalse(code, branchId);
     }

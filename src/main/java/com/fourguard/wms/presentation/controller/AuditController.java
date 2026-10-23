@@ -2,8 +2,10 @@ package com.fourguard.wms.presentation.controller;
 
 import com.fourguard.wms.application.dto.response.audit.ActiveSessionResponse;
 import com.fourguard.wms.application.dto.response.audit.UserActivityAuditResponse;
+import com.fourguard.wms.application.dto.response.history.RemissionHistoryPageResponse;
 import com.fourguard.wms.domain.ports.in.GetActiveSessionsUseCase;
 import com.fourguard.wms.domain.ports.in.GetUserActivityUseCase;
+import com.fourguard.wms.domain.ports.in.RemissionHistoryUseCase;
 import com.fourguard.wms.domain.ports.in.RevokeUserSessionUseCase;
 import com.fourguard.wms.shared.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -37,6 +39,7 @@ public class AuditController {
     private final GetActiveSessionsUseCase getActiveSessionsUseCase;
     private final GetUserActivityUseCase getUserActivityUseCase;
     private final RevokeUserSessionUseCase revokeUserSessionUseCase;
+    private final RemissionHistoryUseCase remissionHistoryUseCase;
 
     @GetMapping("/active-sessions")
     @PreAuthorize("hasAuthority('AUDIT_READ') or hasRole('OPERATIONS_MANAGER')")
@@ -82,6 +85,36 @@ public class AuditController {
 
         return ResponseEntity.ok(
                 ApiResponse.ok("Historial de actividad recuperado con éxito", activityLogs));
+    }
+
+    @GetMapping("/remissions")
+    @PreAuthorize("hasAuthority('AUDIT_READ') or hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasAuthority('RECEIVING_READ') or hasAuthority('SHIPPING_READ') or hasRole('ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR')")
+    @Operation(
+            summary = "Consultar historial de remisiones",
+            description = "Devuelve el historial multi-entidad de recepciones, salidas y traspasos con filtros de fecha, cliente, estatus, turno y búsqueda.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Historial recuperado con éxito"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "No autenticado"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Acceso denegado o permisos insuficientes")
+    })
+    public ResponseEntity<ApiResponse<RemissionHistoryPageResponse>> getRemissionHistory(
+            @RequestParam UUID organizationId,
+            @RequestParam(required = false) UUID branchId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime to,
+            @RequestParam(required = false) UUID clientId,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String entityType,
+            @RequestParam(required = false) UUID shiftSessionId,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        RemissionHistoryPageResponse response = remissionHistoryUseCase.getRemissions(
+                organizationId, branchId, from, to, clientId, status, entityType, shiftSessionId, search, page, size);
+
+        return ResponseEntity.ok(
+                ApiResponse.ok("Historial de remisiones recuperado con éxito", response));
     }
 
     @DeleteMapping("/active-sessions/{userId}")

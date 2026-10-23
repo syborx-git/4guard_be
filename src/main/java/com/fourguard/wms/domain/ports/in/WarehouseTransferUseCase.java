@@ -5,6 +5,7 @@ import com.fourguard.wms.application.dto.request.transfer.CreateTransferRequest;
 import com.fourguard.wms.application.dto.response.reception.MovementAuditResponse;
 import com.fourguard.wms.application.dto.response.transfer.TransferResponse;
 import com.fourguard.wms.application.dto.response.transfer.TransferSummaryResponse;
+import com.fourguard.wms.domain.enums.MovementScope;
 
 import java.util.List;
 import java.util.UUID;
@@ -29,11 +30,21 @@ public interface WarehouseTransferUseCase {
     /**
      * Returns filtered list of transfers for an organization.
      */
+    default List<TransferSummaryResponse> getTransfers(
+            UUID organizationId,
+            UUID branchId,
+            String status,
+            String search) {
+        return getTransfers(organizationId, branchId, status, search, null, MovementScope.ALL);
+    }
+
     List<TransferSummaryResponse> getTransfers(
             UUID organizationId,
             UUID branchId,
             String status,
-            String search);
+            String search,
+            UUID shiftSessionId,
+            MovementScope scope);
 
     /**
      * Cancels a transfer with admin authorization. Reverts inventory location.

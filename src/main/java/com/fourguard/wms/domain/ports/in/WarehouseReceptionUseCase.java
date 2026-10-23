@@ -12,6 +12,7 @@ import com.fourguard.wms.application.dto.response.reception.MovementAuditRespons
 import com.fourguard.wms.application.dto.response.reception.ReceptionPalletResponse;
 import com.fourguard.wms.application.dto.response.reception.ReceptionResponse;
 import com.fourguard.wms.application.dto.response.reception.ReceptionSummaryResponse;
+import com.fourguard.wms.domain.enums.MovementScope;
 
 import java.util.List;
 import java.util.UUID;
@@ -47,11 +48,21 @@ public interface WarehouseReceptionUseCase {
      * @param status         Optional. REGISTERED | COMPLETED | CANCELLED
      * @param search         Optional. Free-text against folio, docNumber, clientName.
      */
+    default List<ReceptionSummaryResponse> getReceptions(
+            UUID organizationId,
+            UUID branchId,
+            String status,
+            String search) {
+        return getReceptions(organizationId, branchId, status, search, null, MovementScope.ALL);
+    }
+
     List<ReceptionSummaryResponse> getReceptions(
             UUID organizationId,
             UUID branchId,
             String status,
-            String search);
+            String search,
+            UUID shiftSessionId,
+            MovementScope scope);
 
     /**
      * Adds one or more pallet/UA codes to an open reception.

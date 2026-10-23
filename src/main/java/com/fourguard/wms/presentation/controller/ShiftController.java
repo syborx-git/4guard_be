@@ -1,10 +1,15 @@
 package com.fourguard.wms.presentation.controller;
 
+import com.fourguard.wms.application.dto.request.CloseShiftSessionRequest;
 import com.fourguard.wms.application.dto.request.CreateShiftRequest;
+import com.fourguard.wms.application.dto.request.OpenShiftSessionRequest;
 import com.fourguard.wms.application.dto.request.ShiftFilterRequest;
 import com.fourguard.wms.application.dto.request.UpdateShiftRequest;
 import com.fourguard.wms.application.dto.request.UpdateShiftStatusRequest;
+import com.fourguard.wms.application.dto.response.ActiveShiftResponse;
 import com.fourguard.wms.application.dto.response.ShiftResponse;
+import com.fourguard.wms.application.dto.response.ShiftSessionResponse;
+import com.fourguard.wms.application.usecase.ShiftSessionService;
 import com.fourguard.wms.application.dto.response.audit.ShiftAuditResponse;
 import com.fourguard.wms.domain.enums.ShiftScopeType;
 import com.fourguard.wms.domain.enums.ShiftStatus;
@@ -30,6 +35,7 @@ import java.util.UUID;
 public class ShiftController {
 
     private final ShiftUseCase shiftUseCase;
+    private final ShiftSessionService shiftSessionService;
 
     @PostMapping
     @PreAuthorize("hasAuthority('SHIFTS_CREATE') or hasRole('OPERATIONS_MANAGER')")
@@ -76,6 +82,40 @@ public class ShiftController {
     public ResponseEntity<ApiResponse<ShiftResponse>> updateShiftStatus(@PathVariable UUID id, @Valid @RequestBody UpdateShiftStatusRequest request) {
         ShiftResponse response = shiftUseCase.updateShiftStatus(id, request);
         return ResponseEntity.ok(ApiResponse.ok("Estatus de turno actualizado con éxito", response));
+    }
+
+    @GetMapping("/active")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Obtener turno vigente", description = "Resuelve el turno operativo vigente para una sucursal según su configuración horaria.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Turno vigente resuelto con éxito"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Sucursal no informada"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "No autorizado"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "La sucursal no pertenece a la organización del usuario"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Sucursal no encontrada")
+    })
+    public ResponseEntity<ApiResponse<ActiveShiftResponse>> getActiveShift(@RequestParam UUID branchId) {
+        ActiveShiftResponse response = shiftSessionService.getActiveShiftWithSession(branchId);
+        return ResponseEntity.ok(ApiResponse.ok("Turno vigente resuelto con éxito", response));
+    }
+
+    @PostMapping("/sessions/open")
+    @PreAuthorize("hasAuthority('SHIFTS_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR')")
+    @Operation(summary = "Abrir sesión de turno", description = "Abre (o devuelve) la sesión operativa vigente de una sucursal. Idempotente.")
+    public ResponseEntity<ApiResponse<ShiftSessionResponse>> openSession(@Valid @RequestBody OpenShiftSessionRequest request) {
+        ShiftSessionResponse response = shiftSessionService.openSession(request);
+        return ResponseEntity.ok(ApiResponse.ok("Sesión de turno abierta con éxito", response));
+    }
+
+    @PostMapping("/sessions/{id}/close")
+    @PreAuthorize("hasAuthority('SHIFTS_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR')")
+    @Operation(summary = "Cerrar sesión de turno", description = "Cierra una sesión operativa de turno y registra su hora de fin.")
+    public ResponseEntity<ApiResponse<ShiftSessionResponse>> closeSession(
+            @PathVariable UUID id,
+            @RequestBody(required = false) CloseShiftSessionRequest request) {
+        CloseShiftSessionRequest body = request != null ? request : CloseShiftSessionRequest.builder().build();
+        ShiftSessionResponse response = shiftSessionService.closeSession(id, body);
+        return ResponseEntity.ok(ApiResponse.ok("Sesión de turno cerrada con éxito", response));
     }
 
     @GetMapping("/{id}")

@@ -19,6 +19,12 @@ public interface ShiftRepositoryPort {
 
     List<ShiftEntity> findAll(ShiftFilterRequest filter);
 
+    /**
+     * Turnos activos aplicables a una sucursal: los de alcance BRANCH/WAREHOUSE_SECTION
+     * de esa sucursal más los GLOBAL sin sucursal asignada.
+     */
+    List<ShiftEntity> findActiveForBranchResolution(UUID branchId);
+
     boolean existsByCodeAndBranchId(String code, UUID branchId);
 
     boolean existsByCodeAndBranchIdAndIdNot(String code, UUID branchId, UUID id);

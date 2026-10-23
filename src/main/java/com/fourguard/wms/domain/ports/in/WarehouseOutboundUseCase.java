@@ -9,6 +9,7 @@ import com.fourguard.wms.application.dto.response.outbound.OutboundResponse;
 import com.fourguard.wms.application.dto.response.outbound.OutboundSummaryResponse;
 import com.fourguard.wms.application.dto.response.outbound.ScanPalletResponse;
 import com.fourguard.wms.application.dto.response.reception.MovementAuditResponse;
+import com.fourguard.wms.domain.enums.MovementScope;
 
 import java.util.List;
 import java.util.UUID;
@@ -32,11 +33,21 @@ public interface WarehouseOutboundUseCase {
     /**
      * Returns filtered list of outbounds for an organization.
      */
+    default List<OutboundSummaryResponse> getOutbounds(
+            UUID organizationId,
+            UUID branchId,
+            String status,
+            String search) {
+        return getOutbounds(organizationId, branchId, status, search, null, MovementScope.ALL);
+    }
+
     List<OutboundSummaryResponse> getOutbounds(
             UUID organizationId,
             UUID branchId,
             String status,
-            String search);
+            String search,
+            UUID shiftSessionId,
+            MovementScope scope);
 
     /**
      * Updates an outbound dispatch status, assigned ramp/operator, vehicle details, or seal.

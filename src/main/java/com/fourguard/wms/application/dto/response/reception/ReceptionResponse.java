@@ -91,6 +91,7 @@ public class ReceptionResponse {
     private OffsetDateTime cancelledAt;
     private String cancellationReason;
     private String cancelledBy;
+    private UUID shiftSessionId;
 
     // Auditoría
     private Long version;

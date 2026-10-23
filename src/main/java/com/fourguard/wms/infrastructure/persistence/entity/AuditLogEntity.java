@@ -55,6 +55,9 @@ public class AuditLogEntity {
     @Column(name = "user_agent", columnDefinition = "TEXT")
     private String userAgent;
 
+    @Column(name = "shift_session_id", columnDefinition = "UUID")
+    private UUID shiftSessionId;
+
     @Column(name = "created_at", updatable = false)
     private OffsetDateTime createdAt;
 

@@ -33,4 +33,5 @@ public class TransferSummaryResponse {
     private Integer distinctSkus;
     private OffsetDateTime createdAt;
     private String createdBy;
+    private UUID shiftSessionId;
 }
