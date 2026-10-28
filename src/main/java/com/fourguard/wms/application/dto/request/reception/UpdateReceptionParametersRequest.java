@@ -39,10 +39,11 @@ public class UpdateReceptionParametersRequest {
     private Integer rampNumber;
     private String rampCode;
 
-    /** Optional: Target lifecycle status (ASSIGNED, IN_PROGRESS, DISCHARGED) */
+    /** Optional: Target lifecycle status (ASSIGNED, IN_PROGRESS, DISCHARGED, PARTIAL_DISCHARGED) */
     private String status;
 
     private String observations;
+    private String handoverNotes;
     private String authorizedByOpsManager;
     private String opsManagerReason;
 
@@ -66,4 +67,3 @@ public class UpdateReceptionParametersRequest {
 
     private List<String> sealNumbers;
 }
-

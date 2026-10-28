@@ -20,6 +20,12 @@ public interface ForkliftOperatorJpaRepository extends JpaRepository<ForkliftOpe
     /** Find an active (non-deleted) operator by its UUID. */
     Optional<ForkliftOperatorEntity> findByIdAndIsDeletedFalse(UUID id);
 
+    /** Find an active operator linked to a UserEntity UUID. */
+    Optional<ForkliftOperatorEntity> findByUserIdAndIsDeletedFalse(UUID userId);
+
+    /** Find an active operator by its employee code (case-insensitive). */
+    Optional<ForkliftOperatorEntity> findFirstByCodeIgnoreCaseAndIsDeletedFalse(String code);
+
     /** List all active operators within an organization. */
     List<ForkliftOperatorEntity> findByOrganizationIdAndIsDeletedFalse(UUID organizationId);
 

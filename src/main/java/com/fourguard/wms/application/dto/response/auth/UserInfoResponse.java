@@ -8,7 +8,7 @@ import java.util.UUID;
 
 /** User information returned inside the login response. */
 @Getter
-@Builder
+@Builder(toBuilder = true)
 public class UserInfoResponse {
     private final UUID   id;
     private final String username;
@@ -22,5 +22,6 @@ public class UserInfoResponse {
     private final String organizationName;
     private final UUID   branchId;
     private final String branchName;
+    private final UUID   forkliftOperatorId;
+    private final String employeeCode;
 }
-

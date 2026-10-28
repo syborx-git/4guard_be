@@ -580,6 +580,7 @@ public  class SecurityGateService implements SecurityGateUseCase {
         inReq.setRampNumber(request.getRampNumber());
         inReq.setRampCode(request.getRampCode());
         inReq.setForkliftOperatorId(request.getForkliftOperatorId());
+        inReq.setForkliftOperatorName(request.getForkliftOperatorName());
         inReq.setDocNumber(entity.getDocNumber() != null ? entity.getDocNumber() : "REM-" + entity.getToken());
         inReq.setDocDate(entity.getDocDate() != null ? entity.getDocDate() : LocalDate.now());
         inReq.setReceptionTime(

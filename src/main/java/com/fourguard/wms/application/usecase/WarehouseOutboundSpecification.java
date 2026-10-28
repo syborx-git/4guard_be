@@ -20,14 +20,14 @@ public class WarehouseOutboundSpecification {
 
     public static Specification<WarehouseOutboundEntity> withFilters(
             UUID orgId, UUID branchId, OutboundStatus status, String search) {
-        return withFilters(orgId, branchId, status, search, null, MovementScope.ALL);
+        return withFilters(orgId, branchId, status, search, null, MovementScope.ALL, null);
     }
 
     public static Specification<WarehouseOutboundEntity> withHistoryFilters(
             UUID orgId, UUID branchId, OutboundStatus status, String search,
             UUID shiftSessionId, OffsetDateTime from, OffsetDateTime to, UUID clientId) {
         Specification<WarehouseOutboundEntity> base = withFilters(
-                orgId, branchId, status, search, shiftSessionId, MovementScope.ALL);
+                orgId, branchId, status, search, shiftSessionId, MovementScope.ALL, null);
 
         return base.and((root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
@@ -47,6 +47,12 @@ public class WarehouseOutboundSpecification {
     public static Specification<WarehouseOutboundEntity> withFilters(
             UUID orgId, UUID branchId, OutboundStatus status, String search,
             UUID shiftSessionId, MovementScope scope) {
+        return withFilters(orgId, branchId, status, search, shiftSessionId, scope, null);
+    }
+
+    public static Specification<WarehouseOutboundEntity> withFilters(
+            UUID orgId, UUID branchId, OutboundStatus status, String search,
+            UUID shiftSessionId, MovementScope scope, UUID forkliftOperatorId) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
 
@@ -61,6 +67,9 @@ public class WarehouseOutboundSpecification {
             }
             if (shiftSessionId != null) {
                 predicates.add(cb.equal(root.get("shiftSessionId"), shiftSessionId));
+            }
+            if (forkliftOperatorId != null) {
+                predicates.add(cb.equal(root.get("forkliftOperator").get("id"), forkliftOperatorId));
             }
             if (scope == MovementScope.CURRENT) {
                 predicates.add(root.get("status").in(List.of(

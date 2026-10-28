@@ -38,7 +38,7 @@ public class ShiftController {
     private final ShiftSessionService shiftSessionService;
 
     @PostMapping
-    @PreAuthorize("hasAuthority('SHIFTS_CREATE') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('SHIFTS_CREATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     @Operation(summary = "Crear turno", description = "Registra un nuevo turno u horario operativo en el sistema.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Turno creado con éxito"),
@@ -52,7 +52,7 @@ public class ShiftController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('SHIFTS_UPDATE') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('SHIFTS_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     @Operation(summary = "Actualizar turno", description = "Actualiza los datos generales y días operativos de un turno existente.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Turno actualizado con éxito"),
@@ -70,7 +70,7 @@ public class ShiftController {
     }
 
     @PatchMapping("/{id}/status")
-    @PreAuthorize("hasAuthority('SHIFTS_STATUS_CHANGE') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('SHIFTS_STATUS_CHANGE') or hasAuthority('SHIFTS_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     @Operation(summary = "Cambiar estatus de turno", description = "Cambia el estado operativo de un turno entre ACTIVE e INACTIVE.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Estatus de turno actualizado con éxito"),
@@ -100,7 +100,7 @@ public class ShiftController {
     }
 
     @PostMapping("/sessions/open")
-    @PreAuthorize("hasAuthority('SHIFTS_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('SHIFTS_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR')")
     @Operation(summary = "Abrir sesión de turno", description = "Abre (o devuelve) la sesión operativa vigente de una sucursal. Idempotente.")
     public ResponseEntity<ApiResponse<ShiftSessionResponse>> openSession(@Valid @RequestBody OpenShiftSessionRequest request) {
         ShiftSessionResponse response = shiftSessionService.openSession(request);
@@ -108,7 +108,7 @@ public class ShiftController {
     }
 
     @PostMapping("/sessions/{id}/close")
-    @PreAuthorize("hasAuthority('SHIFTS_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('SHIFTS_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR')")
     @Operation(summary = "Cerrar sesión de turno", description = "Cierra una sesión operativa de turno y registra su hora de fin.")
     public ResponseEntity<ApiResponse<ShiftSessionResponse>> closeSession(
             @PathVariable UUID id,
@@ -119,7 +119,7 @@ public class ShiftController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('SHIFTS_READ') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('SHIFTS_READ') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('FORKLIFT_OPERATOR')")
     @Operation(summary = "Obtener turno por ID", description = "Recupera la información detallada de un turno por su UUID.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Turno encontrado con éxito"),
@@ -133,7 +133,7 @@ public class ShiftController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAuthority('SHIFTS_READ') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('SHIFTS_READ') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('FORKLIFT_OPERATOR')")
     @Operation(summary = "Obtener lista de turnos", description = "Recupera la lista de turnos registrados filtrando por sucursal, estatus, día u organización.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Lista de turnos recuperada con éxito"),
@@ -162,7 +162,7 @@ public class ShiftController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('SHIFTS_DELETE') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('SHIFTS_DELETE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     @Operation(summary = "Eliminar turno", description = "Realiza un borrado lógico del turno estableciendo is_deleted=true e inactivo.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Turno eliminado con éxito"),
@@ -176,7 +176,7 @@ public class ShiftController {
     }
 
     @GetMapping("/{id}/audit")
-    @PreAuthorize("hasAuthority('SHIFTS_READ') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('SHIFTS_READ') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('FORKLIFT_OPERATOR')")
     @Operation(summary = "Obtener historial de auditoría del turno", description = "Recupera la bitácora de auditoría y cambios para un turno por su UUID.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Historial de auditoría recuperado con éxito"),

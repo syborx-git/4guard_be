@@ -63,16 +63,17 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
     private final com.fourguard.wms.infrastructure.persistence.repository.WarehouseReceptionPalletJpaRepository receptionPalletJpaRepository;
     private final com.fourguard.wms.infrastructure.persistence.repository.SecurityPreCheckinJpaRepository preCheckinJpaRepository;
     private final ShiftSessionService shiftSessionService;
+    private final com.fourguard.wms.infrastructure.notification.QualityAlertBroadcaster alertBroadcaster;
 
     @Override
     @Transactional
     public OutboundResponse createOutbound(CreateOutboundRequest request) {
         log.info("Creating outbound dispatch for client: {}, destination: {}", request.getClientId(), request.getDestinationId());
 
-        OrganizationEntity organization = organizationRepositoryPort.findById(request.getOrganizationId())
+        OrganizationEntity organization = (request.getOrganizationId() != null ? organizationRepositoryPort.findById(request.getOrganizationId()) : Optional.<OrganizationEntity>empty()).or(() -> organizationRepositoryPort.findAll().stream().findFirst())
                 .orElseThrow(() -> new EntityNotFoundException("Organización no encontrada: " + request.getOrganizationId()));
 
-        BranchEntity branch = branchRepositoryPort.findById(request.getBranchId())
+        BranchEntity branch = (request.getBranchId() != null ? branchRepositoryPort.findById(request.getBranchId()) : Optional.<BranchEntity>empty()).or(() -> branchRepositoryPort.findByOrganizationId(organization.getId()).stream().findFirst()).or(() -> branchRepositoryPort.findAll().stream().findFirst())
                 .orElseThrow(() -> new EntityNotFoundException("Sucursal no encontrada: " + request.getBranchId()));
 
         // Resolución flexible de Cliente
@@ -90,6 +91,8 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
             List<ClientEntity> orgClients = clientRepositoryPort.findByOrganizationId(organization.getId());
             if (!orgClients.isEmpty()) {
                 client = orgClients.get(0);
+            } else {
+                client = clientRepositoryPort.findAll().stream().findFirst().orElse(null);
             }
         }
         if (client == null) {
@@ -146,7 +149,8 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
         if (operator == null && request.getForkliftOperatorName() != null && !request.getForkliftOperatorName().isBlank()) {
             String opName = request.getForkliftOperatorName().trim().toLowerCase();
             operator = forkliftOperatorRepositoryPort.findAll().stream()
-                    .filter(o -> o.getFullName() != null && o.getFullName().toLowerCase().contains(opName))
+                    .filter(o -> (o.getFullName() != null && o.getFullName().toLowerCase().contains(opName)) ||
+                                 (o.getCode() != null && o.getCode().equalsIgnoreCase(opName)))
                     .findFirst()
                     .orElse(null);
         }
@@ -159,6 +163,9 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
             } catch (IllegalArgumentException ignored) {}
         } else if (request.getSelectedItemIds() != null && !request.getSelectedItemIds().isEmpty()) {
             targetStatus = OutboundStatus.COMPLETED;
+        }
+        if (targetStatus == OutboundStatus.REGISTERED && operator != null) {
+            targetStatus = OutboundStatus.ASSIGNED;
         }
 
         // Generate consecutive folio per client: SAL-YYYYMMDD-[CLIENT]-[NNNN]
@@ -369,7 +376,8 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
     @Override
     @Transactional(readOnly = true)
     public List<OutboundSummaryResponse> getOutbounds(UUID organizationId, UUID branchId, String status, String search,
-                                                      UUID shiftSessionId, com.fourguard.wms.domain.enums.MovementScope scope) {
+                                                      UUID shiftSessionId, com.fourguard.wms.domain.enums.MovementScope scope,
+                                                      UUID forkliftOperatorId) {
         OutboundStatus obStatus = null;
         if (status != null && !status.isBlank() && !"ALL".equalsIgnoreCase(status)) {
             try {
@@ -380,7 +388,17 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
 
         List<WarehouseOutboundEntity> list = outboundRepositoryPort.findAll(
                 WarehouseOutboundSpecification.withFilters(
-                        organizationId, branchId, obStatus, cleanSearch, shiftSessionId, scope));
+                        organizationId, branchId, obStatus, cleanSearch, shiftSessionId, scope, forkliftOperatorId));
+        if (list.isEmpty() && organizationId != null) {
+            list = outboundRepositoryPort.findAll(
+                    WarehouseOutboundSpecification.withFilters(
+                            null, branchId, obStatus, cleanSearch, shiftSessionId, scope, forkliftOperatorId));
+        }
+        if (list.isEmpty() && branchId != null) {
+            list = outboundRepositoryPort.findAll(
+                    WarehouseOutboundSpecification.withFilters(
+                            null, null, obStatus, cleanSearch, shiftSessionId, scope, forkliftOperatorId));
+        }
         return list.stream().map(outboundMapper::toSummaryResponse).collect(Collectors.toList());
     }
 
@@ -412,15 +430,40 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
                         String currentUsername = securityAuditHelper.getCurrentUsername();
                         outbound.setLeaderAuthorizedBy(currentUsername != null ? currentUsername : "Admin");
 
-                        // Update inventory items state to DISPATCHED y decrementar ocupación
+                        UserEntity activeUser = null;
+                        try {
+                            String lookupUser = currentUsername != null && !currentUsername.isBlank() ? currentUsername : "admin";
+                            activeUser = userRepositoryPort.findByUsernameOrEmail(lookupUser).orElse(null);
+                            if (activeUser == null) {
+                                activeUser = userRepositoryPort.findAll().stream()
+                                        .filter(u -> Boolean.TRUE.equals(u.getIsEnabled()))
+                                        .findFirst()
+                                        .orElse(null);
+                            }
+                        } catch (Exception ignored) {}
+
+                        // Update inventory items state to DISPATCHED, decrementar ocupación y registrar movimiento EXIT
                         if (outbound.getItems() != null) {
                             for (WarehouseOutboundItemEntity oi : outbound.getItems()) {
                                 if (oi.getItem() != null && oi.getItem().getState() != InventoryState.DISPATCHED) {
-                                    oi.getItem().setState(InventoryState.DISPATCHED);
-                                    inventoryItemRepositoryPort.save(oi.getItem());
+                                    InventoryItemEntity item = oi.getItem();
+                                    item.setState(InventoryState.DISPATCHED);
+                                    inventoryItemRepositoryPort.save(item);
 
-                                    if (oi.getItem().getLocation() != null && oi.getItem().getLocation().getId() != null) {
-                                        locationRepositoryPort.decrementOccupancy(oi.getItem().getLocation().getId(), 1);
+                                    if (item.getLocation() != null && item.getLocation().getId() != null) {
+                                        locationRepositoryPort.decrementOccupancy(item.getLocation().getId(), 1);
+                                    }
+
+                                    if (activeUser != null) {
+                                        InventoryMovementEntity movement = InventoryMovementEntity.builder()
+                                                .item(item)
+                                                .fromLocation(item.getLocation())
+                                                .user(activeUser)
+                                                .type(MovementType.EXIT)
+                                                .reason("Despacho Outbound Folio: " + outbound.getFolio() + " - Remisión Salida: " + (outbound.getRemisionNo() != null ? outbound.getRemisionNo() : "N/A"))
+                                                .createdAt(now)
+                                                .build();
+                                        inventoryMovementRepositoryPort.save(movement);
                                     }
                                 }
                             }
@@ -484,6 +527,11 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
                 outbound.setForkliftOperator(operator);
                 oldValues.put("forkliftOperator", oldOp);
                 newValues.put("forkliftOperator", newOp);
+            }
+            if (outbound.getStatus() == OutboundStatus.REGISTERED && (request.getStatus() == null || request.getStatus().isBlank())) {
+                oldValues.put("status", outbound.getStatus().name());
+                newValues.put("status", OutboundStatus.ASSIGNED.name());
+                outbound.setStatus(OutboundStatus.ASSIGNED);
             }
         } else if (request.getForkliftOperatorName() != null && !request.getForkliftOperatorName().isBlank()) {
             String oldOp = outbound.getForkliftOperator() != null ? outbound.getForkliftOperator().getFullName() : "Sin asignar";
@@ -699,6 +747,21 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
                 auditAction = "SALIDA_ASIGNADA";
             }
             logAudit(saved.getId(), auditAction, oldValues, newValues);
+        }
+
+        if (saved.getForkliftOperator() != null) {
+            try {
+                Map<String, Object> ssePayload = new HashMap<>();
+                ssePayload.put("missionId", saved.getId().toString());
+                ssePayload.put("folio", saved.getFolio());
+                ssePayload.put("type", "OUTBOUND_DISPATCH");
+                ssePayload.put("status", saved.getStatus().name());
+                ssePayload.put("forkliftOperatorId", saved.getForkliftOperator().getId().toString());
+                ssePayload.put("forkliftOperatorCode", saved.getForkliftOperator().getCode());
+                ssePayload.put("forkliftOperatorName", saved.getForkliftOperator().getFullName());
+                String evtType = (saved.getStatus() == OutboundStatus.ASSIGNED) ? "MISSION_ASSIGNED" : "MISSION_UPDATED";
+                alertBroadcaster.broadcastMissionEvent(evtType, ssePayload);
+            } catch (Exception ignored) {}
         }
 
         return outboundMapper.toResponse(saved);
