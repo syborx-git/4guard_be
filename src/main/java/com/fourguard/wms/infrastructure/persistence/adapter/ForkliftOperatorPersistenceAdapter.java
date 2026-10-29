@@ -33,6 +33,16 @@ public class ForkliftOperatorPersistenceAdapter implements ForkliftOperatorRepos
     }
 
     @Override
+    public Optional<ForkliftOperatorEntity> findByUserId(UUID userId) {
+        return repository.findByUserIdAndIsDeletedFalse(userId);
+    }
+
+    @Override
+    public Optional<ForkliftOperatorEntity> findByCodeIgnoreCase(String code) {
+        return repository.findFirstByCodeIgnoreCaseAndIsDeletedFalse(code);
+    }
+
+    @Override
     public List<ForkliftOperatorEntity> findByOrganizationId(UUID organizationId) {
         return repository.findByOrganizationIdAndIsDeletedFalse(organizationId);
     }

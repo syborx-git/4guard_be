@@ -23,6 +23,8 @@ public final class SecurityConstants {
 
     /** Public Security Gate endpoints for drivers — no JWT required. */
     public static final String SECURITY_GATE_PUBLIC_PATTERN = "/security-gate/public/**";
+    public static final String NOTIFICATIONS_RF_STREAM_PATTERN = "/notifications/rf-stream";
+    public static final String NOTIFICATIONS_RF_ALERTS_PATTERN = "/notifications/rf-alerts/**";
 
     /** Swagger UI assets — public in dev, consider restricting in prod. */
     public static final String SWAGGER_UI_PATTERN   = "/swagger-ui/**";

@@ -27,7 +27,7 @@ public class WarehouseReceptionController {
     // ─── CHECK-IN (CASETA) ──────────────────────────────────────────────────────
 
     @PostMapping("/check-in")
-    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_CREATE') or hasAuthority('SECURITY_GATE_CREATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_CREATE') or hasAuthority('SECURITY_GATE_CREATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Alta de Pre-Recepción en Caseta",
                description = "Registra el arribo del transporte, chofer, placas, rampa y sellos. Genera automáticamente el folio en estado REGISTERED.")
     public ResponseEntity<ApiResponse<ReceptionResponse>> createCheckIn(
@@ -39,7 +39,7 @@ public class WarehouseReceptionController {
     // ─── UPDATE ANDÉN PARAMETERS ───────────────────────────────────────────────
 
     @PutMapping("/{id}/parameters")
-    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasAuthority('RECEIVING_WRITE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('CONTROL_DESK') or hasRole('WAREHOUSE_OPERATOR') or hasRole('CEO')")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasAuthority('RECEIVING_WRITE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('CONTROL_DESK') or hasRole('WAREHOUSE_OPERATOR') or hasRole('FORKLIFT_OPERATOR') or hasRole('CEO')")
     @Operation(summary = "Actualizar parámetros de descarga en andén",
                description = "Actualiza lote, caducidad, SKU, proveedor, piezas por tarima y ubicación sugerida.")
     public ResponseEntity<ApiResponse<ReceptionResponse>> updateParameters(
@@ -78,17 +78,19 @@ public class WarehouseReceptionController {
     @GetMapping
     @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasAuthority('RECEIVING_READ') or hasAuthority('SECURITY_GATE_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('FORKLIFT_OPERATOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Listar recepciones",
-               description = "Retorna el listado de recepciones filtrado por organización, sucursal, estatus y término de búsqueda.")
+               description = "Retorna el listado de recepciones filtrado por organización, sucursal, estatus, montacarguista y término de búsqueda.")
     public ResponseEntity<ApiResponse<List<ReceptionSummaryResponse>>> getReceptions(
-            @RequestParam UUID organizationId,
+            @RequestParam(required = false) UUID organizationId,
             @RequestParam(required = false) UUID branchId,
             @RequestParam(required = false, defaultValue = "ALL") String status,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) UUID shiftSessionId,
-            @RequestParam(required = false, defaultValue = "ALL") String scope) {
+            @RequestParam(required = false, defaultValue = "ALL") String scope,
+            @RequestParam(required = false) UUID forkliftOperatorId) {
         List<ReceptionSummaryResponse> list = receptionUseCase.getReceptions(
                 organizationId, branchId, status, search, shiftSessionId,
-                com.fourguard.wms.domain.enums.MovementScope.from(scope));
+                com.fourguard.wms.domain.enums.MovementScope.from(scope),
+                forkliftOperatorId);
         return ResponseEntity.ok(ApiResponse.ok("Listado de recepciones obtenido con éxito", list));
     }
 
@@ -108,7 +110,7 @@ public class WarehouseReceptionController {
     // ─── UPDATE PALLET ─────────────────────────────────────────────────────────
 
     @PutMapping("/{id}/pallets/{palletId}")
-    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasAuthority('RECEIVING_WRITE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('CONTROL_DESK') or hasRole('CEO')")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasAuthority('RECEIVING_WRITE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('FORKLIFT_OPERATOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Editar tarima individual",
                description = "Modifica piezas, tipo de tarima u observaciones de una tarima capturada.")
     public ResponseEntity<ApiResponse<ReceptionPalletResponse>> updatePallet(
@@ -122,7 +124,7 @@ public class WarehouseReceptionController {
     // ─── DELETE PALLET ─────────────────────────────────────────────────────────
 
     @DeleteMapping("/{id}/pallets/{palletId}")
-    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasAuthority('RECEIVING_WRITE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('CONTROL_DESK') or hasRole('CEO')")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasAuthority('RECEIVING_WRITE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('FORKLIFT_OPERATOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Eliminar tarima de la recepción",
                description = "Elimina una tarima de la recepción abierta.")
     public ResponseEntity<ApiResponse<Void>> deletePallet(
@@ -135,7 +137,7 @@ public class WarehouseReceptionController {
     // ─── COMPLETE RECEPTION (AUTORIZACIÓN LÍDER) ───────────────────────────────
 
     @PostMapping("/{id}/complete")
-    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_AUTHORIZE') or hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasAuthority('RECEIVING_WRITE') or hasAuthority('RECEIVING_READ') or hasAuthority('QUALITY_AUTHORIZE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('CONTROL_DESK') or hasRole('WAREHOUSE_OPERATOR') or hasRole('CEO')")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_AUTHORIZE') or hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasAuthority('RECEIVING_WRITE') or hasAuthority('RECEIVING_READ') or hasAuthority('QUALITY_AUTHORIZE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('CONTROL_DESK') or hasRole('WAREHOUSE_OPERATOR') or hasRole('FORKLIFT_OPERATOR') or hasRole('CEO')")
     @Operation(summary = "Cierre y Autorización formal de Recepción F01",
                description = "Cierra la recepción con validación de credenciales del Líder/Supervisor de Almacén. Da de alta las UAs en el inventario activo.")
     public ResponseEntity<ApiResponse<ReceptionResponse>> completeReception(
@@ -209,7 +211,7 @@ public class WarehouseReceptionController {
     }
 
     @PostMapping("/{id}/lots")
-    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasAuthority('RECEIVING_WRITE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('CONTROL_DESK') or hasRole('CEO')")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasAuthority('RECEIVING_WRITE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('FORKLIFT_OPERATOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Agregar lote / folio a la recepción",
                description = "Registra un nuevo lote validando el candado de calidad de vida útil mínima de 365 días (ADR-019).")
     public ResponseEntity<ApiResponse<ReceptionLotResponse>> addLot(
@@ -220,7 +222,7 @@ public class WarehouseReceptionController {
     }
 
     @DeleteMapping("/{id}/lots/{lotId}")
-    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasAuthority('RECEIVING_WRITE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('CONTROL_DESK') or hasRole('CEO')")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasAuthority('RECEIVING_WRITE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('FORKLIFT_OPERATOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Eliminar lote de la recepción",
                description = "Elimina un lote registrado siempre y cuando no tenga tarimas escaneadas asociadas.")
     public ResponseEntity<ApiResponse<Void>> deleteLot(
@@ -280,5 +282,3 @@ public class WarehouseReceptionController {
         return ResponseEntity.ok(ApiResponse.ok("Verificación de tarima completada", response));
     }
 }
-
-

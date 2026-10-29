@@ -46,6 +46,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final List<String> EXCLUDED_PATHS = Arrays.asList(
             SecurityConstants.AUTH_PATTERN,              // /auth/**
             SecurityConstants.SECURITY_GATE_PUBLIC_PATTERN, // /security-gate/public/**
+            SecurityConstants.NOTIFICATIONS_RF_STREAM_PATTERN, // /notifications/rf-stream
+            SecurityConstants.NOTIFICATIONS_RF_ALERTS_PATTERN, // /notifications/rf-alerts/**
             SecurityConstants.ACTUATOR_HEALTH,           // /actuator/health
             "/swagger-ui.html",
             "/swagger-ui/**",

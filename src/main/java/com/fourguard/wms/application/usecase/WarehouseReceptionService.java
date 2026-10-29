@@ -61,16 +61,17 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
     private final WarehouseOutboundRepositoryPort outboundRepositoryPort;
     private final com.fourguard.wms.infrastructure.persistence.repository.SecurityPreCheckinJpaRepository preCheckinJpaRepository;
     private final ShiftSessionService shiftSessionService;
+    private final com.fourguard.wms.infrastructure.notification.QualityAlertBroadcaster alertBroadcaster;
 
     @Override
     @Transactional
     public ReceptionResponse createCheckIn(CreateCheckInRequest request) {
         log.info("Creating reception check-in for client: {}, docNumber: {}", request.getClientId(), request.getDocNumber());
 
-        OrganizationEntity organization = organizationRepositoryPort.findById(request.getOrganizationId())
+        OrganizationEntity organization = (request.getOrganizationId() != null ? organizationRepositoryPort.findById(request.getOrganizationId()) : Optional.<OrganizationEntity>empty()).or(() -> organizationRepositoryPort.findAll().stream().findFirst())
                 .orElseThrow(() -> new EntityNotFoundException("Organización no encontrada: " + request.getOrganizationId()));
 
-        BranchEntity branch = branchRepositoryPort.findById(request.getBranchId())
+        BranchEntity branch = (request.getBranchId() != null ? branchRepositoryPort.findById(request.getBranchId()) : Optional.<BranchEntity>empty()).or(() -> branchRepositoryPort.findByOrganizationId(organization.getId()).stream().findFirst()).or(() -> branchRepositoryPort.findAll().stream().findFirst())
                 .orElseThrow(() -> new EntityNotFoundException("Sucursal no encontrada: " + request.getBranchId()));
 
         // Resolución flexible de Cliente (por UUID, código de cliente o nombre)
@@ -88,6 +89,8 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
             List<ClientEntity> orgClients = clientRepositoryPort.findByOrganizationId(organization.getId());
             if (!orgClients.isEmpty()) {
                 client = orgClients.get(0);
+            } else {
+                client = clientRepositoryPort.findAll().stream().findFirst().orElse(null);
             }
         }
         if (client == null) {
@@ -140,6 +143,14 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
         ForkliftOperatorEntity operator = null;
         if (request.getForkliftOperatorId() != null) {
             operator = forkliftOperatorRepositoryPort.findById(request.getForkliftOperatorId()).orElse(null);
+        }
+        if (operator == null && request.getForkliftOperatorName() != null && !request.getForkliftOperatorName().isBlank()) {
+            String opName = request.getForkliftOperatorName().trim().toLowerCase();
+            operator = forkliftOperatorRepositoryPort.findAll().stream()
+                    .filter(o -> (o.getFullName() != null && o.getFullName().toLowerCase().contains(opName)) ||
+                                 (o.getCode() != null && o.getCode().equalsIgnoreCase(opName)))
+                    .findFirst()
+                    .orElse(null);
         }
 
         long folioSeq = receptionRepositoryPort.nextFolioSequenceValue();
@@ -198,7 +209,7 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
                 .branch(branch)
                 .preCheckin(preCheckin)
                 .folio(folio)
-                .status(ReceptionStatus.REGISTERED)
+                .status(operator != null ? ReceptionStatus.ASSIGNED : ReceptionStatus.REGISTERED)
                 .carrier(carrier)
                 .client(client)
                 .ramp(ramp)
@@ -283,6 +294,19 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
                        "plates", (request.getTractorPlates() != null ? request.getTractorPlates() : "") + " / " + (request.getBoxPlates() != null ? request.getBoxPlates() : ""),
                        "ramp", ramp != null ? ramp.getCode() : "Sin rampa"));
 
+        if (saved.getForkliftOperator() != null) {
+            try {
+                Map<String, Object> ssePayload = new HashMap<>();
+                ssePayload.put("missionId", saved.getId().toString());
+                ssePayload.put("folio", saved.getFolio());
+                ssePayload.put("type", "INBOUND_DISCHARGE");
+                ssePayload.put("status", saved.getStatus().name());
+                ssePayload.put("forkliftOperatorId", saved.getForkliftOperator().getId().toString());
+                ssePayload.put("forkliftOperatorCode", saved.getForkliftOperator().getCode());
+                ssePayload.put("forkliftOperatorName", saved.getForkliftOperator().getFullName());
+                alertBroadcaster.broadcastMissionEvent("MISSION_ASSIGNED", ssePayload);
+            } catch (Exception ignored) {}
+        }
         return receptionMapper.toResponse(saved);
     }
 
@@ -378,16 +402,21 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
             }
         }
 
-        // Forklift operator update
+        // Forklift operator update (con fallback por nombre o código si el ID no resuelve)
+        ForkliftOperatorEntity resolvedOperator = null;
         if (request.getForkliftOperatorId() != null) {
-            forkliftOperatorRepositoryPort.findById(request.getForkliftOperatorId()).ifPresent(entity::setForkliftOperator);
-        } else if (request.getForkliftOperatorName() != null && !request.getForkliftOperatorName().isBlank()) {
+            resolvedOperator = forkliftOperatorRepositoryPort.findById(request.getForkliftOperatorId()).orElse(null);
+        }
+        if (resolvedOperator == null && request.getForkliftOperatorName() != null && !request.getForkliftOperatorName().isBlank()) {
             String opName = request.getForkliftOperatorName().trim().toLowerCase();
-            forkliftOperatorRepositoryPort.findAll().stream()
+            resolvedOperator = forkliftOperatorRepositoryPort.findAll().stream()
                     .filter(o -> (o.getFullName() != null && o.getFullName().toLowerCase().contains(opName)) ||
                                  (o.getCode() != null && o.getCode().equalsIgnoreCase(opName)))
                     .findFirst()
-                    .ifPresent(entity::setForkliftOperator);
+                    .orElse(null);
+        }
+        if (resolvedOperator != null) {
+            entity.setForkliftOperator(resolvedOperator);
         }
 
         // Ramp update
@@ -414,10 +443,22 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
 
         // Lifecycle Status transition
         if (request.getStatus() != null && !request.getStatus().isBlank()) {
-            try {
-                ReceptionStatus targetStatus = ReceptionStatus.valueOf(request.getStatus().trim().toUpperCase());
-                entity.setStatus(targetStatus);
-            } catch (IllegalArgumentException ignored) {}
+            String rawStatus = request.getStatus().trim().toUpperCase();
+            if ("PARTIAL_DISCHARGED".equals(rawStatus)) {
+                entity.setStatus(ReceptionStatus.IN_PROGRESS);
+                String note = (request.getHandoverNotes() != null && !request.getHandoverNotes().isBlank())
+                        ? request.getHandoverNotes().trim()
+                        : "Pausa por corte de turno (Descarga Parcial)";
+                String existingObs = entity.getObservations() != null ? entity.getObservations() + " | " : "";
+                entity.setObservations(existingObs + "[RELEVO TURNO]: " + note);
+            } else {
+                try {
+                    ReceptionStatus targetStatus = ReceptionStatus.valueOf(rawStatus);
+                    entity.setStatus(targetStatus);
+                } catch (IllegalArgumentException ignored) {}
+            }
+        } else if (entity.getStatus() == ReceptionStatus.REGISTERED && entity.getForkliftOperator() != null) {
+            entity.setStatus(ReceptionStatus.ASSIGNED);
         }
 
         String currentUser = securityAuditHelper.getCurrentUsername();
@@ -711,6 +752,21 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
             logAudit(saved.getId(), auditAction, before, after);
         }
 
+        if (saved.getForkliftOperator() != null) {
+            try {
+                Map<String, Object> ssePayload = new HashMap<>();
+                ssePayload.put("missionId", saved.getId().toString());
+                ssePayload.put("folio", saved.getFolio());
+                ssePayload.put("type", "INBOUND_DISCHARGE");
+                ssePayload.put("status", saved.getStatus().name());
+                ssePayload.put("forkliftOperatorId", saved.getForkliftOperator().getId().toString());
+                ssePayload.put("forkliftOperatorCode", saved.getForkliftOperator().getCode());
+                ssePayload.put("forkliftOperatorName", saved.getForkliftOperator().getFullName());
+                String evtType = (saved.getStatus() == ReceptionStatus.ASSIGNED) ? "MISSION_ASSIGNED" : "MISSION_UPDATED";
+                alertBroadcaster.broadcastMissionEvent(evtType, ssePayload);
+            } catch (Exception ignored) {}
+        }
+
         List<WarehouseReceptionPalletEntity> pallets = palletRepositoryPort.findByReceptionId(saved.getId());
         return buildReceptionResponse(saved, pallets);
     }
@@ -727,7 +783,7 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
     @Override
     @Transactional(readOnly = true)
     public List<ReceptionSummaryResponse> getReceptions(UUID organizationId, UUID branchId, String status, String search,
-                                                        UUID shiftSessionId, MovementScope scope) {
+                                                        UUID shiftSessionId, MovementScope scope, UUID forkliftOperatorId) {
         ReceptionStatus recStatus = null;
         if (status != null && !status.isBlank() && !"ALL".equalsIgnoreCase(status)) {
             try {
@@ -738,12 +794,21 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
 
         List<WarehouseReceptionEntity> entities = receptionRepositoryPort.findAll(
                 WarehouseReceptionSpecification.withFilters(
-                        organizationId, branchId, recStatus, cleanSearch, shiftSessionId, scope));
+                        organizationId, branchId, recStatus, cleanSearch, shiftSessionId, scope, forkliftOperatorId));
 
+        if (entities.isEmpty() && organizationId != null) {
+            entities = receptionRepositoryPort.findAll(
+                    WarehouseReceptionSpecification.withFilters(
+                            null, branchId, recStatus, cleanSearch, shiftSessionId, scope, forkliftOperatorId));
+        }
+        if (entities.isEmpty() && branchId != null) {
+            entities = receptionRepositoryPort.findAll(
+                    WarehouseReceptionSpecification.withFilters(
+                            null, null, recStatus, cleanSearch, shiftSessionId, scope, forkliftOperatorId));
+        }
         if (entities.isEmpty()) {
             return Collections.emptyList();
         }
-
         List<UUID> receptionIds = entities.stream().map(WarehouseReceptionEntity::getId).collect(Collectors.toList());
         List<WarehouseReceptionPalletEntity> allPallets = palletRepositoryPort.findByReceptionIdIn(receptionIds);
         Map<UUID, List<WarehouseReceptionPalletEntity>> palletsByRecId = allPallets.stream()

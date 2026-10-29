@@ -8,6 +8,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
@@ -78,6 +79,26 @@ public class QualityAlertBroadcaster {
             }
         }
 
+        activeEmitters.removeAll(deadEmitters);
+    }
+
+    public void broadcastMissionEvent(String eventType, Map<String, Object> payload) {
+        if (activeEmitters.isEmpty()) {
+            return;
+        }
+        log.info("[QualityAlertBroadcaster] Emitiendo evento operativo '{}' hacia {} terminales RF",
+                eventType, activeEmitters.size());
+
+        List<SseEmitter> deadEmitters = new ArrayList<>();
+        for (SseEmitter emitter : activeEmitters) {
+            try {
+                emitter.send(SseEmitter.event()
+                        .name(eventType)
+                        .data(payload));
+            } catch (Exception e) {
+                deadEmitters.add(emitter);
+            }
+        }
         activeEmitters.removeAll(deadEmitters);
     }
 

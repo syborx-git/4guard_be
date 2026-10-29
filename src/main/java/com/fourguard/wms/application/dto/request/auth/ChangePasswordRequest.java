@@ -13,7 +13,7 @@ import lombok.NoArgsConstructor;
 @Builder
 public class ChangePasswordRequest {
 
-    @NotBlank(message = "La nueva contraseña es requerida")
-    @Size(min = 8, message = "La contraseña debe tener al menos 8 caracteres de longitud")
+    @NotBlank(message = "La nueva contraseña o PIN es requerida")
+    @Size(min = 4, message = "La contraseña o PIN debe tener al menos 4 caracteres de longitud")
     private String newPassword;
 }

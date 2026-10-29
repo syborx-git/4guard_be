@@ -23,37 +23,28 @@ import java.util.UUID;
  */
 public interface WarehouseReceptionUseCase {
 
-    /**
-     * Registers a new pre-reception from the security checkpoint (Caseta de Seguridad).
-     * Generates a consecutive folio and sets status to REGISTERED.
-     */
     ReceptionResponse createCheckIn(CreateCheckInRequest request);
 
-    /**
-     * Updates the unloading parameters (lot, SKU, pallet type, storage location).
-     * Only allowed when status is REGISTERED.
-     */
     ReceptionResponse updateParameters(UUID id, UpdateReceptionParametersRequest request);
 
-    /**
-     * Returns the full detail of a reception including pallets, seals and audit log.
-     */
     ReceptionResponse getReceptionById(UUID id);
 
-    /**
-     * Returns a filtered list of receptions for a given organization.
-     *
-     * @param organizationId Required. Scopes to one organization.
-     * @param branchId       Optional. Filters by branch.
-     * @param status         Optional. REGISTERED | COMPLETED | CANCELLED
-     * @param search         Optional. Free-text against folio, docNumber, clientName.
-     */
     default List<ReceptionSummaryResponse> getReceptions(
             UUID organizationId,
             UUID branchId,
             String status,
             String search) {
-        return getReceptions(organizationId, branchId, status, search, null, MovementScope.ALL);
+        return getReceptions(organizationId, branchId, status, search, null, MovementScope.ALL, null);
+    }
+
+    default List<ReceptionSummaryResponse> getReceptions(
+            UUID organizationId,
+            UUID branchId,
+            String status,
+            String search,
+            UUID shiftSessionId,
+            MovementScope scope) {
+        return getReceptions(organizationId, branchId, status, search, shiftSessionId, scope, null);
     }
 
     List<ReceptionSummaryResponse> getReceptions(
@@ -62,99 +53,44 @@ public interface WarehouseReceptionUseCase {
             String status,
             String search,
             UUID shiftSessionId,
-            MovementScope scope);
+            MovementScope scope,
+            UUID forkliftOperatorId);
 
-    /**
-     * Adds one or more pallet/UA codes to an open reception.
-     * Validates uniqueness of palletCode within the same reception.
-     */
     List<ReceptionPalletResponse> addPallets(UUID receptionId, AddReceptionPalletsRequest request);
 
-    /**
-     * Updates an individual pallet record (pieces, type, observations).
-     */
     ReceptionPalletResponse updatePallet(UUID receptionId, UUID palletId, UpdatePalletRequest request);
 
-    /**
-     * Removes a pallet from an open reception (soft or hard delete).
-     */
     void deletePallet(UUID receptionId, UUID palletId);
 
-    /**
-     * Closes the reception with leader authorization.
-     * Creates inventory_items (state=AVAILABLE) and inventory_movements (type=ENTRY) for each pallet.
-     * Validates leader credentials (username + password) against wms.users with role check.
-     */
     ReceptionResponse completeReception(UUID id, CompleteReceptionRequest request);
 
-    /**
-     * Cancels a reception with mandatory admin authorization and reason.
-     * Validates admin credentials against wms.users.
-     */
     ReceptionResponse cancelReception(UUID id, CancelReceptionRequest request);
 
-    /**
-     * Reopens a completed reception with supervisor/admin authorization and reason,
-     * allowing forklift operators to scan and register omitted pallets.
-     */
     ReceptionResponse reopenReception(UUID id, ReopenReceptionRequest request);
 
-    /**
-     * Updates the reception doc number (remisión) with audit trail.
-     */
     ReceptionResponse changeRemision(UUID id, ChangeRemisionRequest request);
 
-    /**
-     * Returns the chronological audit log for a reception folio.
-     */
     List<MovementAuditResponse> getAuditLogs(UUID id);
 
-    /**
-     * Returns the current and next consecutive pallet number across the system/branch.
-     */
     java.util.Map<String, Integer> getNextPalletNumber(UUID organizationId, UUID branchId);
 
-    /**
-     * Selectively relabels pallets with internal 4Guard SSCC GS1-128 codes,
-     * preserving supplier UA in immutable wms.ua_mappings and wms.inventory_audit_log.
-     */
     ReceptionResponse relabelUas(UUID id, com.fourguard.wms.application.dto.request.reception.RelabelUasRequest request);
 
-    /**
-     * Returns the lifecycle Tree of Life audit events for a remission folio.
-     */
     List<com.fourguard.wms.infrastructure.persistence.entity.InventoryAuditLogEntity> getRemissionTree(String remissionFolio);
 
-    /**
-     * Returns the list of registered lots for a reception.
-     */
     List<com.fourguard.wms.application.dto.response.reception.ReceptionLotResponse> getLotsByReceptionId(UUID receptionId);
 
-    /**
-     * Adds a new lot to an open reception, validating quality shelf life (>= 365 days).
-     */
     com.fourguard.wms.application.dto.response.reception.ReceptionLotResponse addLot(
             UUID receptionId,
             com.fourguard.wms.application.dto.request.reception.AddReceptionLotRequest request);
 
-    /**
-     * Deletes a lot from an open reception if no pallets are associated with it.
-     */
     void deleteLot(UUID receptionId, UUID lotId);
 
-    /**
-     * Automatically detects if an incoming query (remission, outbound folio, lot, pallet)
-     * corresponds to a previous outbound dispatch (Logística Inversa / Retorno).
-     */
     com.fourguard.wms.application.dto.response.reception.ReturnDetectionResponse detectReturn(
             UUID organizationId,
             UUID branchId,
             String query);
 
-    /**
-     * Validates and marks an individual pallet code (UA/SSCC) scanned by a forklift operator
-     * in the unloading dock against the return manifest.
-     */
     com.fourguard.wms.application.dto.response.reception.VerifyPalletResponse verifyPallet(
             UUID receptionId,
             com.fourguard.wms.application.dto.request.reception.VerifyPalletRequest request);

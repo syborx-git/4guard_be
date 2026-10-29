@@ -33,7 +33,7 @@ public class WarehouseOutboundController {
     // ─── CREATE OUTBOUND ────────────────────────────────────────────────────────
 
     @PostMapping
-    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_CREATE') or hasAuthority('SHIPPING_WRITE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_CREATE') or hasAuthority('SHIPPING_WRITE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Registrar salida de almacén / despacho",
                description = "Registra la salida física y lógica de mercancía. Descuenta las UAs del inventario y genera folio SAL-YYYY-XXXXXX.")
     public ResponseEntity<ApiResponse<OutboundResponse>> createOutbound(
@@ -56,7 +56,7 @@ public class WarehouseOutboundController {
     // ─── UPDATE OUTBOUND ───────────────────────────────────────────────────────
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasAuthority('SHIPPING_WRITE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('FORKLIFT_OPERATOR') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA')")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasAuthority('SHIPPING_WRITE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('FORKLIFT_OPERATOR') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Actualizar salida de almacén / transicionar fase",
                description = "Actualiza el estatus del ciclo operativo (REGISTERED -> ASSIGNED -> IN_PROGRESS -> LOADED -> COMPLETED), rampa, montacarguista o datos de caseta.")
     public ResponseEntity<ApiResponse<OutboundResponse>> updateOutbound(
@@ -71,17 +71,19 @@ public class WarehouseOutboundController {
     @GetMapping
     @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasAuthority('SHIPPING_READ') or hasAuthority('SECURITY_GATE_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('FORKLIFT_OPERATOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Listar salidas de almacén",
-               description = "Retorna el historial de salidas filtrado por organización, sucursal, estatus y búsqueda.")
+               description = "Retorna el historial de salidas filtrado por organización, sucursal, estatus, montacarguista y búsqueda.")
     public ResponseEntity<ApiResponse<List<OutboundSummaryResponse>>> getOutbounds(
-            @RequestParam UUID organizationId,
+            @RequestParam(required = false) UUID organizationId,
             @RequestParam(required = false) UUID branchId,
             @RequestParam(required = false, defaultValue = "ALL") String status,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) UUID shiftSessionId,
-            @RequestParam(required = false, defaultValue = "ALL") String scope) {
+            @RequestParam(required = false, defaultValue = "ALL") String scope,
+            @RequestParam(required = false) UUID forkliftOperatorId) {
         List<OutboundSummaryResponse> list = outboundUseCase.getOutbounds(
                 organizationId, branchId, status, search, shiftSessionId,
-                com.fourguard.wms.domain.enums.MovementScope.from(scope));
+                com.fourguard.wms.domain.enums.MovementScope.from(scope),
+                forkliftOperatorId);
         return ResponseEntity.ok(ApiResponse.ok("Listado de salidas obtenido con éxito", list));
     }
 
@@ -101,7 +103,7 @@ public class WarehouseOutboundController {
     // ─── CHANGE REMISIÓN / CARTA PORTE ─────────────────────────────────────────
 
     @PutMapping({"/{id}/change-shipping-note", "/{id}/change-document", "/{id}/change-waybill", "/{id}/change-remision"})
-    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Modificar número de remisión / carta porte de salida",
                description = "Actualiza el número de remisión / carta porte de la salida con justificación y registro en auditoría.")
     public ResponseEntity<ApiResponse<OutboundResponse>> changeRemision(

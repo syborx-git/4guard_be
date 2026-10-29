@@ -64,11 +64,7 @@ security:
     refresh-token-expiration: 604800000 # 7 días (ms)
   cors:
     allowed-origin-patterns:
-      - "http://localhost:*"
-      - "http://172.*:*"
-      - "http://192.168.*:*"
-      - "http://10.*:*"
-      - "https://*.netlify.app"
+      - "*"
     allowed-methods:
       - GET
       - POST
