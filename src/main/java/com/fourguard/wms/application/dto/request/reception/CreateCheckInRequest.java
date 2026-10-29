@@ -48,6 +48,9 @@ public class CreateCheckInRequest {
     /** Optional: Assigned forklift operator UUID */
     private UUID forkliftOperatorId;
 
+    /** Optional: Assigned forklift operator name or code for fallback resolution */
+    private String forkliftOperatorName;
+
     /** Optional: Lot number captured at check-in */
     private String lotNumber;
 

@@ -29,7 +29,7 @@ public class WarehouseTransferController {
     // ─── CREATE TRANSFER ────────────────────────────────────────────────────────
 
     @PostMapping
-    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_CREATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_CREATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('FORKLIFT_OPERATOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Registrar cambio de almacén / traspaso",
                description = "Realiza la reubicación de tarimas entre bahías. Genera folio CAM-YYYY-XXXXXX y actualiza el inventario.")
     public ResponseEntity<ApiResponse<TransferResponse>> createTransfer(

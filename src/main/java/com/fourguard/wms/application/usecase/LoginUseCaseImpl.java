@@ -6,7 +6,9 @@ import com.fourguard.wms.application.dto.response.auth.UserInfoResponse;
 import com.fourguard.wms.application.mapper.UserMapper;
 import com.fourguard.wms.domain.exception.InvalidCredentialsException;
 import com.fourguard.wms.domain.ports.in.LoginUseCase;
+import com.fourguard.wms.domain.ports.out.ForkliftOperatorRepositoryPort;
 import com.fourguard.wms.domain.ports.out.UserRepositoryPort;
+import com.fourguard.wms.infrastructure.persistence.entity.ForkliftOperatorEntity;
 import com.fourguard.wms.infrastructure.persistence.entity.UserEntity;
 import com.fourguard.wms.infrastructure.security.jwt.JwtProperties;
 import com.fourguard.wms.infrastructure.security.jwt.JwtService;
@@ -19,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -26,6 +29,7 @@ import java.time.ZoneOffset;
 public class LoginUseCaseImpl implements LoginUseCase {
 
     private final UserRepositoryPort userRepositoryPort;
+    private final ForkliftOperatorRepositoryPort forkliftOperatorRepositoryPort;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final JwtProperties jwtProperties;
@@ -74,8 +78,25 @@ public class LoginUseCaseImpl implements LoginUseCase {
         LocalDateTime expiresAt = LocalDateTime.now()
                 .plusNanos(jwtProperties.getAccessTokenExpiration() * 1_000_000L);
 
-        // 9. Map user details to DTO
+        // 9. Map user details to DTO and enrich with ForkliftOperator identity if linked
         UserInfoResponse userInfo = userMapper.toUserInfoResponse(user);
+        try {
+            Optional<ForkliftOperatorEntity> opOpt = forkliftOperatorRepositoryPort.findByUserId(user.getId())
+                    .or(() -> forkliftOperatorRepositoryPort.findByCodeIgnoreCase(user.getUsername()));
+            if (opOpt.isPresent()) {
+                ForkliftOperatorEntity op = opOpt.get();
+                if (op.getUser() == null) {
+                    op.setUser(user);
+                    forkliftOperatorRepositoryPort.save(op);
+                }
+                userInfo = userInfo.toBuilder()
+                        .forkliftOperatorId(op.getId())
+                        .employeeCode(op.getCode())
+                        .build();
+            }
+        } catch (Exception ex) {
+            log.debug("[AUTH] Could not resolve forklift operator identity for {}: {}", user.getUsername(), ex.getMessage());
+        }
 
         log.info("[AUTH] Successful login for: {}", user.getUsername());
 

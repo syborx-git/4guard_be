@@ -16,6 +16,10 @@ public interface ForkliftOperatorRepositoryPort {
 
     Optional<ForkliftOperatorEntity> findActiveById(UUID id);
 
+    Optional<ForkliftOperatorEntity> findByUserId(UUID userId);
+
+    Optional<ForkliftOperatorEntity> findByCodeIgnoreCase(String code);
+
     List<ForkliftOperatorEntity> findByOrganizationId(UUID organizationId);
 
     List<ForkliftOperatorEntity> findAll();

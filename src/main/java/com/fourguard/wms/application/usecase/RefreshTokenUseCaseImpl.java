@@ -6,7 +6,9 @@ import com.fourguard.wms.application.dto.response.auth.UserInfoResponse;
 import com.fourguard.wms.application.mapper.UserMapper;
 import com.fourguard.wms.domain.exception.InvalidCredentialsException;
 import com.fourguard.wms.domain.ports.in.RefreshTokenUseCase;
+import com.fourguard.wms.domain.ports.out.ForkliftOperatorRepositoryPort;
 import com.fourguard.wms.domain.ports.out.UserRepositoryPort;
+import com.fourguard.wms.infrastructure.persistence.entity.ForkliftOperatorEntity;
 import com.fourguard.wms.infrastructure.persistence.entity.UserEntity;
 import com.fourguard.wms.infrastructure.security.jwt.JwtProperties;
 import com.fourguard.wms.infrastructure.security.jwt.JwtService;
@@ -16,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -23,6 +26,7 @@ import java.time.LocalDateTime;
 public class RefreshTokenUseCaseImpl implements RefreshTokenUseCase {
 
     private final UserRepositoryPort userRepositoryPort;
+    private final ForkliftOperatorRepositoryPort forkliftOperatorRepositoryPort;
     private final JwtService jwtService;
     private final JwtProperties jwtProperties;
     private final UserMapper userMapper;
@@ -48,6 +52,17 @@ public class RefreshTokenUseCaseImpl implements RefreshTokenUseCase {
 
             LocalDateTime expiresAt = LocalDateTime.now().plusNanos(jwtProperties.getAccessTokenExpiration() * 1_000_000L);
             UserInfoResponse userInfo = userMapper.toUserInfoResponse(user);
+            try {
+                Optional<ForkliftOperatorEntity> opOpt = forkliftOperatorRepositoryPort.findByUserId(user.getId())
+                        .or(() -> forkliftOperatorRepositoryPort.findByCodeIgnoreCase(user.getUsername()));
+                if (opOpt.isPresent()) {
+                    ForkliftOperatorEntity op = opOpt.get();
+                    userInfo = userInfo.toBuilder()
+                            .forkliftOperatorId(op.getId())
+                            .employeeCode(op.getCode())
+                            .build();
+                }
+            } catch (Exception ignored) {}
 
             log.info("[AUTH] Refresh token successful for: {}", user.getUsername());
 

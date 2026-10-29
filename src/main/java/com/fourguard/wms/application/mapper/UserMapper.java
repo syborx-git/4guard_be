@@ -108,6 +108,8 @@ public interface UserMapper {
     @Mapping(target = "organizationName", source = "organization.name")
     @Mapping(target = "branchId",         source = "branch.id")
     @Mapping(target = "branchName",       source = "branch.name")
+    @Mapping(target = "forkliftOperatorId", ignore = true)
+    @Mapping(target = "employeeCode",      ignore = true)
     UserInfoResponse toUserInfoResponse(UserEntity entity);
 
     // ── Default helpers ───────────────────────────────────────────────────────

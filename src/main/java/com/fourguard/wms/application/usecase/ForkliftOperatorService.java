@@ -218,6 +218,17 @@ public class ForkliftOperatorService implements ForkliftOperatorUseCase {
 
         ForkliftOperatorEntity saved = operatorRepositoryPort.save(existing);
 
+        // Synchronize linked user account
+        if (saved.getUser() != null) {
+            UserEntity linkedUser = saved.getUser();
+            linkedUser.setFirstName(saved.getFirstName());
+            linkedUser.setLastName((saved.getLastNamePaternal() + " " + (saved.getLastNameMaternal() != null ? saved.getLastNameMaternal() : "")).trim());
+            if (saved.getBranch() != null) {
+                linkedUser.setBranch(saved.getBranch());
+            }
+            userRepositoryPort.save(linkedUser);
+        }
+
         logAudit(currentUser, "FORKLIFT_OPERATOR_UPDATED", saved.getId(), snapshot, saved);
 
         return mapper.toResponse(saved);
@@ -260,9 +271,12 @@ public class ForkliftOperatorService implements ForkliftOperatorUseCase {
                     return op.getFullName().toLowerCase().contains(q)
                             || op.getCode().toLowerCase().contains(q)
                             || (op.getJobTitle() != null && op.getJobTitle().toLowerCase().contains(q))
-                            || op.getLicenseNumberDc3().toLowerCase().contains(q);
+                            || (op.getLicenseNumberDc3() != null && op.getLicenseNumberDc3().toLowerCase().contains(q));
                 })
-                .map(mapper::toResponse)
+                .map(op -> {
+                    op.setLicenseStatus(computeLicenseStatus(op.getLicenseExpirationDate()));
+                    return mapper.toResponse(op);
+                })
                 .collect(Collectors.toList());
     }
 
@@ -280,6 +294,13 @@ public class ForkliftOperatorService implements ForkliftOperatorUseCase {
         String currentUser = securityAuditHelper.getCurrentUsername();
 
         logAudit(currentUser, "FORKLIFT_OPERATOR_DELETED", id, existing, null);
+
+        // Inactivate linked user account
+        if (existing.getUser() != null) {
+            existing.getUser().setStatus(UserStatus.INACTIVE);
+            existing.getUser().setIsEnabled(false);
+            userRepositoryPort.save(existing.getUser());
+        }
 
         operatorRepositoryPort.softDeleteById(id, currentUser);
     }
@@ -310,6 +331,13 @@ public class ForkliftOperatorService implements ForkliftOperatorUseCase {
         existing.setUpdatedBy(currentUser);
 
         ForkliftOperatorEntity saved = operatorRepositoryPort.save(existing);
+
+        // Synchronize linked user status
+        if (saved.getUser() != null) {
+            saved.getUser().setStatus(newStatus == ForkliftOperatorStatus.ACTIVO ? UserStatus.ACTIVE : UserStatus.INACTIVE);
+            saved.getUser().setIsEnabled(newStatus == ForkliftOperatorStatus.ACTIVO);
+            userRepositoryPort.save(saved.getUser());
+        }
 
         Map<String, Object> beforeState = buildAuditState(snapshot);
         Map<String, Object> afterState = buildAuditState(saved);
