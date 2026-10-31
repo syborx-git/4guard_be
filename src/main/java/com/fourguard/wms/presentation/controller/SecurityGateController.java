@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -34,7 +35,7 @@ public class SecurityGateController {
     @Operation(summary = "Obtener catálogos dinámicos públicos para transportistas (Clientes, Líneas, Tipos de Transporte)",
                description = "Retorna la lista de clientes activos, líneas transportistas y tipos de transporte permitidos.")
     public ResponseEntity<ApiResponse<SecurityGatePublicCatalogsResponse>> getPublicCatalogs(
-            @RequestParam(required = false) UUID organizationId) {
+            @RequestParam(name = "organizationId", required = false) UUID organizationId) {
         SecurityGatePublicCatalogsResponse response = securityGateUseCase.getPublicCatalogs(organizationId);
         return ResponseEntity.ok(ApiResponse.ok("Catálogos de caseta obtenidos con éxito", response));
     }
@@ -74,8 +75,8 @@ public class SecurityGateController {
     @Operation(summary = "Listar pases activos y choferes en espera",
                description = "Retorna la cola de choferes en espera o con auto-registro enviado para revisión del guardia.")
     public ResponseEntity<ApiResponse<List<PassResponse>>> getActivePasses(
-            @RequestParam UUID organizationId,
-            @RequestParam(required = false) UUID branchId) {
+            @RequestParam(name = "organizationId") UUID organizationId,
+            @RequestParam(name = "branchId", required = false) UUID branchId) {
         List<PassResponse> list = securityGateUseCase.getActivePasses(organizationId, branchId);
         return ResponseEntity.ok(ApiResponse.ok("Pases activos obtenidos con éxito", list));
     }
@@ -85,8 +86,8 @@ public class SecurityGateController {
     @Operation(summary = "Listar unidades en planta (patio / andenes)",
                description = "Retorna los vehículos que han ingresado y están actualmente en descarga, carga o listos para salida.")
     public ResponseEntity<ApiResponse<List<PassResponse>>> getInYardPasses(
-            @RequestParam UUID organizationId,
-            @RequestParam(required = false) UUID branchId) {
+            @RequestParam(name = "organizationId") UUID organizationId,
+            @RequestParam(name = "branchId", required = false) UUID branchId) {
         List<PassResponse> list = securityGateUseCase.getInYardPasses(organizationId, branchId);
         return ResponseEntity.ok(ApiResponse.ok("Unidades en planta obtenidas con éxito", list));
     }
@@ -94,12 +95,17 @@ public class SecurityGateController {
     @GetMapping("/passes/history")
     @PreAuthorize("hasAuthority('SECURITY_GATE_READ') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('CEO') or hasRole('WAREHOUSE_MANAGER')")
     @Operation(summary = "Historial y Auditoría de Caseta de Seguridad",
-               description = "Retorna el histórico completo de pases y movimientos con búsqueda para reimpresión de boleta F01.")
+               description = "Retorna el histórico de pases y movimientos de caseta, con opción de acotar al turno actual o consultar histórico global.")
     public ResponseEntity<ApiResponse<List<PassResponse>>> getHistoryPasses(
-            @RequestParam UUID organizationId,
-            @RequestParam(required = false) UUID branchId,
-            @RequestParam(required = false) String search) {
-        List<PassResponse> list = securityGateUseCase.getHistoryPasses(organizationId, branchId, search);
+            @RequestParam(name = "organizationId") UUID organizationId,
+            @RequestParam(name = "branchId", required = false) UUID branchId,
+            @RequestParam(name = "search", required = false) String search,
+            @RequestParam(name = "currentShiftOnly", required = false, defaultValue = "false") Boolean currentShiftOnly,
+            @RequestParam(name = "shiftSessionId", required = false) UUID shiftSessionId,
+            @RequestParam(name = "from", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) java.time.OffsetDateTime from,
+            @RequestParam(name = "to", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) java.time.OffsetDateTime to) {
+        List<PassResponse> list = securityGateUseCase.getHistoryPasses(
+                organizationId, branchId, search, currentShiftOnly, shiftSessionId, from, to);
         return ResponseEntity.ok(ApiResponse.ok("Historial de caseta obtenido con éxito", list));
     }
 
@@ -130,7 +136,7 @@ public class SecurityGateController {
     @PreAuthorize("hasAuthority('SECURITY_GATE_DELETE') or hasAuthority('SECURITY_GATE_UPDATE') or hasAuthority('SECURITY_GATE_CREATE') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('CEO') or hasRole('WAREHOUSE_MANAGER')")
     @Operation(summary = "Cancelar / Descartar Pase Digital QR",
                description = "Elimina un pase de acceso generado o pendiente que no fue utilizado.")
-    public ResponseEntity<ApiResponse<Void>> deletePass(@PathVariable UUID id) {
+    public ResponseEntity<ApiResponse<Void>> deletePass(@PathVariable String id) {
         securityGateUseCase.cancelPass(id);
         return ResponseEntity.ok(ApiResponse.ok("Pase descartado exitosamente"));
     }

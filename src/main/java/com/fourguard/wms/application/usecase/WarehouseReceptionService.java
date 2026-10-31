@@ -137,7 +137,12 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
         }
         // Si se proporcionó rampa en caseta, validar que esté libre y no bloqueada
         if (ramp != null) {
-            validateRampAvailability(ramp, branch.getId(), null, null);
+            try {
+                validateRampAvailability(ramp, branch.getId(), null, null);
+            } catch (ValidationException e) {
+                log.warn("Ramp {} busy during check-in: {}. Deferring assignment to warehouse.", ramp.getCode(), e.getMessage());
+                ramp = null;
+            }
         }
 
         ForkliftOperatorEntity operator = null;
@@ -202,6 +207,25 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
                 }
                 preCheckinJpaRepository.save(preCheckin);
             }
+        }
+        if (preCheckin == null && ((request.getNoEcoTractor() != null && !request.getNoEcoTractor().isBlank()) ||
+                                   (request.getNoEcoCaja() != null && !request.getNoEcoCaja().isBlank()))) {
+            preCheckin = SecurityPreCheckinEntity.builder()
+                    .token("CHK-" + folio)
+                    .organization(organization)
+                    .branch(branch)
+                    .status("COMPLETED")
+                    .operationType("DESCARGA")
+                    .driverName(request.getDriverName())
+                    .tractorPlates(request.getTractorPlates())
+                    .boxPlates(request.getBoxPlates())
+                    .noEcoTractor(request.getNoEcoTractor() != null ? request.getNoEcoTractor().trim() : null)
+                    .noEcoCaja(request.getNoEcoCaja() != null ? request.getNoEcoCaja().trim() : null)
+                    .docNumber(request.getDocNumber())
+                    .generatedFolio(folio)
+                    .expiresAt(OffsetDateTime.now().plusDays(1))
+                    .build();
+            preCheckin = preCheckinJpaRepository.save(preCheckin);
         }
 
         WarehouseReceptionEntity entity = WarehouseReceptionEntity.builder()
@@ -538,6 +562,25 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
                 entity.getPreCheckin().setBoxPlates(request.getBoxPlates().trim().toUpperCase());
             }
             preCheckinJpaRepository.save(entity.getPreCheckin());
+        } else if ((request.getNoEcoTractor() != null && !request.getNoEcoTractor().isBlank()) ||
+                   (request.getNoEcoCaja() != null && !request.getNoEcoCaja().isBlank())) {
+            SecurityPreCheckinEntity newPre = SecurityPreCheckinEntity.builder()
+                    .token("CHK-" + entity.getFolio())
+                    .organization(entity.getOrganization())
+                    .branch(entity.getBranch())
+                    .status("COMPLETED")
+                    .operationType("DESCARGA")
+                    .driverName(entity.getDriverName())
+                    .tractorPlates(entity.getTractorPlates())
+                    .boxPlates(entity.getBoxPlates())
+                    .noEcoTractor(request.getNoEcoTractor() != null ? request.getNoEcoTractor().trim() : null)
+                    .noEcoCaja(request.getNoEcoCaja() != null ? request.getNoEcoCaja().trim() : null)
+                    .docNumber(entity.getDocNumber())
+                    .generatedFolio(entity.getFolio())
+                    .expiresAt(OffsetDateTime.now().plusDays(1))
+                    .build();
+            newPre = preCheckinJpaRepository.save(newPre);
+            entity.setPreCheckin(newPre);
         }
 
         // Carrier update
