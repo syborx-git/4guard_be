@@ -13,8 +13,9 @@ import java.util.UUID;
 @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
 public class CreateQualityBlockRequest {
 
-    @NotNull(message = "El item_id (tarima) es obligatorio")
     private UUID itemId;
+
+    private String sscc;
 
     @NotNull(message = "La etapa de detección es obligatoria")
     private DetectionStage stage;

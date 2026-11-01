@@ -14,6 +14,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.util.List;
@@ -189,8 +190,40 @@ public class GlobalExceptionHandler {
      * Catch-all for unhandled exceptions.
      * Logs the full stack trace server-side but returns a safe generic message.
      */
+    
+    @ExceptionHandler(AsyncRequestTimeoutException.class)
+    public ResponseEntity<Void> handleAsyncRequestTimeout(AsyncRequestTimeoutException ex) {
+        // En flujos SSE (text/event-stream) o DeferredResult, el timeout es parte del ciclo
+        // natural de vida de la conexión HTTP reactiva. No debe convertirse en JSON ni reportarse como 500.
+        log.debug("[ASYNC] Petición asíncrona / SSE completó su ventana de tiempo normal: {}", ex.getMessage());
+        return ResponseEntity.noContent().build();
+    }
+
+    @ExceptionHandler(java.io.IOException.class)
+    public ResponseEntity<Void> handleIOException(java.io.IOException ex, jakarta.servlet.http.HttpServletRequest request) {
+        String msg = ex.getMessage() != null ? ex.getMessage().toLowerCase() : "";
+        String exName = ex.getClass().getSimpleName();
+        if (msg.contains("aborted") || msg.contains("broken pipe") || msg.contains("connection reset") || exName.contains("ClientAbort")) {
+            // Desconexión normal del cliente/navegador en streaming SSE o cierre de ventana
+            log.debug("[CLIENT_DISCONNECT] Conexión cerrada normalmente por el cliente (SSE/Browser): {}", ex.getMessage());
+            return ResponseEntity.noContent().build();
+        }
+        log.warn("[IO_ERROR] Error de entrada/salida en petición: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+    }
+
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ApiResponse<Void>> handleGeneric(Exception ex) {
+    public ResponseEntity<?> handleGeneric(Exception ex, jakarta.servlet.http.HttpServletRequest request, jakarta.servlet.http.HttpServletResponse response) {
+        String acceptHeader = request.getHeader("Accept");
+        boolean isSse = (acceptHeader != null && acceptHeader.contains("text/event-stream"))
+                || "text/event-stream".equals(response.getContentType());
+
+        // Si la conexión es de streaming SSE o la respuesta ya fue comprometida, no intentar escribir JSON
+        if (isSse || response.isCommitted()) {
+            log.debug("[ASYNC/SSE] Excepción en canal de streaming desconectado [{}]: {}", ex.getClass().getSimpleName(), ex.getMessage());
+            return ResponseEntity.noContent().build();
+        }
+
         log.error("[ERROR] Unhandled exception [{}]: {}", ex.getClass().getSimpleName(), ex.getMessage(), ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.error("Error interno del servidor. Contacte al administrador."));

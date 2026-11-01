@@ -80,7 +80,11 @@ public class BiometricAuthController {
                 .findFirst();
 
         if (userOpt.isEmpty()) {
-            return ResponseEntity.status(401).build();
+            return ResponseEntity.status(401).body(ApiResponse.<AuthResponse>builder()
+                    .success(false)
+                    .message("No se encontró usuario activo para la credencial biométrica")
+                    .timestamp(LocalDateTime.now())
+                    .build());
         }
 
         UserEntity user = userOpt.get();

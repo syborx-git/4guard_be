@@ -485,6 +485,11 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
             entity.setStatus(ReceptionStatus.ASSIGNED);
         }
 
+        // Priority update (NORMAL / URGENT)
+        if (request.getPriority() != null && !request.getPriority().isBlank()) {
+            entity.setPriority(request.getPriority().trim().toUpperCase());
+        }
+
         String currentUser = securityAuditHelper.getCurrentUsername();
         entity.setUpdatedBy(currentUser);
 

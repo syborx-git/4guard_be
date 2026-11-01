@@ -26,6 +26,7 @@ public class ReceptionResponse {
     private UUID branchId;
     private String folio;
     private String status;
+    private String priority;
     private String operationType;
     private UUID sourceOutboundId;
     private String sourceOutboundFolio;

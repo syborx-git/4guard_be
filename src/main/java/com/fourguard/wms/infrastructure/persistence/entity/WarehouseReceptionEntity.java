@@ -53,6 +53,10 @@ public class WarehouseReceptionEntity extends BaseVersionedEntity {
     @Builder.Default
     private ReceptionStatus status = ReceptionStatus.REGISTERED;
 
+    @Column(name = "priority", length = 20)
+    @Builder.Default
+    private String priority = "NORMAL";
+
     // ── CheckIn Caseta ──────────────────────────────────────────────────────
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "pre_checkin_id")
