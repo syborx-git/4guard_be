@@ -2,9 +2,11 @@ package com.fourguard.wms.presentation.controller;
 
 import com.fourguard.wms.application.dto.response.audit.ActiveSessionResponse;
 import com.fourguard.wms.application.dto.response.audit.UserActivityAuditResponse;
+import com.fourguard.wms.application.dto.response.audit.UserWorkHoursResponse;
 import com.fourguard.wms.application.dto.response.history.RemissionHistoryPageResponse;
 import com.fourguard.wms.domain.ports.in.GetActiveSessionsUseCase;
 import com.fourguard.wms.domain.ports.in.GetUserActivityUseCase;
+import com.fourguard.wms.domain.ports.in.GetUserWorkHoursUseCase;
 import com.fourguard.wms.domain.ports.in.RemissionHistoryUseCase;
 import com.fourguard.wms.domain.ports.in.RevokeUserSessionUseCase;
 import com.fourguard.wms.shared.response.ApiResponse;
@@ -23,21 +25,23 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.security.Principal;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
 /**
- * REST controller for audit log queries and active sessions.
+ * REST controller for audit log queries, active sessions, and work hours reporting.
  */
 @RestController
 @RequestMapping("/audit")
 @RequiredArgsConstructor
-@Tag(name = "Auditoría", description = "Endpoints para la consulta de bitácoras y sesiones activas")
+@Tag(name = "Auditoría", description = "Endpoints para la consulta de bitácoras, sesiones activas y reporte de horas")
 public class AuditController {
 
     private final GetActiveSessionsUseCase getActiveSessionsUseCase;
     private final GetUserActivityUseCase getUserActivityUseCase;
+    private final GetUserWorkHoursUseCase getUserWorkHoursUseCase;
     private final RevokeUserSessionUseCase revokeUserSessionUseCase;
     private final RemissionHistoryUseCase remissionHistoryUseCase;
 
@@ -61,6 +65,27 @@ public class AuditController {
 
         return ResponseEntity.ok(
                 ApiResponse.ok("Sesiones activas recuperadas con éxito", activeSessions));
+    }
+
+    @GetMapping("/work-hours")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('CEO')")
+    @Operation(
+            summary = "Consultar reporte de horas trabajadas",
+            description = "Endpoint exclusivo para Dirección General. Calcula las horas trabajadas netas, asistencias e intervalos de sesión con descuento por inactividad.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Reporte de horas trabajadas obtenido con éxito"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "No autenticado"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Acceso denegado: Exclusivo de Dirección General")
+    })
+    public ResponseEntity<ApiResponse<List<UserWorkHoursResponse>>> getWorkHours(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(required = false) UUID organizationId,
+            @RequestParam(required = false) UUID branchId,
+            @RequestParam(required = false) String role,
+            Principal principal) {
+
+        List<UserWorkHoursResponse> report = getUserWorkHoursUseCase.getWorkHours(date, organizationId, branchId, role, principal);
+        return ResponseEntity.ok(ApiResponse.ok("Reporte de horas trabajadas obtenido con éxito", report));
     }
 
     @GetMapping("/user-activity")

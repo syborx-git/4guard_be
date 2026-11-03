@@ -3,6 +3,7 @@ package com.fourguard.wms.domain.ports.out;
 import com.fourguard.wms.infrastructure.persistence.entity.AuditLogEntity;
 
 import java.time.OffsetDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -16,6 +17,5 @@ public interface AuditLogRepositoryPort {
     List<AuditLogEntity> findByActionAndCreatedAtAfter(String action, OffsetDateTime since);
     Optional<AuditLogEntity> findLastLogoutForUserAfter(UUID userId, OffsetDateTime timestamp);
     List<AuditLogEntity> findUserActivity(UUID userId, String action, OffsetDateTime fromDate, OffsetDateTime toDate);
+    List<AuditLogEntity> findSessionsInDateRange(OffsetDateTime startDate, OffsetDateTime endDate, Collection<String> actions);
 }
-
-
