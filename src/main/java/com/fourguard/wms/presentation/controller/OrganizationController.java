@@ -63,7 +63,7 @@ public class OrganizationController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('ORGANIZATIONS_READ') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('ORGANIZATIONS_READ') or isAuthenticated()")
     @Operation(summary = "Obtener organización por ID", description = "Recupera los detalles de una organización específica por su UUID.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Organización encontrada"),
@@ -91,7 +91,7 @@ public class OrganizationController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAuthority('ORGANIZATIONS_READ') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('ORGANIZATIONS_READ') or isAuthenticated()")
     @Operation(summary = "Obtener todas las organizaciones", description = "Recupera la lista de todas las organizaciones registradas.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Lista recuperada con éxito"),

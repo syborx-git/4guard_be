@@ -2,6 +2,7 @@ package com.fourguard.wms.application.dto.request;
 
 import com.fourguard.wms.domain.enums.ShiftScopeType;
 import com.fourguard.wms.domain.enums.ShiftStatus;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -39,6 +40,16 @@ public class CreateShiftRequest {
 
     @Min(value = 0, message = "La tolerancia no puede ser negativa")
     Integer toleranceMinutes;
+
+    LocalTime mealStartTime;
+
+    LocalTime mealEndTime;
+
+    @Min(value = 0, message = "La ventana de pausa anticipada no puede ser negativa")
+    @Max(value = 60, message = "La ventana de pausa anticipada no puede superar 60 minutos")
+    Integer mealEarlyPauseMinutes;
+
+    Boolean hasMealBreak;
 
     @NotNull(message = "El alcance (scopeType) es requerido")
     ShiftScopeType scopeType;

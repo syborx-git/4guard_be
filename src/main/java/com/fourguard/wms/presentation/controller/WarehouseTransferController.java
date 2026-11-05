@@ -69,7 +69,7 @@ public class WarehouseTransferController {
     // ─── LIFECYCLE TRANSITIONS (RF TERMINAL & CONTROL DESK) ─────────────────────
 
     @PostMapping("/{id}/start")
-    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('FORKLIFT_OPERATOR') or hasRole('CONTROL_DESK')")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('FORKLIFT_OPERATOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Iniciar maniobra de traspaso en montacargas", description = "Pasa el estatus a IN_PROGRESS y estampa hora de inicio.")
     public ResponseEntity<ApiResponse<TransferResponse>> startTransfer(
             @PathVariable UUID id,
@@ -80,7 +80,7 @@ public class WarehouseTransferController {
     }
 
     @PostMapping("/{id}/pause")
-    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('FORKLIFT_OPERATOR') or hasRole('CONTROL_DESK')")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('FORKLIFT_OPERATOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Pausar maniobra de traspaso", description = "Pausa la tarea por cambio de turno o interrupción urgente.")
     public ResponseEntity<ApiResponse<TransferResponse>> pauseTransfer(
             @PathVariable UUID id,
@@ -92,7 +92,7 @@ public class WarehouseTransferController {
     }
 
     @PostMapping("/{id}/resume")
-    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('FORKLIFT_OPERATOR') or hasRole('CONTROL_DESK')")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('FORKLIFT_OPERATOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Reanudar maniobra de traspaso", description = "Reanuda un traspaso previamente pausado pasando a IN_PROGRESS.")
     public ResponseEntity<ApiResponse<TransferResponse>> resumeTransfer(
             @PathVariable UUID id,
@@ -103,7 +103,7 @@ public class WarehouseTransferController {
     }
 
     @PostMapping("/{id}/complete")
-    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('FORKLIFT_OPERATOR') or hasRole('CONTROL_DESK')")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('FORKLIFT_OPERATOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Completar depósito de traspaso", description = "Asienta la reubicación de inventario en Kardex y marca COMPLETED.")
     public ResponseEntity<ApiResponse<TransferResponse>> completeTransfer(
             @PathVariable UUID id,
@@ -114,7 +114,7 @@ public class WarehouseTransferController {
     }
 
     @PatchMapping("/{id}/priority")
-    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('CONTROL_DESK')")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Actualizar prioridad de traspaso", description = "Cambia prioridad a 'NORMAL' o 'URGENT' y despacha alarma a terminales RF.")
     public ResponseEntity<ApiResponse<TransferResponse>> updatePriority(
             @PathVariable UUID id,
@@ -125,7 +125,7 @@ public class WarehouseTransferController {
     }
 
     @PutMapping("/{id}/reassign")
-    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('CONTROL_DESK')")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('FORKLIFT_OPERATOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Reasignar operador de montacargas", description = "Asigna dinámicamente un nuevo montacarguista a la maniobra.")
     public ResponseEntity<ApiResponse<TransferResponse>> reassignOperator(
             @PathVariable UUID id,
@@ -138,7 +138,7 @@ public class WarehouseTransferController {
     // ─── CANCEL TRANSFER ───────────────────────────────────────────────────────
 
     @PostMapping("/{id}/cancel")
-    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_CANCEL') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_CANCEL') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Cancelar traspaso", description = "Revoca el traspaso reubicando las tarimas a su bahía de origen.")
     public ResponseEntity<ApiResponse<TransferResponse>> cancelTransfer(
             @PathVariable UUID id,
@@ -150,7 +150,7 @@ public class WarehouseTransferController {
     // ─── AUDIT LOGS ───────────────────────────────────────────────────────────
 
     @GetMapping("/{id}/audit")
-    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasAuthority('INVENTORY_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('FORKLIFT_OPERATOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Consultar auditoría del traspaso", description = "Retorna la línea de tiempo de auditoría del traspaso.")
     public ResponseEntity<ApiResponse<List<MovementAuditResponse>>> getAuditLogs(@PathVariable UUID id) {
         List<MovementAuditResponse> logs = transferUseCase.getAuditLogs(id);

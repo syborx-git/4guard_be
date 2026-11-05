@@ -60,7 +60,7 @@ public class WarehouseMapController {
 
 
     @PatchMapping("/positions/{positionId}/status")
-    @PreAuthorize("hasAuthority('LOCATIONS_UPDATE') or hasAuthority('INVENTORY_UPDATE') or hasAuthority('QUALITY_UPDATE') or hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('FORKLIFT_OPERATOR')")
+    @PreAuthorize("hasAuthority('LOCATIONS_UPDATE') or hasAuthority('INVENTORY_UPDATE') or hasAuthority('QUALITY_UPDATE') or hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('FORKLIFT_OPERATOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Actualizar estado operativo de posición", description = "Ejecuta transiciones FSM: BLOCK (bloqueo QM), RELEASE (liberación) u OCCUPY.")
     public ResponseEntity<ApiResponse<PositionMapDetailResponse>> updatePositionStatus(
             @PathVariable UUID positionId,
@@ -72,7 +72,7 @@ public class WarehouseMapController {
     }
 
     @PostMapping("/positions")
-    @PreAuthorize("hasAuthority('LOCATIONS_CREATE') or hasAuthority('LAYOUT_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('LOCATIONS_CREATE') or hasAuthority('LAYOUT_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Dar de alta una nueva posición/bahía", description = "Crea una posición fija, temporal de buffer o precarga en la sección de almacén.")
     public ResponseEntity<ApiResponse<PositionMapDetailResponse>> createPosition(
             @Valid @RequestBody com.fourguard.wms.application.dto.request.map.CreatePositionMapRequest request,
@@ -83,7 +83,7 @@ public class WarehouseMapController {
     }
 
     @PutMapping("/positions/{positionId}")
-    @PreAuthorize("hasAuthority('LOCATIONS_UPDATE') or hasAuthority('LAYOUT_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('LOCATIONS_UPDATE') or hasAuthority('LAYOUT_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Actualizar configuración y capacidad de una posición", description = "Modifica la capacidad en tarimas, categoría, o coordenadas físicas.")
     public ResponseEntity<ApiResponse<PositionMapDetailResponse>> updatePositionDetails(
             @PathVariable UUID positionId,
@@ -95,7 +95,7 @@ public class WarehouseMapController {
     }
 
     @DeleteMapping("/positions/{positionId}")
-    @PreAuthorize("hasAuthority('LOCATIONS_DELETE') or hasAuthority('LAYOUT_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('LOCATIONS_DELETE') or hasAuthority('LAYOUT_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Dar de baja una posición/bahía", description = "Inhabilita o da de baja lógica la posición si no tiene inventario activo.")
     public ResponseEntity<ApiResponse<Void>> deletePosition(
             @PathVariable UUID positionId,

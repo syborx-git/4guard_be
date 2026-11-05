@@ -9,11 +9,7 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 /**
- * Turno vigente resuelto para una sucursal.
- *
- * <p>En la Fase 2 la resolución es de solo lectura: {@code sessionId} viaja
- * {@code null} y no se persiste ninguna sesión. La Fase 3 agregará
- * {@code shift_sessions} y poblará {@code sessionId}.</p>
+ * Turno vigente resuelto para una sucursal, incluyendo horario de comida y estado de pausa.
  */
 @Getter
 @Builder(toBuilder = true)
@@ -30,6 +26,14 @@ public class ActiveShiftResponse {
     private final LocalTime endTime;
     private final Boolean isOvernight;
     private final Integer toleranceMinutes;
+
+    /** Horario y ventana de comida */
+    private final LocalTime mealStartTime;
+    private final LocalTime mealEndTime;
+    private final Integer mealEarlyPauseMinutes;
+    private final Boolean hasMealBreak;
+    private final Boolean isMealActive;
+    private final Boolean canPauseForMeal;
 
     /** Fecha de negocio calculada en la zona horaria de la sucursal. */
     private final LocalDate businessDate;

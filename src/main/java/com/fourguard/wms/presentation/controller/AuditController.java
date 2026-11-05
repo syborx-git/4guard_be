@@ -113,7 +113,7 @@ public class AuditController {
     }
 
     @GetMapping("/remissions")
-    @PreAuthorize("hasAuthority('AUDIT_READ') or hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasAuthority('RECEIVING_READ') or hasAuthority('SHIPPING_READ') or hasRole('ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('AUDIT_READ') or hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasAuthority('RECEIVING_READ') or hasAuthority('SHIPPING_READ') or hasRole('ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('CONTROL_DESK') or hasRole('SHIFT_LEADER') or hasRole('SECURITY_GUARD') or hasRole('CEO')")
     @Operation(
             summary = "Consultar historial de remisiones",
             description = "Devuelve el historial multi-entidad de recepciones, salidas y traspasos con filtros de fecha, cliente, estatus, turno y búsqueda.")

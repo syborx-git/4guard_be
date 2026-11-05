@@ -150,7 +150,7 @@ public class WarehouseReceptionController {
     // ─── CANCEL RECEPTION (ADMIN) ──────────────────────────────────────────────
 
     @PostMapping("/{id}/cancel")
-    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_CANCEL') or hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('CEO')")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_CANCEL') or hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Cancelación extraordinaria de recepción",
                description = "Revoca la recepción con validación de credenciales de Administrador y motivo obligatorio.")
     public ResponseEntity<ApiResponse<ReceptionResponse>> cancelReception(
@@ -163,7 +163,7 @@ public class WarehouseReceptionController {
     // ─── REOPEN RECEPTION (SUPERVISOR / ADMIN) ──────────────────────────────────
 
     @PostMapping("/{id}/reopen")
-    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasAuthority('RECEIVING_WRITE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('CEO')")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasAuthority('RECEIVING_WRITE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Reapertura extraordinaria de recepción",
                description = "Reabre una recepción finalizada para permitir el registro de pallets faltantes con autorización y motivo obligatorio.")
     public ResponseEntity<ApiResponse<ReceptionResponse>> reopenReception(
@@ -235,7 +235,7 @@ public class WarehouseReceptionController {
     // ─── AUDIT LOGS ───────────────────────────────────────────────────────────
 
     @GetMapping("/{id}/audit")
-    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasAuthority('RECEIVING_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('CONTROL_DESK') or hasRole('CEO')")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasAuthority('RECEIVING_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('FORKLIFT_OPERATOR') or hasRole('SECURITY_GUARD') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Consultar auditoría de la recepción",
                description = "Retorna la línea de tiempo de auditoría de la recepción con sus deltas de modificación.")
     public ResponseEntity<ApiResponse<List<MovementAuditResponse>>> getAuditLogs(@PathVariable UUID id) {

@@ -90,7 +90,7 @@ public class WarehouseOutboundController {
     // ─── CANCEL OUTBOUND ───────────────────────────────────────────────────────
 
     @PostMapping("/{id}/cancel")
-    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_CANCEL') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_CANCEL') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Cancelar salida de almacén",
                description = "Revoca el despacho y restaura las tarimas al inventario disponible.")
     public ResponseEntity<ApiResponse<OutboundResponse>> cancelOutbound(
@@ -174,7 +174,7 @@ public class WarehouseOutboundController {
     // ─── PAUSE / RESUME DISPATCH ──────────────────────────────────────────────
 
     @PostMapping("/{id}/pause")
-    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('CONTROL_DESK') or hasRole('CEO')")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('FORKLIFT_OPERATOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Pausar despacho por urgencia o fin de turno",
                description = "Pone la maniobra de salida en pausa manteniendo las tarimas ya estibadas.")
     public ResponseEntity<ApiResponse<OutboundResponse>> pauseOutbound(
@@ -186,7 +186,7 @@ public class WarehouseOutboundController {
     }
 
     @PostMapping("/{id}/resume")
-    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('CONTROL_DESK') or hasRole('CEO')")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('FORKLIFT_OPERATOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Reanudar despacho pausado",
                description = "Restaura la salida a IN_PROGRESS para continuar la carga en andén.")
     public ResponseEntity<ApiResponse<OutboundResponse>> resumeOutbound(@PathVariable UUID id) {
@@ -195,7 +195,7 @@ public class WarehouseOutboundController {
     }
 
     @GetMapping("/{id}/audit")
-    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasAuthority('SHIPPING_READ') or hasAuthority('OUTBOUND_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('CONTROL_DESK') or hasRole('CEO')")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasAuthority('SHIPPING_READ') or hasAuthority('OUTBOUND_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('FORKLIFT_OPERATOR') or hasRole('SECURITY_GUARD') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Consultar auditoría de la salida",
                description = "Retorna la línea de tiempo de auditoría del despacho.")
     public ResponseEntity<ApiResponse<List<MovementAuditResponse>>> getAuditLogs(@PathVariable UUID id) {
