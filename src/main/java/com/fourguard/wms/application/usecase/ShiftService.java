@@ -75,6 +75,8 @@ public class ShiftService implements ShiftUseCase {
             throw new ValidationException("El código de turno '" + request.getCode() + "' ya existe para esta sucursal.");
         }
 
+        validateMealSchedule(request.getStartTime(), request.getEndTime(),
+                request.getMealStartTime(), request.getMealEndTime(), request.getHasMealBreak());
         boolean isOvernight = request.getEndTime().isBefore(request.getStartTime());
 
         // Validate overlaps
@@ -326,6 +328,37 @@ public class ShiftService implements ShiftUseCase {
                 .collect(Collectors.toList());
     }
 
+    // ── Meal Schedule & Pause Window Helpers ──────────────────────────────────
+
+    private void validateMealSchedule(java.time.LocalTime startTime, java.time.LocalTime endTime,
+                                      java.time.LocalTime mealStart, java.time.LocalTime mealEnd,
+                                      Boolean hasMealBreak) {
+        if (Boolean.FALSE.equals(hasMealBreak) || (mealStart == null && mealEnd == null)) {
+            return;
+        }
+        if (mealStart == null || mealEnd == null) {
+            throw new ValidationException("Debe especificar tanto la hora de inicio como la hora de término de comida.");
+        }
+        if (mealStart.equals(mealEnd)) {
+            throw new ValidationException("La hora de inicio y término de comida no pueden ser idénticas.");
+        }
+
+        boolean shiftOvernight = endTime.isBefore(startTime);
+        if (!isTimeWithinShift(mealStart, startTime, endTime, shiftOvernight) ||
+            !isTimeWithinShift(mealEnd, startTime, endTime, shiftOvernight)) {
+            throw new ValidationException("El horario de comida (" + mealStart + " a " + mealEnd +
+                    ") debe estar comprendido dentro de la jornada del turno (" + startTime + " a " + endTime + ").");
+        }
+    }
+
+    private boolean isTimeWithinShift(java.time.LocalTime target, java.time.LocalTime start, java.time.LocalTime end, boolean overnight) {
+        if (!overnight) {
+            return !target.isBefore(start) && !target.isAfter(end);
+        } else {
+            return !target.isBefore(start) || !target.isAfter(end);
+        }
+    }
+
     // ── Active Shift Resolution Helpers ───────────────────────────────────────
 
     private ZoneId resolveZone(String timezone) {
@@ -387,6 +420,10 @@ public class ShiftService implements ShiftUseCase {
                 .restBreakMinutes(source.getRestBreakMinutes())
                 .toleranceMinutes(source.getToleranceMinutes())
                 .isOvernight(source.getIsOvernight())
+                .mealStartTime(source.getMealStartTime())
+                .mealEndTime(source.getMealEndTime())
+                .mealEarlyPauseMinutes(source.getMealEarlyPauseMinutes())
+                .hasMealBreak(source.getHasMealBreak())
                 .status(source.getStatus())
                 .scopeType(source.getScopeType())
                 .branch(source.getBranch())
@@ -423,6 +460,10 @@ public class ShiftService implements ShiftUseCase {
         state.put("restBreakMinutes", entity.getRestBreakMinutes());
         state.put("toleranceMinutes", entity.getToleranceMinutes());
         state.put("isOvernight", entity.getIsOvernight());
+        state.put("mealStartTime", entity.getMealStartTime() != null ? entity.getMealStartTime().toString() : null);
+        state.put("mealEndTime", entity.getMealEndTime() != null ? entity.getMealEndTime().toString() : null);
+        state.put("mealEarlyPauseMinutes", entity.getMealEarlyPauseMinutes());
+        state.put("hasMealBreak", entity.getHasMealBreak());
         state.put("status", entity.getStatus() != null ? entity.getStatus().name() : null);
         state.put("scopeType", entity.getScopeType() != null ? entity.getScopeType().name() : null);
         state.put("branchId", entity.getBranch() != null ? entity.getBranch().getId().toString() : null);

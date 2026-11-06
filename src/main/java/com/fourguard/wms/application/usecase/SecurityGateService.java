@@ -48,6 +48,7 @@ public  class SecurityGateService implements SecurityGateUseCase {
     private final WarehouseReceptionUseCase warehouseReceptionUseCase;
     private final WarehouseOutboundUseCase warehouseOutboundUseCase;
     private final SecurityAuditHelper securityAuditHelper;
+    private final ShiftSessionService shiftSessionService;
 
     @Override
     @Transactional(readOnly = true)
@@ -351,7 +352,7 @@ public  class SecurityGateService implements SecurityGateUseCase {
         // 2. Unificar todas las recepciones activas en planta de
         // wms.warehouse_receptions (incluye canceladas recientes que no han salido de caseta)
         List<WarehouseReceptionEntity> activeReceptions = warehouseReceptionRepositoryPort.findAll(
-                WarehouseReceptionSpecification.withFilters(organizationId, branchId, null, null));
+                WarehouseReceptionSpecification.withFilters(organizationId, branchId, null, null, null, com.fourguard.wms.domain.enums.MovementScope.CURRENT));
 
         OffsetDateTime recentThreshold = OffsetDateTime.now().minusDays(2);
         for (WarehouseReceptionEntity rec : activeReceptions) {
@@ -367,7 +368,7 @@ public  class SecurityGateService implements SecurityGateUseCase {
         // 3. Unificar todos los embarques (outbounds) activos en planta de
         // wms.warehouse_outbounds (incluye cancelados recientes que no han salido de caseta)
         List<WarehouseOutboundEntity> activeOutbounds = warehouseOutboundRepositoryPort.findAll(
-                WarehouseOutboundSpecification.withFilters(organizationId, branchId, null, null));
+                WarehouseOutboundSpecification.withFilters(organizationId, branchId, null, null, null, com.fourguard.wms.domain.enums.MovementScope.CURRENT));
 
         for (WarehouseOutboundEntity out : activeOutbounds) {
             boolean isOldCancelled = out.getStatus() == OutboundStatus.CANCELLED &&
@@ -399,8 +400,55 @@ public  class SecurityGateService implements SecurityGateUseCase {
     @Override
     @Transactional(readOnly = true)
     public List<PassResponse> getHistoryPasses(UUID organizationId, UUID branchId, String search) {
-        List<SecurityPreCheckinEntity> list = preCheckinJpaRepository.findHistoryPasses(
-                organizationId, branchId);
+        return getHistoryPasses(organizationId, branchId, search, false, null, null, null);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PassResponse> getHistoryPasses(UUID organizationId, UUID branchId, String search,
+            Boolean currentShiftOnly, UUID shiftSessionId, OffsetDateTime from, OffsetDateTime to) {
+        List<SecurityPreCheckinEntity> list = preCheckinJpaRepository.findHistoryPasses(organizationId, branchId);
+
+        if (Boolean.TRUE.equals(currentShiftOnly)) {
+            UUID targetSessionId = shiftSessionId;
+            OffsetDateTime since = null;
+            if (targetSessionId == null && branchId != null) {
+                try {
+                    var activeSession = shiftSessionService.getOrOpenActiveSession(branchId);
+                    if (activeSession != null) {
+                        targetSessionId = activeSession.getId();
+                        since = activeSession.getStartedAt();
+                    }
+                } catch (Exception e) {
+                    log.warn("Could not resolve active session for shift history: {}", e.getMessage());
+                }
+            }
+            if (since == null) {
+                since = OffsetDateTime.now().truncatedTo(ChronoUnit.DAYS);
+            }
+            final UUID finalSessionId = targetSessionId;
+            final OffsetDateTime finalSince = since;
+
+            list = list.stream().filter(p -> {
+                if (finalSessionId != null && finalSessionId.equals(p.getShiftSessionId())) {
+                    return true;
+                }
+                if (p.getShiftSessionId() == null) {
+                    OffsetDateTime exitTime = p.getExitedAt() != null ? p.getExitedAt() : p.getCreatedAt();
+                    return exitTime != null && !exitTime.isBefore(finalSince);
+                }
+                return false;
+            }).toList();
+        } else if (from != null || to != null) {
+            list = list.stream().filter(p -> {
+                OffsetDateTime exitTime = p.getExitedAt() != null ? p.getExitedAt() : p.getCreatedAt();
+                if (exitTime == null) return false;
+                if (from != null && exitTime.isBefore(from)) return false;
+                if (to != null && exitTime.isAfter(to)) return false;
+                return true;
+            }).toList();
+        }
+
         if (search != null && !search.isBlank()) {
             String q = search.trim().toLowerCase();
             list = list.stream().filter(p -> (p.getToken() != null && p.getToken().toLowerCase().contains(q)) ||
@@ -662,6 +710,16 @@ public  class SecurityGateService implements SecurityGateUseCase {
             entity.setExitedBy(currentUser);
             entity.setExitedAt(OffsetDateTime.now());
             entity.setStatus("COMPLETED_EXIT");
+            try {
+                if (entity.getBranch() != null) {
+                    var session = shiftSessionService.getOrOpenActiveSession(entity.getBranch().getId());
+                    if (session != null) {
+                        entity.setShiftSessionId(session.getId());
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Could not link shift session to check-out pass {}: {}", entity.getId(), e.getMessage());
+            }
 
             SecurityPreCheckinEntity saved = preCheckinJpaRepository.save(Objects.requireNonNull(entity));
             return mapToResponseWithWarehouseStatus(saved);
@@ -754,16 +812,120 @@ public  class SecurityGateService implements SecurityGateUseCase {
     @Override
     @Transactional
     public void cancelPass(UUID passId) {
-        log.info("Cancelling / discarding pass with ID: {}", passId);
-        SecurityPreCheckinEntity entity = preCheckinJpaRepository.findById(Objects.requireNonNull(passId))
-                .orElseThrow(() -> new EntityNotFoundException("Pase de acceso no encontrado con ID: " + passId));
+        if (passId != null) {
+            cancelPass(passId.toString());
+        }
+    }
 
-        if ("COMPLETED".equalsIgnoreCase(entity.getStatus()) || "COMPLETED_EXIT".equalsIgnoreCase(entity.getStatus())) {
-            throw new ValidationException(
-                    "No se puede eliminar un pase que ya completó su autorización y registro en planta.");
+    @Override
+    @Transactional
+    public void cancelPass(String passIdOrFolio) {
+        if (passIdOrFolio == null || passIdOrFolio.isBlank()) {
+            return;
+        }
+        String cleanIdentifier = passIdOrFolio.trim();
+        log.info("Cancelling / discarding pass or in-yard unit with identifier: {}", cleanIdentifier);
+
+        UUID passId = null;
+        try {
+            passId = UUID.fromString(cleanIdentifier);
+        } catch (IllegalArgumentException ignored) {
         }
 
-        preCheckinJpaRepository.delete(Objects.requireNonNull(entity));
+        // 1. Buscar en SecurityPreCheckinEntity por ID si es UUID
+        if (passId != null) {
+            Optional<SecurityPreCheckinEntity> opt = preCheckinJpaRepository.findById(passId);
+            if (opt.isPresent()) {
+                SecurityPreCheckinEntity entity = opt.get();
+                if ("COMPLETED".equalsIgnoreCase(entity.getStatus()) || "COMPLETED_EXIT".equalsIgnoreCase(entity.getStatus())) {
+                    entity.setStatus("COMPLETED_EXIT");
+                    preCheckinJpaRepository.save(entity);
+                } else {
+                    preCheckinJpaRepository.delete(entity);
+                }
+                return;
+            }
+        }
+
+        // 2. Buscar en SecurityPreCheckinEntity por Token o GeneratedFolio
+        Optional<SecurityPreCheckinEntity> byToken = preCheckinJpaRepository.findByToken(cleanIdentifier);
+        if (byToken.isEmpty()) {
+            byToken = preCheckinJpaRepository.findByToken(cleanIdentifier.toUpperCase());
+        }
+        if (byToken.isPresent()) {
+            SecurityPreCheckinEntity entity = byToken.get();
+            if ("COMPLETED".equalsIgnoreCase(entity.getStatus()) || "COMPLETED_EXIT".equalsIgnoreCase(entity.getStatus())) {
+                entity.setStatus("COMPLETED_EXIT");
+                preCheckinJpaRepository.save(entity);
+            } else {
+                preCheckinJpaRepository.delete(entity);
+            }
+            return;
+        }
+
+        Optional<SecurityPreCheckinEntity> byFolio = preCheckinJpaRepository.findByGeneratedFolio(cleanIdentifier);
+        if (byFolio.isPresent()) {
+            SecurityPreCheckinEntity entity = byFolio.get();
+            entity.setStatus("COMPLETED_EXIT");
+            preCheckinJpaRepository.save(entity);
+            return;
+        }
+
+        // 3. Si es una Salida (Outbound), registrar salida en caseta para excluir de patio
+        Optional<WarehouseOutboundEntity> outboundOpt = warehouseOutboundRepositoryPort.findByFolio(cleanIdentifier);
+        if (outboundOpt.isEmpty() && passId != null) {
+            outboundOpt = warehouseOutboundRepositoryPort.findById(passId);
+        }
+        if (outboundOpt.isPresent()) {
+            WarehouseOutboundEntity out = outboundOpt.get();
+            SecurityPreCheckinEntity exitEntity = SecurityPreCheckinEntity.builder()
+                    .token("DISCARD-" + out.getFolio())
+                    .organization(out.getOrganization())
+                    .branch(out.getBranch())
+                    .status("COMPLETED_EXIT")
+                    .operationType("CARGA")
+                    .generatedFolio(out.getFolio())
+                    .driverName(safeTruncate(out.getDriverName(), 200))
+                    .tractorPlates(safeTruncate(out.getTractorPlates(), 50))
+                    .boxPlates(safeTruncate(out.getBoxPlates(), 50))
+                    .departureTime(LocalTime.now())
+                    .exitObservations("Descartado de patio")
+                    .exitedAt(OffsetDateTime.now())
+                    .createdAt(out.getCreatedAt() != null ? out.getCreatedAt() : OffsetDateTime.now())
+                    .expiresAt(OffsetDateTime.now().plusDays(1))
+                    .build();
+            preCheckinJpaRepository.save(exitEntity);
+            return;
+        }
+
+        // 4. Si es una Recepcion (Inbound), registrar salida en caseta para excluir de patio
+        Optional<WarehouseReceptionEntity> recOpt = warehouseReceptionRepositoryPort.findByFolio(cleanIdentifier);
+        if (recOpt.isEmpty() && passId != null) {
+            recOpt = warehouseReceptionRepositoryPort.findById(passId);
+        }
+        if (recOpt.isPresent()) {
+            WarehouseReceptionEntity rec = recOpt.get();
+            SecurityPreCheckinEntity exitEntity = SecurityPreCheckinEntity.builder()
+                    .token("DISCARD-" + rec.getFolio())
+                    .organization(rec.getOrganization())
+                    .branch(rec.getBranch())
+                    .status("COMPLETED_EXIT")
+                    .operationType("DESCARGA")
+                    .generatedFolio(rec.getFolio())
+                    .driverName(safeTruncate(rec.getDriverName(), 200))
+                    .tractorPlates(safeTruncate(rec.getTractorPlates(), 50))
+                    .boxPlates(safeTruncate(rec.getBoxPlates(), 50))
+                    .departureTime(LocalTime.now())
+                    .exitObservations("Descartado de patio")
+                    .exitedAt(OffsetDateTime.now())
+                    .createdAt(rec.getCreatedAt() != null ? rec.getCreatedAt() : OffsetDateTime.now())
+                    .expiresAt(OffsetDateTime.now().plusDays(1))
+                    .build();
+            preCheckinJpaRepository.save(exitEntity);
+            return;
+        }
+
+        log.warn("Pass or in-yard folio not found for discarding: {}", cleanIdentifier);
     }
 
     private PassResponse mapReceptionToPassResponse(WarehouseReceptionEntity rec) {
@@ -806,7 +968,7 @@ public  class SecurityGateService implements SecurityGateUseCase {
                 .generatedFolio(rec.getFolio())
                 .observations(rec.getObservations())
                 .warehouseStatus(rec.getStatus() != null ? rec.getStatus().name() : "REGISTERED")
-                .isReadyForExit(rec.getStatus() == ReceptionStatus.COMPLETED || rec.getStatus() == ReceptionStatus.CANCELLED)
+                .isReadyForExit(rec.getStatus() == ReceptionStatus.DISCHARGED)
                 .cancellationReason(rec.getCancellationReason())
                 .cancelledBy(rec.getCancelledBy())
                 .cancelledAt(rec.getCancelledAt())
@@ -850,7 +1012,7 @@ public  class SecurityGateService implements SecurityGateUseCase {
                 .generatedFolio(out.getFolio())
                 .observations(out.getObservations())
                 .warehouseStatus(out.getStatus() != null ? out.getStatus().name() : "REGISTERED")
-                .isReadyForExit(out.getStatus() == OutboundStatus.COMPLETED || out.getStatus() == OutboundStatus.CANCELLED)
+                .isReadyForExit(out.getStatus() == OutboundStatus.LOADED)
                 .cancellationReason(out.getCancellationReason())
                 .cancelledBy(out.getCancelledBy())
                 .cancelledAt(out.getCancelledAt())

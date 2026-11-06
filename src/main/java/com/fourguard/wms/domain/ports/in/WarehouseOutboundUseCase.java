@@ -52,6 +52,12 @@ public interface WarehouseOutboundUseCase {
 
     OutboundResponse updateOutbound(UUID id, com.fourguard.wms.application.dto.request.outbound.UpdateOutboundRequest request);
 
+    OutboundResponse updatePriority(UUID id, String priority);
+
+    OutboundResponse pauseOutbound(UUID id, String reason);
+
+    OutboundResponse resumeOutbound(UUID id);
+
     OutboundResponse cancelOutbound(UUID id, CancelOutboundRequest request);
 
     OutboundResponse changeRemision(UUID id, ChangeRemisionRequest request);

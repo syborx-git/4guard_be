@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -73,6 +74,9 @@ public class AuditLogPersistenceAdapter implements AuditLogRepositoryPort {
 
         return repository.findAll(spec);
     }
+
+    @Override
+    public List<AuditLogEntity> findSessionsInDateRange(OffsetDateTime startDate, OffsetDateTime endDate, Collection<String> actions) {
+        return repository.findSessionsInDateRange(startDate, endDate, actions);
+    }
 }
-
-

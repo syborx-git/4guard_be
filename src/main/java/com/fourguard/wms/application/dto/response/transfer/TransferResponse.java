@@ -12,6 +12,7 @@ import java.util.UUID;
 /**
  * Full detail response DTO for internal warehouse transfer (Cambio de Almacén).
  * Homologated with Frontend `WarehouseTransfer`.
+ * ADR-011, ADR-017, ADR-020, ADR-022.
  */
 @Data
 @Builder
@@ -24,6 +25,7 @@ public class TransferResponse {
     private UUID branchId;
     private String folio;
     private String status;
+    private String priority;
 
     private UUID originLocationId;
     private String originLocationCode;
@@ -42,6 +44,11 @@ public class TransferResponse {
     private Integer distinctSkus;
 
     private List<TransferItemResponse> items;
+
+    private OffsetDateTime startedAt;
+    private OffsetDateTime completedAt;
+    private OffsetDateTime pausedAt;
+    private String pauseReason;
 
     private OffsetDateTime cancelledAt;
     private String cancellationReason;

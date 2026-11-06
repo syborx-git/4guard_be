@@ -34,7 +34,7 @@ public class ClientController {
     // ── CRUD Principal del Cliente ───────────────────────────────────────────
 
     @PostMapping
-    @PreAuthorize("hasAuthority('CLIENTS_CREATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('CLIENTS_CREATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Crear cliente", description = "Registra un nuevo cliente depositante con sus contactos y destinos físicos.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Cliente creado con éxito"),
@@ -50,7 +50,7 @@ public class ClientController {
     }
 
     @PutMapping
-    @PreAuthorize("hasAuthority('CLIENTS_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('CLIENTS_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Actualizar cliente", description = "Actualiza los datos del cliente y sincroniza inteligentemente contactos y destinos.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Cliente actualizado con éxito"),
@@ -87,7 +87,7 @@ public class ClientController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('CLIENTS_DELETE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('CLIENTS_DELETE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Eliminar cliente", description = "Elimina físicamente un cliente y sus registros relacionados (CASCADE). Usar solo si no tiene historial de movimientos.")
     public ResponseEntity<ApiResponse<Void>> deleteClient(@PathVariable UUID id) {
         clientUseCase.deleteClient(id);
@@ -95,14 +95,14 @@ public class ClientController {
     }
 
     @PatchMapping("/{id}/status")
-    @PreAuthorize("hasAuthority('CLIENTS_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('CLIENTS_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Alternar estado del cliente", description = "Cambia el estado del cliente entre ACTIVE e INACTIVE (baja lógica - RN-CLI-006).")
     public ResponseEntity<ApiResponse<ClientResponse>> toggleClientStatus(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.ok("Estado del cliente actualizado", clientUseCase.toggleClientStatus(id)));
     }
 
     @GetMapping("/{id}/audit")
-    @PreAuthorize("hasAuthority('CLIENTS_READ') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('CLIENTS_READ') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Historial de auditoría del cliente", description = "Recupera la bitácora de cambios para un cliente específico.")
     public ResponseEntity<ApiResponse<List<ClientAuditResponse>>> getClientAuditLogs(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.ok("Historial recuperado con éxito", clientUseCase.getClientAuditLogs(id)));
@@ -118,7 +118,7 @@ public class ClientController {
     }
 
     @PostMapping("/{id}/destinations")
-    @PreAuthorize("hasAuthority('CLIENTS_UPDATE') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('CLIENTS_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Agregar destino físico", description = "Vincula una nueva bodega/planta de destino a un cliente existente.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Destino agregado con éxito"),
@@ -132,7 +132,7 @@ public class ClientController {
     }
 
     @PutMapping("/{id}/destinations/{destinationId}")
-    @PreAuthorize("hasAuthority('CLIENTS_UPDATE') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('CLIENTS_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Actualizar destino físico", description = "Actualiza los datos de una bodega/planta de destino específica.")
     public ResponseEntity<ApiResponse<PhysicalDestinationDto>> updateDestination(
             @PathVariable UUID id,
@@ -143,7 +143,7 @@ public class ClientController {
     }
 
     @DeleteMapping("/{id}/destinations/{destinationId}")
-    @PreAuthorize("hasAuthority('CLIENTS_UPDATE') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('CLIENTS_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Eliminar destino físico", description = "Elimina una bodega/planta de destino de un cliente.")
     public ResponseEntity<ApiResponse<Void>> deleteDestination(
             @PathVariable UUID id,

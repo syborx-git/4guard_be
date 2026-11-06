@@ -24,7 +24,12 @@ public interface SecurityGateUseCase {
 
     List<PassResponse> getInYardPasses(UUID organizationId, UUID branchId);
 
-    List<PassResponse> getHistoryPasses(UUID organizationId, UUID branchId, String search);
+    default List<PassResponse> getHistoryPasses(UUID organizationId, UUID branchId, String search) {
+        return getHistoryPasses(organizationId, branchId, search, false, null, null, null);
+    }
+
+    List<PassResponse> getHistoryPasses(UUID organizationId, UUID branchId, String search,
+            Boolean currentShiftOnly, UUID shiftSessionId, java.time.OffsetDateTime from, java.time.OffsetDateTime to);
 
     PassResponse completeCheckin(String token, GuardCheckinCompletionRequest request);
 
@@ -34,5 +39,11 @@ public interface SecurityGateUseCase {
 
     PassResponse checkOut(String tokenOrFolio, GuardCheckOutRequest request);
 
-    void cancelPass(UUID passId);
+    default void cancelPass(UUID passId) {
+        if (passId != null) {
+            cancelPass(passId.toString());
+        }
+    }
+
+    void cancelPass(String passIdOrFolio);
 }

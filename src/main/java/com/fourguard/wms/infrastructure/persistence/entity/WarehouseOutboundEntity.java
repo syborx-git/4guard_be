@@ -50,6 +50,10 @@ public class WarehouseOutboundEntity extends BaseVersionedEntity {
     @Builder.Default
     private OutboundStatus status = OutboundStatus.REGISTERED;
 
+    @Column(name = "priority", length = 20)
+    @Builder.Default
+    private String priority = "NORMAL";
+
     // ── Cliente y Destino ───────────────────────────────────────────────────
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "client_id", nullable = false)
@@ -123,9 +127,18 @@ public class WarehouseOutboundEntity extends BaseVersionedEntity {
     @Builder.Default
     private Integer distinctSkus = 0;
 
-    // ── Cierre y Cancelación ────────────────────────────────────────────────
+    // ── Cierre, Pausa y Cancelación ─────────────────────────────────────────
+    @Column(name = "started_at")
+    private OffsetDateTime startedAt;
+
     @Column(name = "completed_at")
     private OffsetDateTime completedAt;
+
+    @Column(name = "paused_at")
+    private OffsetDateTime pausedAt;
+
+    @Column(name = "pause_reason", length = 100)
+    private String pauseReason;
 
     @Column(name = "leader_authorized_by", length = 100)
     private String leaderAuthorizedBy;

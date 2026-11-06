@@ -20,6 +20,7 @@ public class OutboundSummaryResponse {
     private UUID id;
     private String folio;
     private String status;
+    private String priority; // NORMAL o URGENT
 
     private UUID clientId;
     private String clientName;
@@ -48,7 +49,10 @@ public class OutboundSummaryResponse {
     private Double totalPieces;
     private Integer distinctSkus;
 
+    private OffsetDateTime startedAt;
     private OffsetDateTime completedAt;
+    private OffsetDateTime pausedAt;
+    private String pauseReason;
     private OffsetDateTime createdAt;
     private String createdBy;
     private UUID shiftSessionId;

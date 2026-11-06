@@ -47,10 +47,35 @@ public class QualityService implements QualityUseCase {
     @Override
     @Transactional
     public QualityBlockResponse createBlock(UUID organizationId, UUID branchId, UUID userId, CreateQualityBlockRequest request) {
-        log.info("Creating quality block for item: {}, branch: {}", request.getItemId(), branchId);
+        log.info("Creating quality block for item: {}, sscc: {}, branch: {}", request.getItemId(), request.getSscc(), branchId);
 
-        InventoryItemEntity item = inventoryItemRepository.findById(request.getItemId())
-                .orElseThrow(() -> new EntityNotFoundException("Tarima / Item no encontrado con ID: " + request.getItemId()));
+        InventoryItemEntity item = null;
+        if (request.getItemId() != null) {
+            item = inventoryItemRepository.findById(request.getItemId()).orElse(null);
+        }
+        if (item == null && request.getSscc() != null && !request.getSscc().isBlank()) {
+            item = inventoryItemRepository.findBySsccOrExternalUa(request.getSscc().trim()).orElse(null);
+        }
+
+        if (item == null) {
+            OrganizationEntity org = organizationRepository.findById(organizationId).orElse(null);
+            BranchEntity branch = branchRepository.findById(branchId).orElse(null);
+            String palletCode = (request.getSscc() != null && !request.getSscc().isBlank())
+                    ? request.getSscc().trim()
+                    : "SSCC-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+
+            item = InventoryItemEntity.builder()
+                    .organization(org)
+                    .branch(branch)
+                    .sscc(palletCode)
+                    .externalUa(palletCode)
+                    .state(InventoryState.IN_QUALITY)
+                    .quantity(request.getQuantity() != null ? request.getQuantity() : BigDecimal.ONE)
+                    .quarantineReason(request.getNotes())
+                    .sapFolio("INBOUND")
+                    .build();
+            item = inventoryItemRepository.save(item);
+        }
 
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado con ID: " + userId));

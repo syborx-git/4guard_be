@@ -14,6 +14,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * JPA Specification for filtering Warehouse Transfers.
+ * Homologado con ADR-011, ADR-017, ADR-020 y ADR-022.
+ */
 public class WarehouseTransferSpecification {
 
     private WarehouseTransferSpecification() {}
@@ -62,7 +66,10 @@ public class WarehouseTransferSpecification {
             if (scope == MovementScope.CURRENT) {
                 predicates.add(root.get("status").in(List.of(
                         TransferStatus.DRAFT,
-                        TransferStatus.CONFIRMED)));
+                        TransferStatus.CONFIRMED,
+                        TransferStatus.ASSIGNED,
+                        TransferStatus.IN_PROGRESS,
+                        TransferStatus.PAUSED)));
             } else if (scope == MovementScope.HISTORY) {
                 predicates.add(root.get("status").in(List.of(
                         TransferStatus.COMPLETED,

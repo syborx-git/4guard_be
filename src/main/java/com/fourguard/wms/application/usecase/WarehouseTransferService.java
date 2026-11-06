@@ -6,6 +6,7 @@ import com.fourguard.wms.application.dto.response.reception.MovementAuditRespons
 import com.fourguard.wms.application.dto.response.transfer.TransferResponse;
 import com.fourguard.wms.application.dto.response.transfer.TransferSummaryResponse;
 import com.fourguard.wms.application.mapper.WarehouseTransferMapper;
+import com.fourguard.wms.domain.enums.MovementScope;
 import com.fourguard.wms.domain.enums.MovementType;
 import com.fourguard.wms.domain.enums.TransferReason;
 import com.fourguard.wms.domain.enums.TransferStatus;
@@ -13,6 +14,7 @@ import com.fourguard.wms.domain.exception.EntityNotFoundException;
 import com.fourguard.wms.domain.exception.ValidationException;
 import com.fourguard.wms.domain.ports.in.WarehouseTransferUseCase;
 import com.fourguard.wms.domain.ports.out.*;
+import com.fourguard.wms.infrastructure.notification.QualityAlertBroadcaster;
 import com.fourguard.wms.infrastructure.persistence.entity.*;
 import com.fourguard.wms.shared.audit.AuditService;
 import com.fourguard.wms.shared.audit.SecurityAuditHelper;
@@ -30,6 +32,10 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * Service implementation for Warehouse Transfer Use Case (Cambio de Almacén).
+ * Homologado con ADR-011, ADR-017, ADR-020 y ADR-022.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -49,13 +55,14 @@ public class WarehouseTransferService implements WarehouseTransferUseCase {
     private final PasswordEncoder passwordEncoder;
     private final WarehouseTransferMapper transferMapper;
     private final ShiftSessionService shiftSessionService;
+    private final QualityAlertBroadcaster alertBroadcaster;
 
     @Override
     @Transactional
     public TransferResponse createTransfer(CreateTransferRequest request) {
-        log.info("Creating warehouse transfer from origin: (id={}, code={}) to dest: (id={}, code={})",
+        log.info("Creating warehouse transfer from origin: (id={}, code={}) to dest: (id={}, code={}) with priority: {}",
                 request.getOriginLocationId(), request.getOriginLocationCode(),
-                request.getDestinationLocationId(), request.getDestinationLocationCode());
+                request.getDestinationLocationId(), request.getDestinationLocationCode(), request.getPriority());
 
         if (request.getOrganizationId() == null) {
             throw new ValidationException("El ID de la organización es obligatorio para registrar un traspaso.");
@@ -106,12 +113,6 @@ public class WarehouseTransferService implements WarehouseTransferUseCase {
                             : request.getDestinationLocationId()));
         }
 
-        if (Boolean.TRUE.equals(destination.getIsBlocked())) {
-            throw new ValidationException("La ubicación destino ("
-                    + (destination.getCode() != null ? destination.getCode() : destination.getId())
-                    + ") se encuentra bloqueada.");
-        }
-
         if (origin.getId().equals(destination.getId())) {
             throw new ValidationException("La ubicación de origen y destino no pueden ser la misma.");
         }
@@ -122,76 +123,53 @@ public class WarehouseTransferService implements WarehouseTransferUseCase {
         }
         if (operator == null && request.getForkliftOperatorName() != null
                 && !request.getForkliftOperatorName().isBlank()) {
-            String opName = request.getForkliftOperatorName().trim().toLowerCase();
+            String opName = request.getForkliftOperatorName().trim();
             operator = forkliftOperatorRepositoryPort.findAll().stream()
-                    .filter(o -> o.getFullName().toLowerCase().contains(opName))
+                    .filter(o -> opName.equalsIgnoreCase(o.getFullName())
+                            || (o.getCode() != null && opName.equalsIgnoreCase(o.getCode())))
                     .findFirst().orElse(null);
         }
 
-        TransferReason reason = TransferReason.REUB_OPERATIVA;
-        if (request.getReasonCode() != null) {
-            try {
-                reason = TransferReason.valueOf(request.getReasonCode().toUpperCase().trim());
-            } catch (IllegalArgumentException ignored) {
-            }
+        TransferReason reason;
+        try {
+            reason = TransferReason.valueOf(request.getReasonCode());
+        } catch (IllegalArgumentException e) {
+            throw new ValidationException("Código de motivo inválido: " + request.getReasonCode());
         }
 
-        // Generate consecutive folio: CAM-YYYY-XXXXXX
-        long seq = transferRepositoryPort.nextFolioSequenceValue();
+        long nextVal = transferRepositoryPort.nextFolioSequenceValue();
         int year = LocalDate.now().getYear();
-        String folio = String.format("CAM-%d-%06d", year, seq);
+        String folio = String.format("CAM-%d-%06d", year, nextVal);
 
-        // Fetch items to transfer
+        List<InventoryItemEntity> originItems = inventoryItemRepositoryPort.findByLocationId(origin.getId());
+        if (originItems.isEmpty()) {
+            throw new ValidationException("La bahía origen (" + origin.getCode() + ") no tiene inventario disponible.");
+        }
+
         List<InventoryItemEntity> itemsToMove = new ArrayList<>();
-        Set<String> requestedCodes = new HashSet<>();
-        if (request.getPalletCodes() != null)
-            requestedCodes.addAll(request.getPalletCodes());
-        if (request.getPalletIds() != null)
-            requestedCodes.addAll(request.getPalletIds());
-
-        if (request.getSelectedItemIds() != null) {
-            for (UUID itemId : request.getSelectedItemIds()) {
-                if (itemId != null) {
-                    inventoryItemRepositoryPort.findById(itemId).ifPresent(item -> {
-                        if (!itemsToMove.contains(item)) itemsToMove.add(item);
-                    });
-                }
-            }
+        if (request.getSelectedItemIds() != null && !request.getSelectedItemIds().isEmpty()) {
+            Set<UUID> targetIds = new HashSet<>(request.getSelectedItemIds());
+            itemsToMove = originItems.stream()
+                    .filter(i -> targetIds.contains(i.getId()))
+                    .collect(Collectors.toList());
+        } else if (request.getPalletCodes() != null && !request.getPalletCodes().isEmpty()) {
+            Set<String> targetCodes = new HashSet<>(request.getPalletCodes());
+            itemsToMove = originItems.stream()
+                    .filter(i -> (i.getSscc() != null && targetCodes.contains(i.getSscc())) ||
+                            (i.getExternalUa() != null && targetCodes.contains(i.getExternalUa())))
+                    .collect(Collectors.toList());
+        } else if (request.getPalletIds() != null && !request.getPalletIds().isEmpty()) {
+            Set<String> targetCodes = new HashSet<>(request.getPalletIds());
+            itemsToMove = originItems.stream()
+                    .filter(i -> (i.getSscc() != null && targetCodes.contains(i.getSscc())) ||
+                            (i.getExternalUa() != null && targetCodes.contains(i.getExternalUa())))
+                    .collect(Collectors.toList());
+        } else {
+            itemsToMove = new ArrayList<>(originItems);
         }
 
-        for (String code : requestedCodes) {
-            if (code == null || code.isBlank())
-                continue;
-            String cleanCode = code.trim();
-            // Check if code is a UUID
-            try {
-                UUID uId = UUID.fromString(cleanCode);
-                inventoryItemRepositoryPort.findById(uId).ifPresent(item -> {
-                    if (!itemsToMove.contains(item)) {
-                        itemsToMove.add(item);
-                    }
-                });
-            } catch (IllegalArgumentException ignored) {}
-
-            inventoryItemRepositoryPort.findBySsccOrExternalUa(cleanCode).ifPresent(item -> {
-                if (!itemsToMove.contains(item)) {
-                    itemsToMove.add(item);
-                }
-            });
-        }
-
-        // Fallback: If no items matched by code/id, match all items currently in origin location
-        if (itemsToMove.isEmpty() && origin != null && origin.getId() != null) {
-            List<InventoryItemEntity> originItems = inventoryItemRepositoryPort.findByLocationId(origin.getId());
-            if (!originItems.isEmpty()) {
-                itemsToMove.addAll(originItems);
-            }
-        }
-
-        // Validar que se hayan encontrado ítems de inventario existentes
         if (itemsToMove.isEmpty()) {
-            throw new ValidationException(
-                    "No se encontraron ítems de inventario disponibles asociados a las tarimas o códigos especificados para el traspaso.");
+            throw new ValidationException("No se encontraron las tarimas seleccionadas en la bahía de origen.");
         }
 
         Set<UUID> distinctSkuIds = itemsToMove.stream()
@@ -226,11 +204,19 @@ public class WarehouseTransferService implements WarehouseTransferUseCase {
             creator = activeUser != null ? activeUser.getUsername() : "Sistema / Supervisor";
         }
 
+        String priority = (request.getPriority() != null && !request.getPriority().isBlank())
+                ? request.getPriority().trim().toUpperCase()
+                : "NORMAL";
+        if (!"NORMAL".equals(priority) && !"URGENT".equals(priority)) {
+            priority = "NORMAL";
+        }
+
         WarehouseTransferEntity transfer = WarehouseTransferEntity.builder()
                 .organization(organization)
                 .branch(branch)
                 .folio(folio)
-                .status(TransferStatus.COMPLETED)
+                .status(TransferStatus.ASSIGNED)
+                .priority(priority)
                 .originLocation(origin)
                 .destinationLocation(destination)
                 .forkliftOperator(operator)
@@ -244,14 +230,8 @@ public class WarehouseTransferService implements WarehouseTransferUseCase {
                 .shiftSessionId(shiftSessionService.getOrOpenActiveSession(branch.getId()).getId())
                 .build();
 
-        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         List<WarehouseTransferItemEntity> transferItems = new ArrayList<>();
-
         for (InventoryItemEntity item : itemsToMove) {
-            // Relocate item in inventory
-            item.setLocation(destination);
-            inventoryItemRepositoryPort.save(item);
-
             String itemSscc = (item.getSscc() != null && !item.getSscc().isBlank()) ? item.getSscc()
                     : item.getExternalUa();
             if (itemSscc == null || itemSscc.isBlank())
@@ -263,33 +243,11 @@ public class WarehouseTransferService implements WarehouseTransferUseCase {
                     .pieces(item.getQuantity() != null ? item.getQuantity() : BigDecimal.ZERO)
                     .palletCode(itemSscc)
                     .build());
-
-            // Log Inventory Movement
-            if (activeUser != null) {
-                InventoryMovementEntity movement = InventoryMovementEntity.builder()
-                        .item(item)
-                        .fromLocation(origin)
-                        .toLocation(destination)
-                        .user(activeUser)
-                        .type(MovementType.TRANSFER)
-                        .reason("Traspaso Folio: " + folio + " (" + reason.name() + ")")
-                        .createdAt(now)
-                        .build();
-                inventoryMovementRepositoryPort.save(movement);
-            }
         }
         transfer.setItems(transferItems);
 
-        // Actualizar ocupación física de bahías: decrementar origen e incrementar
-        // destino
-        if (origin != null && origin.getId() != null) {
-            locationRepositoryPort.decrementOccupancy(origin.getId(), itemsToMove.size());
-        }
-        if (destination != null && destination.getId() != null) {
-            locationRepositoryPort.incrementOccupancy(destination.getId(), itemsToMove.size());
-        }
-
         WarehouseTransferEntity saved = transferRepositoryPort.save(transfer);
+
         String originCode = (origin != null && origin.getCode() != null) ? origin.getCode() : "N/A";
         String destinationCode = (destination != null && destination.getCode() != null) ? destination.getCode() : "N/A";
         String operatorName = (operator != null && operator.getFullName() != null) ? operator.getFullName() : "N/A";
@@ -300,210 +258,401 @@ public class WarehouseTransferService implements WarehouseTransferUseCase {
                 Map.of("folio", safeFolio,
                         "origin", originCode,
                         "destination", destinationCode,
+                        "priority", priority,
                         "totalPallets", String.valueOf(itemsToMove.size()),
                         "operator", operatorName));
 
+        // Transmisión SSE a la terminal RF
+        try {
+            Map<String, Object> ssePayload = new HashMap<>();
+            ssePayload.put("missionId", saved.getId().toString());
+            ssePayload.put("folio", saved.getFolio());
+            ssePayload.put("type", "INTERNAL_TRANSFER");
+            ssePayload.put("status", saved.getStatus().name());
+            ssePayload.put("priority", saved.getPriority());
+            ssePayload.put("originLocation", originCode);
+            ssePayload.put("destinationLocation", destinationCode);
+            if (saved.getForkliftOperator() != null) {
+                ssePayload.put("forkliftOperatorId", saved.getForkliftOperator().getId().toString());
+                ssePayload.put("forkliftOperatorCode", saved.getForkliftOperator().getCode());
+                ssePayload.put("forkliftOperatorName", saved.getForkliftOperator().getFullName());
+            }
+            ssePayload.put("totalPallets", saved.getTotalPallets());
+            ssePayload.put("totalPieces", saved.getTotalPieces());
+            alertBroadcaster.broadcastMissionEvent("MISSION_ASSIGNED", ssePayload);
+        } catch (Exception ignored) {
+        }
+
         return transferMapper.toResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public TransferResponse startTransfer(UUID id, UUID operatorId) {
+        WarehouseTransferEntity transfer = transferRepositoryPort.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Traspaso no encontrado con ID: " + id));
+
+        if (transfer.getStatus() != TransferStatus.ASSIGNED && transfer.getStatus() != TransferStatus.PAUSED) {
+            throw new ValidationException("Solo se puede iniciar un traspaso en estado ASIGNADO o PAUSADO. Estado actual: " + transfer.getStatus());
+        }
+
+        if (operatorId != null && transfer.getForkliftOperator() == null) {
+            forkliftOperatorRepositoryPort.findById(operatorId).ifPresent(transfer::setForkliftOperator);
+        }
+
+        transfer.setStatus(TransferStatus.IN_PROGRESS);
+        if (transfer.getStartedAt() == null) {
+            transfer.setStartedAt(OffsetDateTime.now(ZoneOffset.UTC));
+        }
+
+        WarehouseTransferEntity saved = transferRepositoryPort.save(transfer);
+        broadcastTransferEvent("MISSION_UPDATED", saved);
+        return transferMapper.toResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public TransferResponse pauseTransfer(UUID id, String reason, String notes) {
+        WarehouseTransferEntity transfer = transferRepositoryPort.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Traspaso no encontrado con ID: " + id));
+
+        if (transfer.getStatus() != TransferStatus.IN_PROGRESS && transfer.getStatus() != TransferStatus.ASSIGNED) {
+            throw new ValidationException("Solo se puede pausar un traspaso en curso o asignado. Estado actual: " + transfer.getStatus());
+        }
+
+        transfer.setStatus(TransferStatus.PAUSED);
+        transfer.setPausedAt(OffsetDateTime.now(ZoneOffset.UTC));
+        transfer.setPauseReason(reason != null ? reason : "Pausa operativa / Cambio de turno");
+
+        WarehouseTransferEntity saved = transferRepositoryPort.save(transfer);
+        broadcastTransferEvent("MISSION_UPDATED", saved);
+        return transferMapper.toResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public TransferResponse resumeTransfer(UUID id, UUID operatorId) {
+        WarehouseTransferEntity transfer = transferRepositoryPort.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Traspaso no encontrado con ID: " + id));
+
+        if (transfer.getStatus() != TransferStatus.PAUSED) {
+            throw new ValidationException("Solo se puede reanudar un traspaso en estado PAUSADO. Estado actual: " + transfer.getStatus());
+        }
+
+        if (operatorId != null) {
+            forkliftOperatorRepositoryPort.findById(operatorId).ifPresent(transfer::setForkliftOperator);
+        }
+
+        transfer.setStatus(TransferStatus.IN_PROGRESS);
+        transfer.setPauseReason(null);
+
+        WarehouseTransferEntity saved = transferRepositoryPort.save(transfer);
+        broadcastTransferEvent("MISSION_UPDATED", saved);
+        return transferMapper.toResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public TransferResponse completeTransfer(UUID id, UUID destinationLocationId) {
+        WarehouseTransferEntity transfer = transferRepositoryPort.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Traspaso no encontrado con ID: " + id));
+
+        if (transfer.getStatus() == TransferStatus.COMPLETED) {
+            return transferMapper.toResponse(transfer);
+        }
+        if (transfer.getStatus() == TransferStatus.CANCELLED) {
+            throw new ValidationException("No se puede completar un traspaso cancelado.");
+        }
+
+        LocationEntity destination = transfer.getDestinationLocation();
+        if (destinationLocationId != null && !destinationLocationId.equals(destination.getId())) {
+            destination = locationRepositoryPort.findById(destinationLocationId)
+                    .orElseThrow(() -> new EntityNotFoundException("Nueva bahía destino no encontrada"));
+            transfer.setDestinationLocation(destination);
+        }
+
+        LocationEntity origin = transfer.getOriginLocation();
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+
+        UserEntity activeUser = null;
+        try {
+            String currentUsername = securityAuditHelper.getCurrentUsername();
+            if (currentUsername != null && !currentUsername.isBlank()) {
+                activeUser = userRepositoryPort.findByUsernameOrEmail(currentUsername).orElse(null);
+            }
+        } catch (Exception ignored) {
+        }
+
+        int movedCount = 0;
+        for (WarehouseTransferItemEntity transferItem : transfer.getItems()) {
+            InventoryItemEntity item = transferItem.getItem();
+            if (item != null) {
+                item.setLocation(destination);
+                inventoryItemRepositoryPort.save(item);
+                movedCount++;
+
+                if (activeUser != null) {
+                    InventoryMovementEntity movement = InventoryMovementEntity.builder()
+                            .item(item)
+                            .fromLocation(origin)
+                            .toLocation(destination)
+                            .user(activeUser)
+                            .type(MovementType.TRANSFER)
+                            .reason("Traspaso Folio: " + transfer.getFolio() + " (" + transfer.getReasonCode() + ")")
+                            .createdAt(now)
+                            .build();
+                    inventoryMovementRepositoryPort.save(movement);
+                }
+            }
+        }
+
+        if (origin != null && origin.getId() != null && movedCount > 0) {
+            locationRepositoryPort.decrementOccupancy(origin.getId(), movedCount);
+        }
+        if (destination != null && destination.getId() != null && movedCount > 0) {
+            locationRepositoryPort.incrementOccupancy(destination.getId(), movedCount);
+        }
+
+        transfer.setStatus(TransferStatus.COMPLETED);
+        transfer.setCompletedAt(now);
+
+        WarehouseTransferEntity saved = transferRepositoryPort.save(transfer);
+        broadcastTransferEvent("MISSION_COMPLETED", saved);
+
+        logAudit(saved.getId(), "TRASPASO_COMPLETADO", activeUser,
+                Map.of("status", "IN_PROGRESS"),
+                Map.of("status", "COMPLETED", "destination", destination.getCode(), "totalPallets", String.valueOf(movedCount)));
+
+        return transferMapper.toResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public TransferResponse updatePriority(UUID id, String priority) {
+        WarehouseTransferEntity transfer = transferRepositoryPort.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Traspaso no encontrado con ID: " + id));
+
+        String sanitized = (priority != null) ? priority.trim().toUpperCase() : "NORMAL";
+        if (!"NORMAL".equals(sanitized) && !"URGENT".equals(sanitized)) {
+            throw new ValidationException("Prioridad inválida: " + priority + ". Debe ser 'NORMAL' o 'URGENT'.");
+        }
+
+        transfer.setPriority(sanitized);
+        WarehouseTransferEntity saved = transferRepositoryPort.save(transfer);
+
+        broadcastTransferEvent("URGENT".equals(sanitized) ? "MISSION_URGENT_PREEMPT" : "MISSION_UPDATED", saved);
+        return transferMapper.toResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public TransferResponse reassignOperator(UUID id, UUID forkliftOperatorId) {
+        WarehouseTransferEntity transfer = transferRepositoryPort.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Traspaso no encontrado con ID: " + id));
+
+        ForkliftOperatorEntity newOperator = forkliftOperatorRepositoryPort.findById(forkliftOperatorId)
+                .orElseThrow(() -> new EntityNotFoundException("Operador de montacargas no encontrado con ID: " + forkliftOperatorId));
+
+        transfer.setForkliftOperator(newOperator);
+        WarehouseTransferEntity saved = transferRepositoryPort.save(transfer);
+
+        broadcastTransferEvent("MISSION_ASSIGNED", saved);
+        return transferMapper.toResponse(saved);
+    }
+
+    private void broadcastTransferEvent(String eventType, WarehouseTransferEntity transfer) {
+        try {
+            Map<String, Object> ssePayload = new HashMap<>();
+            ssePayload.put("missionId", transfer.getId().toString());
+            ssePayload.put("folio", transfer.getFolio());
+            ssePayload.put("type", "INTERNAL_TRANSFER");
+            ssePayload.put("status", transfer.getStatus().name());
+            ssePayload.put("priority", transfer.getPriority());
+            if (transfer.getOriginLocation() != null) {
+                ssePayload.put("originLocation", transfer.getOriginLocation().getCode());
+            }
+            if (transfer.getDestinationLocation() != null) {
+                ssePayload.put("destinationLocation", transfer.getDestinationLocation().getCode());
+            }
+            if (transfer.getForkliftOperator() != null) {
+                ssePayload.put("forkliftOperatorId", transfer.getForkliftOperator().getId().toString());
+                ssePayload.put("forkliftOperatorCode", transfer.getForkliftOperator().getCode());
+                ssePayload.put("forkliftOperatorName", transfer.getForkliftOperator().getFullName());
+            }
+            ssePayload.put("totalPallets", transfer.getTotalPallets());
+            ssePayload.put("totalPieces", transfer.getTotalPieces());
+            alertBroadcaster.broadcastMissionEvent(eventType, ssePayload);
+        } catch (Exception ignored) {
+        }
     }
 
     @Override
     @Transactional(readOnly = true)
     public TransferResponse getTransferById(UUID id) {
         WarehouseTransferEntity entity = transferRepositoryPort.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Traspaso no encontrado: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Traspaso no encontrado con ID: " + id));
         return transferMapper.toResponse(entity);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<TransferSummaryResponse> getTransfers(UUID organizationId, UUID branchId, String status,
-            String search, UUID shiftSessionId, com.fourguard.wms.domain.enums.MovementScope scope) {
-        TransferStatus trStatus = null;
+    public List<TransferSummaryResponse> getTransfers(
+            UUID organizationId,
+            UUID branchId,
+            String status,
+            String search,
+            UUID shiftSessionId,
+            MovementScope scope) {
+
+        TransferStatus transferStatus = null;
         if (status != null && !status.isBlank() && !"ALL".equalsIgnoreCase(status)) {
             try {
-                trStatus = TransferStatus.valueOf(status.toUpperCase().trim());
-            } catch (IllegalArgumentException ignored) {
+                transferStatus = TransferStatus.valueOf(status.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                log.warn("Invalid transfer status filter: {}", status);
             }
         }
-        String cleanSearch = (search != null && !search.isBlank()) ? search.trim() : null;
 
-        List<WarehouseTransferEntity> list = transferRepositoryPort.findAll(
-                WarehouseTransferSpecification.withFilters(
-                        organizationId, branchId, trStatus, cleanSearch, shiftSessionId, scope));
-        return list.stream().map(transferMapper::toSummaryResponse).collect(Collectors.toList());
+        var spec = WarehouseTransferSpecification.withFilters(
+                organizationId, branchId, transferStatus, search, shiftSessionId, scope);
+
+        return transferRepositoryPort.findAll(spec).stream()
+                .map(transferMapper::toSummaryResponse)
+                .collect(Collectors.toList());
     }
 
     @Override
     @Transactional
     public TransferResponse cancelTransfer(UUID id, CancelTransferRequest request) {
         WarehouseTransferEntity transfer = transferRepositoryPort.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Traspaso no encontrado: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Traspaso no encontrado con ID: " + id));
 
         if (transfer.getStatus() == TransferStatus.CANCELLED) {
             throw new ValidationException("El traspaso ya se encuentra cancelado.");
         }
 
-        UserEntity admin = validateUserCredentials(request.getAdminUsername(), request.getAdminPassword());
+        UserEntity authorizedBy = userRepositoryPort.findByUsernameOrEmail(request.getAdminUsername())
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "Usuario autorizador no encontrado: " + request.getAdminUsername()));
 
-        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-        transfer.setStatus(TransferStatus.CANCELLED);
-        transfer.setCancelledAt(now);
-        transfer.setCancellationReason(request.getReason());
-        String adminName = ((admin.getFirstName() != null ? admin.getFirstName() : "") +
-                (admin.getLastName() != null ? " " + admin.getLastName() : "")).trim();
-        if (adminName.isBlank())
-            adminName = admin.getUsername();
-        transfer.setCancelledBy(adminName);
+        if (!passwordEncoder.matches(request.getAdminPassword(), authorizedBy.getPassword())) {
+            throw new ValidationException("Contraseña incorrecta para el usuario autorizador.");
+        }
 
-        // Revert items back to originLocation
-        if (transfer.getItems() != null && !transfer.getItems().isEmpty()) {
-            for (WarehouseTransferItemEntity ti : transfer.getItems()) {
-                InventoryItemEntity item = ti.getItem();
+        // Revertir inventario si estaba completado
+        if (transfer.getStatus() == TransferStatus.COMPLETED) {
+            LocationEntity origin = transfer.getOriginLocation();
+            LocationEntity destination = transfer.getDestinationLocation();
+            int movedCount = 0;
+
+            for (WarehouseTransferItemEntity transferItem : transfer.getItems()) {
+                InventoryItemEntity item = transferItem.getItem();
                 if (item != null) {
-                    item.setLocation(transfer.getOriginLocation());
+                    item.setLocation(origin);
                     inventoryItemRepositoryPort.save(item);
+                    movedCount++;
 
-                    InventoryMovementEntity comp = InventoryMovementEntity.builder()
+                    InventoryMovementEntity revMovement = InventoryMovementEntity.builder()
                             .item(item)
-                            .fromLocation(transfer.getDestinationLocation())
-                            .toLocation(transfer.getOriginLocation())
-                            .user(admin)
+                            .fromLocation(destination)
+                            .toLocation(origin)
+                            .user(authorizedBy)
                             .type(MovementType.TRANSFER)
-                            .reason("Compensación por cancelación de Traspaso: " + transfer.getFolio() + " ("
-                                    + request.getReason() + ")")
-                            .createdAt(now)
+                            .reason("REVERSIÓN de Traspaso Folio: " + transfer.getFolio()
+                                    + " (Cancelado: " + request.getReason() + ")")
+                            .createdAt(OffsetDateTime.now(ZoneOffset.UTC))
                             .build();
-                    inventoryMovementRepositoryPort.save(comp);
+                    inventoryMovementRepositoryPort.save(revMovement);
                 }
             }
+
+            if (destination != null && destination.getId() != null && movedCount > 0) {
+                locationRepositoryPort.decrementOccupancy(destination.getId(), movedCount);
+            }
+            if (origin != null && origin.getId() != null && movedCount > 0) {
+                locationRepositoryPort.incrementOccupancy(origin.getId(), movedCount);
+            }
         }
 
-        // Revertir ocupación física de bahías
-        int itemsCount = (transfer.getItems() != null) ? transfer.getItems().size() : 0;
-        if (itemsCount > 0) {
-            if (transfer.getOriginLocation() != null && transfer.getOriginLocation().getId() != null) {
-                locationRepositoryPort.incrementOccupancy(transfer.getOriginLocation().getId(), itemsCount);
-            }
-            if (transfer.getDestinationLocation() != null && transfer.getDestinationLocation().getId() != null) {
-                locationRepositoryPort.decrementOccupancy(transfer.getDestinationLocation().getId(), itemsCount);
-            }
-        }
+        transfer.setStatus(TransferStatus.CANCELLED);
+        transfer.setCancelledAt(OffsetDateTime.now(ZoneOffset.UTC));
+        transfer.setCancellationReason(request.getReason());
+        transfer.setCancelledBy(authorizedBy.getUsername());
 
         WarehouseTransferEntity saved = transferRepositoryPort.save(transfer);
 
-        logAudit(saved.getId(), "TRASPASO_CANCELADO", admin,
-                Map.of("status", "COMPLETED"),
+        logAudit(saved.getId(), "TRASPASO_CANCELADO", authorizedBy,
+                Map.of("status", "ACTIVE"),
                 Map.of("status", "CANCELLED",
-                        "cancelledBy", saved.getCancelledBy() != null ? saved.getCancelledBy() : "N/A",
-                        "reason", request.getReason() != null ? request.getReason() : "Cancelado por supervisor"));
+                        "reason", request.getReason(),
+                        "authorizedBy", authorizedBy.getUsername()));
 
+        broadcastTransferEvent("MISSION_CANCELLED", saved);
         return transferMapper.toResponse(saved);
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<MovementAuditResponse> getAuditLogs(UUID id) {
+        WarehouseTransferEntity transfer = transferRepositoryPort.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Traspaso no encontrado con ID: " + id));
+
         List<AuditLogEntity> logs = auditLogRepositoryPort.findByEntityTypeAndEntityId("TRANSFER", id);
+        if (logs.isEmpty()) {
+            logs = auditLogRepositoryPort.findByEntityTypeAndEntityId("WarehouseTransferEntity", id);
+        }
+
         return logs.stream()
                 .sorted((a, b) -> {
-                    if (a.getCreatedAt() == null && b.getCreatedAt() == null)
-                        return 0;
-                    if (a.getCreatedAt() == null)
-                        return 1;
-                    if (b.getCreatedAt() == null)
-                        return -1;
-                    return b.getCreatedAt().compareTo(a.getCreatedAt()); // Reverse chronological
+                    if (a.getCreatedAt() == null && b.getCreatedAt() == null) return 0;
+                    if (a.getCreatedAt() == null) return 1;
+                    if (b.getCreatedAt() == null) return -1;
+                    return b.getCreatedAt().compareTo(a.getCreatedAt());
                 })
                 .map(this::mapToAuditResponse)
                 .collect(Collectors.toList());
     }
 
-    // ─── PRIVATE HELPERS ─────────────────────────────────────────────────────────
-
-    private UserEntity validateUserCredentials(String username, String password) {
-        final String searchIdentifier = (username != null && !username.isBlank())
-                ? username.trim()
-                : (securityAuditHelper.getCurrentUsername() != null ? securityAuditHelper.getCurrentUsername().trim()
-                        : "");
-
-        if (searchIdentifier.isBlank()) {
-            throw new ValidationException("El nombre de usuario para autorización de traspaso es obligatorio.");
-        }
-
-        UserEntity user = userRepositoryPort.findByUsernameOrEmail(searchIdentifier)
-                .or(() -> userRepositoryPort.findByUsername(searchIdentifier))
-                .or(() -> userRepositoryPort.findByEmail(searchIdentifier))
-                .orElseGet(() -> {
-                    String current = securityAuditHelper.getCurrentUsername();
-                    if (current != null && !current.isBlank()) {
-                        return userRepositoryPort.findByUsernameOrEmail(current)
-                                .or(() -> userRepositoryPort.findByUsername(current))
-                                .or(() -> userRepositoryPort.findByEmail(current))
-                                .orElse(null);
-                    }
-                    return null;
-                });
-
-        if (user == null) {
-            throw new ValidationException("Credenciales inválidas: usuario '" + searchIdentifier + "' no encontrado.");
-        }
-
-        if (Boolean.FALSE.equals(user.getIsEnabled())) {
-            throw new ValidationException("El usuario '" + user.getUsername() + "' está inactivo o deshabilitado.");
-        }
-
-        String currentAuthUser = securityAuditHelper.getCurrentUsername();
-        boolean isCurrentSessionUser = currentAuthUser != null
-                && (currentAuthUser.equalsIgnoreCase(user.getUsername()) ||
-                        currentAuthUser.equalsIgnoreCase(user.getEmail()));
-
-        boolean passwordMatches = (password != null && !password.isBlank()
-                && passwordEncoder.matches(password, user.getPassword()))
-                || "admin123".equals(password)
-                || "adminPassword".equals(password)
-                || "admin".equals(password)
-                || (isCurrentSessionUser && (password == null || password.isBlank() || "admin123".equals(password)));
-
-        if (!passwordMatches) {
-            throw new ValidationException("Contraseña incorrecta para el usuario '"
-                    + (user.getEmail() != null ? user.getEmail() : user.getUsername()) + "'.");
-        }
-
-        return user;
-    }
-
-    private void logAudit(UUID entityId, String action, UserEntity actor, Map<String, Object> before,
-            Map<String, Object> after) {
+    private void logAudit(UUID entityId, String action, UserEntity user,
+            Map<String, ?> oldVals, Map<String, ?> newVals) {
         try {
-            UserEntity activeUser = actor;
+            UserEntity activeUser = user;
             if (activeUser == null) {
                 String username = securityAuditHelper.getCurrentUsername();
                 if (username != null && !username.isBlank()) {
-                    activeUser = userRepositoryPort.findByUsernameOrEmail(username).orElse(null);
+                    activeUser = userRepositoryPort.findByUsername(username).orElse(null);
                 }
             }
             if (activeUser == null) {
-                activeUser = userRepositoryPort.findAll().stream().findFirst().orElse(null);
+                activeUser = userRepositoryPort.findAll().stream()
+                        .filter(u -> Boolean.TRUE.equals(u.getIsEnabled()))
+                        .findFirst()
+                        .orElse(null);
             }
             if (activeUser != null) {
-                auditService.log(activeUser, action, "TRANSFER", entityId, before, after);
+                Map<String, Object> beforeMap = oldVals != null ? new HashMap<>(oldVals) : Collections.emptyMap();
+                Map<String, Object> afterMap = newVals != null ? new HashMap<>(newVals) : Collections.emptyMap();
+                auditService.log(activeUser, action, "TRANSFER", entityId, beforeMap, afterMap);
             }
         } catch (Exception e) {
-            log.warn("Could not record relational audit log for transfer {}: {}", entityId, e.getMessage());
+            log.warn("Could not record audit log for transfer {}: {}", entityId, e.getMessage());
         }
     }
 
     private MovementAuditResponse mapToAuditResponse(AuditLogEntity log) {
-        List<MovementAuditResponse.MovementAuditDetailResponse> details = log.getDetails() != null ? log.getDetails()
-                .stream().map(d -> MovementAuditResponse.MovementAuditDetailResponse.builder()
-                        .fieldName(translateFieldName(d.getFieldName()))
-                        .oldValue(translateFieldValue(d.getFieldName(), d.getOldValue()))
-                        .newValue(translateFieldValue(d.getFieldName(), d.getNewValue()))
-                        .build())
-                .collect(Collectors.toList()) : List.of();
+        List<MovementAuditResponse.MovementAuditDetailResponse> details = log.getDetails() != null
+                ? log.getDetails().stream()
+                        .map(d -> MovementAuditResponse.MovementAuditDetailResponse.builder()
+                                .fieldName(translateFieldName(d.getFieldName()))
+                                .oldValue(translateFieldValue(d.getFieldName(), d.getOldValue()))
+                                .newValue(translateFieldValue(d.getFieldName(), d.getNewValue()))
+                                .build())
+                        .collect(Collectors.toList())
+                : List.of();
 
         String actionLabel = switch (log.getAction()) {
             case "TRASPASO_REGISTRADO" -> "Reubicación de Tarima (Traspaso / Putaway)";
+            case "TRASPASO_COMPLETADO" -> "Depósito Físico Concluido en Bahía Destino";
             case "TRASPASO_CANCELADO" -> "Cancelación de Reubicación de Inventario";
             default -> log.getAction();
         };
@@ -536,6 +685,7 @@ public class WarehouseTransferService implements WarehouseTransferUseCase {
             case "sourceLocation", "source_location", "origin" -> "Ubicación Origen";
             case "targetLocation", "target_location", "destination" -> "Ubicación Destino";
             case "status" -> "Estado Operativo";
+            case "priority" -> "Prioridad Operativa";
             case "reason", "cancellationReason" -> "Motivo / Justificación";
             case "authorizedBy", "authorized_by" -> "Autorizado Por (Supervisor)";
             case "cancelledBy", "cancelled_by" -> "Cancelado Por";
@@ -554,9 +704,13 @@ public class WarehouseTransferService implements WarehouseTransferUseCase {
             return "Sin especificar";
         String val = value.trim();
         return switch (val) {
+            case "ASSIGNED" -> "Asignado a Montacargas";
+            case "IN_PROGRESS" -> "En Maniobra de Reubicación";
+            case "PAUSED" -> "Pausado (Cambio de Turno / Espera)";
             case "COMPLETED" -> "Completado / Reubicado";
             case "CANCELLED" -> "Cancelado";
-            case "PENDING" -> "Pendiente";
+            case "URGENT" -> "Urgente (Prioridad Alta)";
+            case "NORMAL" -> "Normal";
             default -> val;
         };
     }
