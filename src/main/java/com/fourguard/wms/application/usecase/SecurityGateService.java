@@ -49,6 +49,7 @@ public  class SecurityGateService implements SecurityGateUseCase {
     private final WarehouseOutboundUseCase warehouseOutboundUseCase;
     private final SecurityAuditHelper securityAuditHelper;
     private final ShiftSessionService shiftSessionService;
+    private final com.fourguard.wms.domain.ports.out.WmsNotificationPort wmsNotificationPort;
 
     @Override
     @Transactional(readOnly = true)
@@ -177,7 +178,7 @@ public  class SecurityGateService implements SecurityGateUseCase {
     }
 
     @Override
-    @Transactional
+    @Transactional(readOnly = true)
     public PassResponse getPassByToken(String token) {
         if (token == null || token.isBlank()) {
             throw new ValidationException("El token de acceso es obligatorio");
@@ -185,21 +186,12 @@ public  class SecurityGateService implements SecurityGateUseCase {
 
         String searchToken = token.trim().toUpperCase();
         SecurityPreCheckinEntity entity = preCheckinJpaRepository.findByToken(searchToken)
-                .orElseGet(() -> {
-                    OrganizationEntity org = organizationRepositoryPort.findAll().stream().findFirst()
-                            .orElseThrow(() -> new EntityNotFoundException("No se encontró organización por defecto"));
-                    BranchEntity br = branchRepositoryPort.findByOrganizationId(org.getId()).stream().findFirst()
-                            .orElseThrow(() -> new EntityNotFoundException("No se encontró sucursal por defecto"));
-                    SecurityPreCheckinEntity newPre = SecurityPreCheckinEntity.builder()
-                            .token(searchToken)
-                            .organization(org)
-                            .branch(br)
-                            .status("PENDING_DRIVER")
-                            .operationType("DESCARGA")
-                            .expiresAt(OffsetDateTime.now().plusDays(1))
-                            .build();
-                    return preCheckinJpaRepository.save(newPre);
-                });
+                .orElseThrow(() -> new EntityNotFoundException("Pase de acceso no encontrado: " + searchToken));
+
+        if (entity.getExpiresAt() != null && entity.getExpiresAt().isBefore(OffsetDateTime.now())
+                && !"COMPLETED".equals(entity.getStatus()) && !"COMPLETED_EXIT".equals(entity.getStatus())) {
+            throw new ValidationException("El pase de acceso #" + searchToken + " ha expirado.");
+        }
 
         return mapToResponse(entity);
     }
@@ -323,6 +315,30 @@ public  class SecurityGateService implements SecurityGateUseCase {
         entity.setStatus("SUBMITTED");
 
         SecurityPreCheckinEntity saved = preCheckinJpaRepository.save(Objects.requireNonNull(entity));
+
+        // Difusión en tiempo real vía WebSocket STOMP
+        if (saved.getOrganization() != null && saved.getBranch() != null) {
+            wmsNotificationPort.broadcastGateEvent(
+                    saved.getOrganization().getId(),
+                    saved.getBranch().getId(),
+                    com.fourguard.wms.application.dto.websocket.GateEventDto.builder()
+                            .eventType("DRIVER_PRE_CHECKIN_SUBMITTED")
+                            .preCheckinId(saved.getId())
+                            .token(saved.getToken())
+                            .operationType(saved.getOperationType())
+                            .status(saved.getStatus())
+                            .driverName(saved.getDriverName())
+                            .driverPhone(saved.getDriverPhone())
+                            .tractorPlates(saved.getTractorPlates())
+                            .boxPlates(saved.getBoxPlates())
+                            .carrierName(saved.getCarrier() != null ? saved.getCarrier().getName() : saved.getCarrierLine())
+                            .clientName(saved.getClient() != null ? saved.getClient().getName() : saved.getClientName())
+                            .observations(saved.getObservations())
+                            .timestamp(OffsetDateTime.now())
+                            .build()
+            );
+        }
+
         return mapToResponse(saved);
     }
 
@@ -562,6 +578,32 @@ public  class SecurityGateService implements SecurityGateUseCase {
                         : "guardia");
 
         SecurityPreCheckinEntity saved = preCheckinJpaRepository.save(Objects.requireNonNull(entity));
+
+        // Difusión en tiempo real vía WebSocket STOMP
+        if (saved.getOrganization() != null && saved.getBranch() != null) {
+            wmsNotificationPort.broadcastGateEvent(
+                    saved.getOrganization().getId(),
+                    saved.getBranch().getId(),
+                    com.fourguard.wms.application.dto.websocket.GateEventDto.builder()
+                            .eventType("GUARD_CHECKIN_COMPLETED")
+                            .preCheckinId(saved.getId())
+                            .folio(saved.getGeneratedFolio())
+                            .token(saved.getToken())
+                            .operationType(saved.getOperationType())
+                            .status("COMPLETED")
+                            .driverName(saved.getDriverName())
+                            .tractorPlates(saved.getTractorPlates())
+                            .boxPlates(saved.getBoxPlates())
+                            .rampCode(saved.getRampCode())
+                            .rampNumber(saved.getRampNumber())
+                            .sealNumbers(saved.getSealNumbers())
+                            .carrierName(saved.getCarrier() != null ? saved.getCarrier().getName() : saved.getCarrierLine())
+                            .clientName(saved.getClient() != null ? saved.getClient().getName() : saved.getClientName())
+                            .timestamp(OffsetDateTime.now())
+                            .build()
+            );
+        }
+
         return mapToResponseWithWarehouseStatus(saved);
     }
 
@@ -722,6 +764,27 @@ public  class SecurityGateService implements SecurityGateUseCase {
             }
 
             SecurityPreCheckinEntity saved = preCheckinJpaRepository.save(Objects.requireNonNull(entity));
+
+            // Difusión en tiempo real vía WebSocket STOMP
+            if (saved.getOrganization() != null && saved.getBranch() != null) {
+                wmsNotificationPort.broadcastGateEvent(
+                        saved.getOrganization().getId(),
+                        saved.getBranch().getId(),
+                        com.fourguard.wms.application.dto.websocket.GateEventDto.builder()
+                                .eventType("GUARD_CHECKOUT_COMPLETED")
+                                .preCheckinId(saved.getId())
+                                .folio(saved.getGeneratedFolio())
+                                .token(saved.getToken())
+                                .operationType(saved.getOperationType())
+                                .status("COMPLETED_EXIT")
+                                .driverName(saved.getDriverName())
+                                .tractorPlates(saved.getTractorPlates())
+                                .observations(saved.getExitObservations())
+                                .timestamp(OffsetDateTime.now())
+                                .build()
+                );
+            }
+
             return mapToResponseWithWarehouseStatus(saved);
         }
 

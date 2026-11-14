@@ -77,6 +77,7 @@ public class SecurityConfig {
                                 SecurityConstants.SECURITY_GATE_PUBLIC_PATTERN,
                                 SecurityConstants.NOTIFICATIONS_RF_STREAM_PATTERN,
                                 SecurityConstants.NOTIFICATIONS_RF_ALERTS_PATTERN,
+                                SecurityConstants.WEBSOCKET_ENDPOINT_PATTERN,
                                 "/swagger-ui.html",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",

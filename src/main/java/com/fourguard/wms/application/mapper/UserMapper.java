@@ -86,9 +86,9 @@ public interface UserMapper {
 
     // ── Entity to Domain Model ────────────────────────────────────────────────
 
-    @Mapping(target = "organization", source = "organization.id", qualifiedByName = "mapOrganizationIdToOrganization")
-    @Mapping(target = "branch", source = "branch.id", qualifiedByName = "mapBranchIdToBranch")
-    @Mapping(target = "role", source = "role.id", qualifiedByName = "mapRoleIdToRole")
+    @Mapping(target = "organization", source = "organization", qualifiedByName = "mapOrganizationEntityToOrganization")
+    @Mapping(target = "branch", source = "branch", qualifiedByName = "mapBranchEntityToBranch")
+    @Mapping(target = "role", source = "role", qualifiedByName = "mapRoleEntityToRole")
     User toUser(UserEntity userEntity);
 
     List<User> toUserList(List<UserEntity> userEntities);
@@ -133,6 +133,40 @@ public interface UserMapper {
     // objects from their IDs will happen in the service layer, or by injecting
     // repository ports into the mapper if MapStruct is configured for that.
     // For now, they return null, and the service will populate them.
+    @Named("mapOrganizationEntityToOrganization")
+    default Organization mapOrganizationEntityToOrganization(OrganizationEntity entity) {
+        if (entity == null) return null;
+        return Organization.builder()
+                .id(entity.getId())
+                .name(entity.getName())
+                .code(entity.getCode())
+                .version(entity.getVersion())
+                .build();
+    }
+
+    @Named("mapBranchEntityToBranch")
+    default Branch mapBranchEntityToBranch(BranchEntity entity) {
+        if (entity == null) return null;
+        return Branch.builder()
+                .id(entity.getId())
+                .name(entity.getName())
+                .code(entity.getCode())
+                .version(entity.getVersion())
+                .build();
+    }
+
+    @Named("mapRoleEntityToRole")
+    default Role mapRoleEntityToRole(RoleEntity entity) {
+        if (entity == null) return null;
+        return Role.builder()
+                .id(entity.getId())
+                .name(entity.getName())
+                .level(entity.getLevel())
+                .isSystem(entity.getIsSystem())
+                .version(entity.getVersion())
+                .build();
+    }
+
     @Named("mapOrganizationIdToOrganization")
     default Organization mapOrganizationIdToOrganization(UUID organizationId) {
         if (organizationId == null) return null;

@@ -2,6 +2,8 @@ package com.fourguard.wms.application.usecase;
 
 import com.fourguard.wms.application.dto.request.reception.*;
 import com.fourguard.wms.application.dto.response.reception.*;
+import com.fourguard.wms.application.dto.websocket.ForkliftMissionEventDto;
+import com.fourguard.wms.application.dto.websocket.RampEventDto;
 import com.fourguard.wms.application.mapper.WarehouseReceptionMapper;
 import com.fourguard.wms.domain.enums.InventoryState;
 import com.fourguard.wms.domain.enums.LocationCategory;
@@ -62,6 +64,7 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
     private final com.fourguard.wms.infrastructure.persistence.repository.SecurityPreCheckinJpaRepository preCheckinJpaRepository;
     private final ShiftSessionService shiftSessionService;
     private final com.fourguard.wms.infrastructure.notification.QualityAlertBroadcaster alertBroadcaster;
+    private final WmsNotificationPort wmsNotificationPort;
 
     @Override
     @Transactional
@@ -318,6 +321,33 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
                        "plates", (request.getTractorPlates() != null ? request.getTractorPlates() : "") + " / " + (request.getBoxPlates() != null ? request.getBoxPlates() : ""),
                        "ramp", ramp != null ? ramp.getCode() : "Sin rampa"));
 
+        // Difusión reactiva WebSocket STOMP de Asignación de Rampa
+        if (saved.getRamp() != null && saved.getBranch() != null && saved.getOrganization() != null) {
+            try {
+                Integer rampNum = null;
+                try { rampNum = Integer.parseInt(saved.getRamp().getCode().replaceAll("[^0-9]", "")); } catch (Exception ignored) {}
+                wmsNotificationPort.broadcastRampEvent(
+                        saved.getOrganization().getId(),
+                        saved.getBranch().getId(),
+                        RampEventDto.builder()
+                                .eventType("RAMP_ASSIGNED")
+                                .rampId(saved.getRamp().getId())
+                                .rampCode(saved.getRamp().getCode())
+                                .rampNumber(rampNum)
+                                .status("BUSY")
+                                .operationType("INBOUND")
+                                .currentFolio(saved.getFolio())
+                                .carrierName(saved.getCarrier() != null ? saved.getCarrier().getName() : null)
+                                .driverName(saved.getDriverName())
+                                .forkliftOperatorName(saved.getForkliftOperator() != null ? saved.getForkliftOperator().getFullName() : null)
+                                .occupiedAt(OffsetDateTime.now())
+                                .build()
+                );
+            } catch (Exception ex) {
+                log.warn("[WarehouseReceptionService] Fallo al difundir RAMP_ASSIGNED por STOMP: {}", ex.getMessage());
+            }
+        }
+
         if (saved.getForkliftOperator() != null) {
             try {
                 Map<String, Object> ssePayload = new HashMap<>();
@@ -329,6 +359,27 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
                 ssePayload.put("forkliftOperatorCode", saved.getForkliftOperator().getCode());
                 ssePayload.put("forkliftOperatorName", saved.getForkliftOperator().getFullName());
                 alertBroadcaster.broadcastMissionEvent("MISSION_ASSIGNED", ssePayload);
+
+                if (saved.getBranch() != null && saved.getOrganization() != null) {
+                    wmsNotificationPort.broadcastMissionEvent(
+                            saved.getOrganization().getId(),
+                            saved.getBranch().getId(),
+                            ForkliftMissionEventDto.builder()
+                                    .missionId(saved.getId())
+                                    .folio(saved.getFolio())
+                                    .missionType("INBOUND_DISCHARGE")
+                                    .status(saved.getStatus().name())
+                                    .priority(saved.getPriority() != null ? saved.getPriority() : "NORMAL")
+                                    .organizationId(saved.getOrganization().getId())
+                                    .branchId(saved.getBranch().getId())
+                                    .forkliftOperatorId(saved.getForkliftOperator().getId())
+                                    .forkliftOperatorCode(saved.getForkliftOperator().getCode())
+                                    .forkliftOperatorName(saved.getForkliftOperator().getFullName())
+                                    .rampCode(saved.getRamp() != null ? saved.getRamp().getCode() : null)
+                                    .timestamp(OffsetDateTime.now())
+                                    .build()
+                    );
+                }
             } catch (Exception ignored) {}
         }
         return receptionMapper.toResponse(saved);
@@ -800,6 +851,36 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
             logAudit(saved.getId(), auditAction, before, after);
         }
 
+        // Difusión reactiva WebSocket STOMP de Asignación / Liberación de Rampa
+        if (saved.getRamp() != null && saved.getBranch() != null && saved.getOrganization() != null) {
+            try {
+                boolean isReleased = (saved.getStatus() == ReceptionStatus.COMPLETED || saved.getStatus() == ReceptionStatus.CANCELLED);
+                Integer rampNum = null;
+                try { rampNum = Integer.parseInt(saved.getRamp().getCode().replaceAll("[^0-9]", "")); } catch (Exception ignored) {}
+
+                wmsNotificationPort.broadcastRampEvent(
+                        saved.getOrganization().getId(),
+                        saved.getBranch().getId(),
+                        RampEventDto.builder()
+                                .eventType(isReleased ? "RAMP_RELEASED" : "RAMP_ASSIGNED")
+                                .rampId(saved.getRamp().getId())
+                                .rampCode(saved.getRamp().getCode())
+                                .rampNumber(rampNum)
+                                .status(isReleased ? "AVAILABLE" : "BUSY")
+                                .operationType("INBOUND")
+                                .currentFolio(saved.getFolio())
+                                .carrierName(saved.getCarrier() != null ? saved.getCarrier().getName() : null)
+                                .driverName(saved.getDriverName())
+                                .forkliftOperatorName(saved.getForkliftOperator() != null ? saved.getForkliftOperator().getFullName() : null)
+                                .occupiedAt(OffsetDateTime.now())
+                                .releasedAt(isReleased ? OffsetDateTime.now() : null)
+                                .build()
+                );
+            } catch (Exception ex) {
+                log.warn("[WarehouseReceptionService] Fallo al difundir evento Rampa por STOMP: {}", ex.getMessage());
+            }
+        }
+
         if (saved.getForkliftOperator() != null) {
             try {
                 Map<String, Object> ssePayload = new HashMap<>();
@@ -812,6 +893,27 @@ public class WarehouseReceptionService implements WarehouseReceptionUseCase {
                 ssePayload.put("forkliftOperatorName", saved.getForkliftOperator().getFullName());
                 String evtType = (saved.getStatus() == ReceptionStatus.ASSIGNED) ? "MISSION_ASSIGNED" : "MISSION_UPDATED";
                 alertBroadcaster.broadcastMissionEvent(evtType, ssePayload);
+
+                if (saved.getBranch() != null && saved.getOrganization() != null) {
+                    wmsNotificationPort.broadcastMissionEvent(
+                            saved.getOrganization().getId(),
+                            saved.getBranch().getId(),
+                            ForkliftMissionEventDto.builder()
+                                    .missionId(saved.getId())
+                                    .folio(saved.getFolio())
+                                    .missionType("INBOUND_DISCHARGE")
+                                    .status(saved.getStatus().name())
+                                    .priority(saved.getPriority() != null ? saved.getPriority() : "NORMAL")
+                                    .organizationId(saved.getOrganization().getId())
+                                    .branchId(saved.getBranch().getId())
+                                    .forkliftOperatorId(saved.getForkliftOperator().getId())
+                                    .forkliftOperatorCode(saved.getForkliftOperator().getCode())
+                                    .forkliftOperatorName(saved.getForkliftOperator().getFullName())
+                                    .rampCode(saved.getRamp() != null ? saved.getRamp().getCode() : null)
+                                    .timestamp(OffsetDateTime.now())
+                                    .build()
+                    );
+                }
             } catch (Exception ignored) {}
         }
 
