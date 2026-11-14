@@ -60,7 +60,8 @@ public class WarehouseTransferService implements WarehouseTransferUseCase {
     @Override
     @Transactional
     public TransferResponse createTransfer(CreateTransferRequest request) {
-        log.info("Creating warehouse transfer from origin: (id={}, code={}) to dest: (id={}, code={}) with priority: {}",
+        log.info(
+                "Creating warehouse transfer from origin: (id={}, code={}) to dest: (id={}, code={}) with priority: {}",
                 request.getOriginLocationId(), request.getOriginLocationCode(),
                 request.getDestinationLocationId(), request.getDestinationLocationCode(), request.getPriority());
 
@@ -293,7 +294,9 @@ public class WarehouseTransferService implements WarehouseTransferUseCase {
                 .orElseThrow(() -> new EntityNotFoundException("Traspaso no encontrado con ID: " + id));
 
         if (transfer.getStatus() != TransferStatus.ASSIGNED && transfer.getStatus() != TransferStatus.PAUSED) {
-            throw new ValidationException("Solo se puede iniciar un traspaso en estado ASIGNADO o PAUSADO. Estado actual: " + transfer.getStatus());
+            throw new ValidationException(
+                    "Solo se puede iniciar un traspaso en estado ASIGNADO o PAUSADO. Estado actual: "
+                            + transfer.getStatus());
         }
 
         if (operatorId != null && transfer.getForkliftOperator() == null) {
@@ -317,7 +320,8 @@ public class WarehouseTransferService implements WarehouseTransferUseCase {
                 .orElseThrow(() -> new EntityNotFoundException("Traspaso no encontrado con ID: " + id));
 
         if (transfer.getStatus() != TransferStatus.IN_PROGRESS && transfer.getStatus() != TransferStatus.ASSIGNED) {
-            throw new ValidationException("Solo se puede pausar un traspaso en curso o asignado. Estado actual: " + transfer.getStatus());
+            throw new ValidationException(
+                    "Solo se puede pausar un traspaso en curso o asignado. Estado actual: " + transfer.getStatus());
         }
 
         transfer.setStatus(TransferStatus.PAUSED);
@@ -336,7 +340,8 @@ public class WarehouseTransferService implements WarehouseTransferUseCase {
                 .orElseThrow(() -> new EntityNotFoundException("Traspaso no encontrado con ID: " + id));
 
         if (transfer.getStatus() != TransferStatus.PAUSED) {
-            throw new ValidationException("Solo se puede reanudar un traspaso en estado PAUSADO. Estado actual: " + transfer.getStatus());
+            throw new ValidationException(
+                    "Solo se puede reanudar un traspaso en estado PAUSADO. Estado actual: " + transfer.getStatus());
         }
 
         if (operatorId != null) {
@@ -421,7 +426,8 @@ public class WarehouseTransferService implements WarehouseTransferUseCase {
 
         logAudit(saved.getId(), "TRASPASO_COMPLETADO", activeUser,
                 Map.of("status", "IN_PROGRESS"),
-                Map.of("status", "COMPLETED", "destination", destination.getCode(), "totalPallets", String.valueOf(movedCount)));
+                Map.of("status", "COMPLETED", "destination", destination.getCode(), "totalPallets",
+                        String.valueOf(movedCount)));
 
         return transferMapper.toResponse(saved);
     }
@@ -451,7 +457,8 @@ public class WarehouseTransferService implements WarehouseTransferUseCase {
                 .orElseThrow(() -> new EntityNotFoundException("Traspaso no encontrado con ID: " + id));
 
         ForkliftOperatorEntity newOperator = forkliftOperatorRepositoryPort.findById(forkliftOperatorId)
-                .orElseThrow(() -> new EntityNotFoundException("Operador de montacargas no encontrado con ID: " + forkliftOperatorId));
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "Operador de montacargas no encontrado con ID: " + forkliftOperatorId));
 
         transfer.setForkliftOperator(newOperator);
         WarehouseTransferEntity saved = transferRepositoryPort.save(transfer);
@@ -594,7 +601,7 @@ public class WarehouseTransferService implements WarehouseTransferUseCase {
     @Override
     @Transactional(readOnly = true)
     public List<MovementAuditResponse> getAuditLogs(UUID id) {
-        WarehouseTransferEntity transfer = transferRepositoryPort.findById(id)
+        transferRepositoryPort.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Traspaso no encontrado con ID: " + id));
 
         List<AuditLogEntity> logs = auditLogRepositoryPort.findByEntityTypeAndEntityId("TRANSFER", id);

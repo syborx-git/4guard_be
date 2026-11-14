@@ -110,6 +110,16 @@ public class UserService implements CreateUserUseCase, GetUserUseCase, UpdateUse
         // Audit log
         logAuditChange(currentUser, "USER_CREATED", savedUserEntity.getId(), null, savedUserEntity);
 
+        if (savedUserEntity.getRole() == null || savedUserEntity.getRole().getName() == null) {
+            savedUserEntity.setRole(roleRepositoryPort.findById(request.getRoleId()).orElse(null));
+        }
+        if (savedUserEntity.getOrganization() == null || savedUserEntity.getOrganization().getName() == null) {
+            savedUserEntity.setOrganization(organizationRepositoryPort.findById(request.getOrganizationId()).orElse(null));
+        }
+        if (request.getBranchId() != null && (savedUserEntity.getBranch() == null || savedUserEntity.getBranch().getName() == null)) {
+            savedUserEntity.setBranch(branchRepositoryPort.findById(request.getBranchId()).orElse(null));
+        }
+
         return userMapper.toUserResponse(userMapper.toUser(savedUserEntity));
     }
 
@@ -181,6 +191,16 @@ public class UserService implements CreateUserUseCase, GetUserUseCase, UpdateUse
 
         // Audit log
         logAuditChange(currentUser, "USER_UPDATED", updatedUserEntity.getId(), originalSnapshot, updatedUserEntity);
+
+        if (existingUser.getRole() != null && (updatedUserEntity.getRole() == null || updatedUserEntity.getRole().getName() == null)) {
+            updatedUserEntity.setRole(roleRepositoryPort.findById(existingUser.getRole().getId()).orElse(null));
+        }
+        if (existingUser.getOrganization() != null && (updatedUserEntity.getOrganization() == null || updatedUserEntity.getOrganization().getName() == null)) {
+            updatedUserEntity.setOrganization(organizationRepositoryPort.findById(existingUser.getOrganization().getId()).orElse(null));
+        }
+        if (existingUser.getBranch() != null && (updatedUserEntity.getBranch() == null || updatedUserEntity.getBranch().getName() == null)) {
+            updatedUserEntity.setBranch(branchRepositoryPort.findById(existingUser.getBranch().getId()).orElse(null));
+        }
 
         return userMapper.toUserResponse(userMapper.toUser(updatedUserEntity));
     }
