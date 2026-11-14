@@ -1,0 +1,39 @@
+name: CD — Deploy Backend to Hetzner
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy 4Guard Backend to Hetzner
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy via SSH to Hetzner
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.HETZNER_HOST }}
+          username: ${{ secrets.HETZNER_USER }}
+          key: ${{ secrets.HETZNER_SSH_KEY }}
+          passphrase: ${{ secrets.HETZNER_SSH_PASSPHRASE }}
+          password: ${{ secrets.HETZNER_PASSWORD }}
+          port: ${{ secrets.HETZNER_PORT || 22 }}
+          script_stop: true
+          script: |
+            echo "=========================================================="
+            echo "🚀 [CI/CD] Iniciando despliegue de 4Guard Backend en Hetzner"
+            echo "=========================================================="
+            cd /opt/4guard/4guard_be
+            git fetch origin main
+            git reset --hard origin/main
+            cd /opt/4guard
+            docker compose build --no-cache 4guard-backend
+            docker compose up -d 4guard-backend
+            echo "=== Estado de los Contenedores ==="
+            docker compose ps
+            echo "=========================================================="
+            echo "✅ [CI/CD] Despliegue de Backend finalizado con éxito!"
+            echo "=========================================================="
