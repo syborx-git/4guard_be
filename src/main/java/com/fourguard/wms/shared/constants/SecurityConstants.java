@@ -26,6 +26,9 @@ public final class SecurityConstants {
     public static final String NOTIFICATIONS_RF_STREAM_PATTERN = "/notifications/rf-stream";
     public static final String NOTIFICATIONS_RF_ALERTS_PATTERN = "/notifications/rf-alerts/**";
 
+    /** WebSocket STOMP handshake endpoint — autenticación delegada al frame CONNECT */
+    public static final String WEBSOCKET_ENDPOINT_PATTERN = "/ws-wms/**";
+
     /** Swagger UI assets — public in dev, consider restricting in prod. */
     public static final String SWAGGER_UI_PATTERN   = "/swagger-ui/**";
     public static final String SWAGGER_DOCS_PATTERN = "/v3/api-docs/**";

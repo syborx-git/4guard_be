@@ -1,25 +1,32 @@
 package com.fourguard.wms.infrastructure.notification;
 
+import com.fourguard.wms.application.dto.websocket.QualityBlockEventDto;
 import com.fourguard.wms.domain.model.quality.QualityAlertEvent;
+import com.fourguard.wms.domain.ports.out.WmsNotificationPort;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Broadcaster reactivo de eventos y alertas hacia las Terminales RF (PWA) de Montacarguistas
- * y la Consola de Calidad mediante Server-Sent Events (SSE).
+ * y la Consola de Calidad mediante Server-Sent Events (SSE) y WebSocket STOMP.
  */
 @Component
 @Slf4j
+@RequiredArgsConstructor
 public class QualityAlertBroadcaster {
 
+    private final WmsNotificationPort wmsNotificationPort;
     private final List<SseEmitter> activeEmitters = new CopyOnWriteArrayList<>();
     private final List<QualityAlertEvent> recentAlerts = new CopyOnWriteArrayList<>();
     private static final int MAX_RECENT_ALERTS = 25;
@@ -81,6 +88,32 @@ public class QualityAlertBroadcaster {
         }
 
         activeEmitters.removeAll(deadEmitters);
+
+        // Difusión en tiempo real vía WebSocket STOMP
+        if (wmsNotificationPort != null && event.getOrganizationId() != null && event.getBranchId() != null) {
+            try {
+                wmsNotificationPort.broadcastQualityAlert(
+                        event.getOrganizationId(),
+                        event.getBranchId(),
+                        QualityBlockEventDto.builder()
+                                .eventId(event.getEventId() != null ? event.getEventId() : UUID.randomUUID())
+                                .eventType(event.getEventType())
+                                .severity(event.getSeverity())
+                                .sscc(event.getSscc())
+                                .palletFolio(event.getPalletFolio())
+                                .sku(event.getSku())
+                                .productName(event.getProductName())
+                                .locationCode(event.getLocationCode())
+                                .reason(event.getReason())
+                                .recommendedAction(event.getRecommendedAction())
+                                .requiredInstruction(event.getRequiredInstruction())
+                                .timestamp(event.getTimestamp() != null ? event.getTimestamp() : OffsetDateTime.now())
+                                .build()
+                );
+            } catch (Exception ex) {
+                log.warn("[QualityAlertBroadcaster] Fallo al difundir por STOMP: {}", ex.getMessage());
+            }
+        }
     }
 
     public void broadcastMissionEvent(String eventType, Map<String, Object> payload) {

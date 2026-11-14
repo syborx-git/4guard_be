@@ -160,6 +160,8 @@ public class QualityService implements QualityUseCase {
         try {
             qualityAlertBroadcaster.broadcast(QualityAlertEvent.builder()
                     .eventId(UUID.randomUUID())
+                    .organizationId(organizationId)
+                    .branchId(branchId)
                     .eventType("QM_BLOCK_ALERT")
                     .severity(savedIncidence.getSeverity() != null ? savedIncidence.getSeverity().name() : "CRITICAL")
                     .sscc(item.getSscc() != null ? item.getSscc() : item.getId().toString())
@@ -294,6 +296,8 @@ public class QualityService implements QualityUseCase {
         try {
             qualityAlertBroadcaster.broadcast(QualityAlertEvent.builder()
                     .eventId(UUID.randomUUID())
+                    .organizationId(organizationId)
+                    .branchId(branchId)
                     .eventType("QM_RELEASE_AUTHORIZED")
                     .severity("INFO")
                     .sscc(item.getSscc() != null ? item.getSscc() : item.getId().toString())
@@ -384,6 +388,8 @@ public class QualityService implements QualityUseCase {
             try {
                 qualityAlertBroadcaster.broadcast(QualityAlertEvent.builder()
                         .eventId(UUID.randomUUID())
+                        .organizationId(organizationId)
+                        .branchId(branchId)
                         .eventType("QM_CONDITIONING_REQUIRED")
                         .severity(saved.getStatus() == LoadVerificationStatus.RECHAZADO ? "CRITICAL" : "WARNING")
                         .palletFolio(saved.getFolio())

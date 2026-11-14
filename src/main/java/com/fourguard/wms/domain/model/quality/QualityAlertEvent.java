@@ -17,6 +17,8 @@ import java.util.UUID;
 public class QualityAlertEvent {
 
     private UUID eventId;
+    private UUID organizationId;
+    private UUID branchId;
     private String eventType; // QM_BLOCK_ALERT, QM_CONDITIONING_REQUIRED, QM_RELEASE_AUTHORIZED, ENVIRONMENTAL_ALERT
     private String severity; // CRITICAL (RED), WARNING (YELLOW), INFO (BLUE)
     private String sscc;

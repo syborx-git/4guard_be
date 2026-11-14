@@ -36,7 +36,7 @@ public class QualityAiController {
     private final UserRepositoryPort userRepositoryPort;
 
     @PostMapping("/evaluate-rule")
-    @PreAuthorize("hasAuthority('QUALITY_READ') or hasAuthority('QUALITY_UPDATE') or hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasAuthority('INVENTORY_READ') or hasAuthority('RECEIVING_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('QUALITY_AUDITOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('CONTROL_DESK') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('FORKLIFT_OPERATOR') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('CEO')")
+    @PreAuthorize("hasAuthority('QUALITY_READ') or hasAuthority('QUALITY_UPDATE') or hasAuthority('RECEIVING_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('CEO') or hasRole('QM_INSPECTOR') or hasRole('ROLE_QM_INSPECTOR') or hasRole('QUALITY_AUDITOR')")
     @Operation(summary = "Evaluación determinista de reglas físicas de calidad",
                description = "Evalúa en < 1ms tolerancias de inclinación, daños en empaque, uso de Diurex, roturas de tarima y límites de humedad bajo IT01, IT02 e IT01-8.6-02.")
     public ResponseEntity<ApiResponse<QualityAiEvaluationResponse>> evaluateRule(
@@ -47,7 +47,7 @@ public class QualityAiController {
     }
 
     @PostMapping("/chat")
-    @PreAuthorize("hasAuthority('QUALITY_READ') or hasAuthority('QUALITY_UPDATE') or hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasAuthority('INVENTORY_READ') or hasAuthority('RECEIVING_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('QUALITY_AUDITOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('CONTROL_DESK') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('FORKLIFT_OPERATOR') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('CEO')")
+    @PreAuthorize("hasAuthority('QUALITY_READ') or hasAuthority('QUALITY_UPDATE') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('CEO') or hasRole('QM_INSPECTOR') or hasRole('ROLE_QM_INSPECTOR') or hasRole('QUALITY_AUDITOR')")
     @Operation(summary = "Consultar al Asistente IA de Calidad",
                description = "Responde dudas técnicas y normativas fundamentadas en los instructivos oficiales de 4GUARD con fallback a motor de reglas.")
     public ResponseEntity<ApiResponse<QualityAiChatResponse>> askAssistant(
@@ -66,7 +66,7 @@ public class QualityAiController {
     }
 
     @PostMapping("/sampling-calc")
-    @PreAuthorize("hasAuthority('QUALITY_READ') or hasAuthority('QUALITY_UPDATE') or hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasAuthority('INVENTORY_READ') or hasAuthority('RECEIVING_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_MANAGER') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('QUALITY_AUDITOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('CONTROL_DESK') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('FORKLIFT_OPERATOR') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('CEO')")
+    @PreAuthorize("hasAuthority('QUALITY_READ') or hasAuthority('QUALITY_UPDATE') or hasAuthority('RECEIVING_READ') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('CEO') or hasRole('QM_INSPECTOR') or hasRole('ROLE_QM_INSPECTOR') or hasRole('QUALITY_AUDITOR')")
     @Operation(summary = "Calcular plan oficial de muestreo",
                description = "Calcula la cantidad exacta de muestra y el protocolo de extracción por tipo de material o café verde bajo IT01-PO-GC-8.6-04 Rev. 02.")
     public ResponseEntity<ApiResponse<SamplingCalculationResponse>> calculateSampling(
