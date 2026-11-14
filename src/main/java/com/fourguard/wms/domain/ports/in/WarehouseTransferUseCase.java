@@ -12,13 +12,13 @@ import java.util.UUID;
 
 /**
  * Primary (Driving) Port — Use Case interface for Warehouse Transfer management (Cambio de Almacén).
+ * Homologado con ADR-011, ADR-017, ADR-020 y ADR-022.
  */
 public interface WarehouseTransferUseCase {
 
     /**
      * Registers a new internal pallet relocation.
-     * Validates: origin has pallets, destination is empty, operator exists.
-     * Updates inventory_items.location_id and creates inventory_movements (TRANSFER).
+     * When dispatched with an operator, enters status ASSIGNED and streams via SSE to RF terminals.
      */
     TransferResponse createTransfer(CreateTransferRequest request);
 
@@ -45,6 +45,37 @@ public interface WarehouseTransferUseCase {
             String search,
             UUID shiftSessionId,
             MovementScope scope);
+
+    /**
+     * Starts execution of a transfer by forklift operator (ASSIGNED -> IN_PROGRESS).
+     */
+    TransferResponse startTransfer(UUID id, UUID operatorId);
+
+    /**
+     * Pauses a transfer due to shift end or urgent task preemption (IN_PROGRESS -> PAUSED).
+     */
+    TransferResponse pauseTransfer(UUID id, String reason, String notes);
+
+    /**
+     * Resumes a paused transfer (PAUSED -> IN_PROGRESS).
+     */
+    TransferResponse resumeTransfer(UUID id, UUID operatorId);
+
+    /**
+     * Completes physical relocation of pallets to destination rack (IN_PROGRESS -> COMPLETED).
+     * Updates inventory_items.location_id and creates inventory_movements.
+     */
+    TransferResponse completeTransfer(UUID id, UUID destinationLocationId);
+
+    /**
+     * Updates transfer priority ('NORMAL' or 'URGENT') and broadcasts preemptive SSE event.
+     */
+    TransferResponse updatePriority(UUID id, String priority);
+
+    /**
+     * Reassigns forklift operator dynamically.
+     */
+    TransferResponse reassignOperator(UUID id, UUID forkliftOperatorId);
 
     /**
      * Cancels a transfer with admin authorization. Reverts inventory location.

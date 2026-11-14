@@ -28,7 +28,7 @@ public class ProductSkuController {
     private final ProductSkuUseCase productSkuUseCase;
 
     @PostMapping
-    @PreAuthorize("hasAuthority('INVENTORY_CREATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('INVENTORY_CREATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Crear SKU", description = "Registra una nueva referencia o SKU en el catálogo de un cliente.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "SKU creado con éxito"),
@@ -42,7 +42,7 @@ public class ProductSkuController {
     }
 
     @PutMapping
-    @PreAuthorize("hasAuthority('INVENTORY_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('INVENTORY_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Actualizar SKU", description = "Actualiza los datos de un SKU existente en el catálogo.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "SKU actualizado con éxito"),
@@ -89,7 +89,7 @@ public class ProductSkuController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('INVENTORY_DELETE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('INVENTORY_DELETE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Eliminar SKU", description = "Elimina físicamente un SKU del catálogo por su ID.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "SKU eliminado con éxito"),
@@ -103,7 +103,7 @@ public class ProductSkuController {
     }
 
     @GetMapping("/{id}/audit")
-    @PreAuthorize("hasAuthority('INVENTORY_READ') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('AUDITOR')")
+    @PreAuthorize("hasAuthority('INVENTORY_READ') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('CONTROL_DESK') or hasRole('CEO') or hasRole('AUDITOR')")
     @Operation(summary = "Historial de auditoría del SKU", description = "Recupera la bitácora cronológica de cambios y eventos de auditoría para un SKU.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Historial de auditoría recuperado con éxito"),

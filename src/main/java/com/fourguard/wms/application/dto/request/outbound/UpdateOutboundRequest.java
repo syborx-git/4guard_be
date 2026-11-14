@@ -12,6 +12,9 @@ import java.util.UUID;
 public class UpdateOutboundRequest {
 
     private String status;
+    private String priority; // NORMAL o URGENT
+    private String pauseReason;
+
     private UUID destinationId;
     private String destinationName;
     private String destinationAddress;

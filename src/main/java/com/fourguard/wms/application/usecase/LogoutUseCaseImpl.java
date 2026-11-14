@@ -14,6 +14,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
+import java.util.Map;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -27,9 +30,9 @@ public class LogoutUseCaseImpl implements LogoutUseCase {
     @Override
     @Transactional
     public void logout(LogoutRequest request, String currentUsername) {
-        log.info("[AUTH] User '{}' requested secure logout", currentUsername);
+        log.info("[AUTH] User '{}' requested secure logout (reason: {})", currentUsername, request != null ? request.getReason() : "UNSPECIFIED");
 
-        String refreshToken = request.getRefreshToken();
+        String refreshToken = request != null ? request.getRefreshToken() : null;
 
         // Validate the refresh token structure and expiration
         try {
@@ -49,9 +52,17 @@ public class LogoutUseCaseImpl implements LogoutUseCase {
         // Revoke all active session tokens in blacklist cache/storage
         tokenBlacklistPort.revokeUserSessions(userEntity.getId());
 
-        // Persist logout event to database audit log
-        auditService.log(userEntity, "LOGOUT", "USER", userEntity.getId(), null, java.util.Map.of("username", currentUsername));
+        // Determine specific audit action based on reason
+        String reason = (request != null && request.getReason() != null) ? request.getReason().toUpperCase() : "MANUAL";
+        String auditAction = "TIMEOUT".equals(reason) ? "SESSION_TIMEOUT_LOGOUT" : "LOGOUT";
 
-        log.info("[AUTH] User '{}' successfully logged out and sessions revoked", currentUsername);
+        Map<String, Object> details = new HashMap<>();
+        details.put("username", currentUsername);
+        details.put("reason", reason);
+
+        // Persist logout event to database audit log
+        auditService.log(userEntity, auditAction, "USER", userEntity.getId(), null, details);
+
+        log.info("[AUTH] User '{}' successfully logged out with action '{}' and sessions revoked", currentUsername, auditAction);
     }
 }

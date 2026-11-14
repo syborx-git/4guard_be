@@ -24,14 +24,16 @@ import java.util.UUID;
 @Tag(name = "Mapa de Nave 2D", description = "Endpoints de topología espacial, blueprint SVG y gestión de posiciones en tiempo real")
 public class WarehouseMapController {
 
+    private static final UUID DEFAULT_BRANCH_ID = UUID.fromString("b73f0907-9fa5-4bdf-87db-2eb5e7683936");
     private final WarehouseMapUseCase mapUseCase;
 
     @GetMapping("/topology")
     @PreAuthorize("hasAuthority('INVENTORY_READ') or hasAuthority('LAYOUT_READ') or hasAuthority('SECTIONS_READ') or hasAuthority('LOCATIONS_READ') or hasAuthority('RECEIVING_READ') or hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasAuthority('QUALITY_READ') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('FORKLIFT_OPERATOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Obtener topología 2D completa", description = "Retorna las naves del almacén con coordenadas SVG y métricas agregadas de ocupación.")
     public ResponseEntity<ApiResponse<WarehouseTopologyResponse>> getTopology(
-            @RequestParam UUID branchId) {
-        WarehouseTopologyResponse response = mapUseCase.getTopology(branchId);
+            @RequestParam(required = false) UUID branchId) {
+        UUID effectiveBranchId = branchId != null ? branchId : DEFAULT_BRANCH_ID;
+        WarehouseTopologyResponse response = mapUseCase.getTopology(effectiveBranchId);
         return ResponseEntity.ok(ApiResponse.ok("Topología del almacén recuperada con éxito", response));
     }
 
@@ -50,17 +52,18 @@ public class WarehouseMapController {
     @PreAuthorize("hasAuthority('INVENTORY_READ') or hasAuthority('LAYOUT_READ') or hasAuthority('SECTIONS_READ') or hasAuthority('LOCATIONS_READ') or hasAuthority('RECEIVING_READ') or hasAuthority('WAREHOUSE_MOVEMENTS_READ') or hasAuthority('QUALITY_READ') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('SECURITY_GUARD') or hasRole('VIGILANCIA') or hasRole('FORKLIFT_OPERATOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Consultar todas las posiciones/bahías", description = "Retorna la cuadrícula completa de posiciones de la sucursal o filtrada por sección para la tabla de Consulta de Bahías.")
     public ResponseEntity<ApiResponse<List<PositionMapDetailResponse>>> getAllPositions(
-            @RequestParam UUID branchId,
+            @RequestParam(required = false) UUID branchId,
             @RequestParam(required = false) UUID sectionId,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String search) {
-        List<PositionMapDetailResponse> response = mapUseCase.getAllPositions(branchId, sectionId, status, search);
+        UUID effectiveBranchId = branchId != null ? branchId : DEFAULT_BRANCH_ID;
+        List<PositionMapDetailResponse> response = mapUseCase.getAllPositions(effectiveBranchId, sectionId, status, search);
         return ResponseEntity.ok(ApiResponse.ok("Posiciones recuperadas con éxito", response));
     }
 
 
     @PatchMapping("/positions/{positionId}/status")
-    @PreAuthorize("hasAuthority('LOCATIONS_UPDATE') or hasAuthority('INVENTORY_UPDATE') or hasAuthority('QUALITY_UPDATE') or hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('FORKLIFT_OPERATOR')")
+    @PreAuthorize("hasAuthority('LOCATIONS_UPDATE') or hasAuthority('INVENTORY_UPDATE') or hasAuthority('QUALITY_UPDATE') or hasAuthority('WAREHOUSE_MOVEMENTS_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('SHIFT_LEADER') or hasRole('WAREHOUSE_OPERATOR') or hasRole('FORKLIFT_OPERATOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Actualizar estado operativo de posición", description = "Ejecuta transiciones FSM: BLOCK (bloqueo QM), RELEASE (liberación) u OCCUPY.")
     public ResponseEntity<ApiResponse<PositionMapDetailResponse>> updatePositionStatus(
             @PathVariable UUID positionId,
@@ -72,7 +75,7 @@ public class WarehouseMapController {
     }
 
     @PostMapping("/positions")
-    @PreAuthorize("hasAuthority('LOCATIONS_CREATE') or hasAuthority('LAYOUT_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('LOCATIONS_CREATE') or hasAuthority('LAYOUT_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Dar de alta una nueva posición/bahía", description = "Crea una posición fija, temporal de buffer o precarga en la sección de almacén.")
     public ResponseEntity<ApiResponse<PositionMapDetailResponse>> createPosition(
             @Valid @RequestBody com.fourguard.wms.application.dto.request.map.CreatePositionMapRequest request,
@@ -83,7 +86,7 @@ public class WarehouseMapController {
     }
 
     @PutMapping("/positions/{positionId}")
-    @PreAuthorize("hasAuthority('LOCATIONS_UPDATE') or hasAuthority('LAYOUT_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('LOCATIONS_UPDATE') or hasAuthority('LAYOUT_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Actualizar configuración y capacidad de una posición", description = "Modifica la capacidad en tarimas, categoría, o coordenadas físicas.")
     public ResponseEntity<ApiResponse<PositionMapDetailResponse>> updatePositionDetails(
             @PathVariable UUID positionId,
@@ -95,7 +98,7 @@ public class WarehouseMapController {
     }
 
     @DeleteMapping("/positions/{positionId}")
-    @PreAuthorize("hasAuthority('LOCATIONS_DELETE') or hasAuthority('LAYOUT_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('LOCATIONS_DELETE') or hasAuthority('LAYOUT_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Dar de baja una posición/bahía", description = "Inhabilita o da de baja lógica la posición si no tiene inventario activo.")
     public ResponseEntity<ApiResponse<Void>> deletePosition(
             @PathVariable UUID positionId,

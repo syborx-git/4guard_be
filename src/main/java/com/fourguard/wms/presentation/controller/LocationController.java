@@ -28,7 +28,7 @@ public class LocationController {
     private final LocationUseCase locationUseCase;
 
     @PostMapping
-    @PreAuthorize("hasAuthority('LOCATIONS_CREATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('LOCATIONS_CREATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Crear ubicación", description = "Registra una nueva posición de almacenamiento física con estado inicial ACTIVE.")
     public ResponseEntity<ApiResponse<LocationResponse>> createLocation(
             @Valid @RequestBody CreateLocationRequest request) {
@@ -37,7 +37,7 @@ public class LocationController {
     }
 
     @PutMapping
-    @PreAuthorize("hasAuthority('LOCATIONS_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('LOCATIONS_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Actualizar ubicación", description = "Actualiza los datos de una ubicación. Para cambiar el estado operativo usa PATCH /{id}/status.")
     public ResponseEntity<ApiResponse<LocationResponse>> updateLocation(
             @Valid @RequestBody UpdateLocationRequest request) {
@@ -46,7 +46,7 @@ public class LocationController {
     }
 
     @PatchMapping("/{id}/status")
-    @PreAuthorize("hasAuthority('LOCATIONS_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('LOCATIONS_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('CONTROL_DESK') or hasRole('WAREHOUSE_OPERATOR') or hasRole('FORKLIFT_OPERATOR') or hasRole('CEO')")
     @Operation(summary = "Cambiar estado de la ubicación", description = "Cambia el estado operativo (FSM) de una ubicación.")
     public ResponseEntity<ApiResponse<LocationResponse>> changeLocationStatus(
             @PathVariable UUID id,
@@ -84,7 +84,7 @@ public class LocationController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('LOCATIONS_DELETE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('LOCATIONS_DELETE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Eliminar ubicación", description = "Elimina físicamente una ubicación del sistema por su ID.")
     public ResponseEntity<ApiResponse<Void>> deleteLocation(@PathVariable UUID id) {
         locationUseCase.deleteLocation(id);
@@ -92,7 +92,7 @@ public class LocationController {
     }
 
     @GetMapping("/{id}/audit")
-    @PreAuthorize("hasAuthority('LOCATIONS_READ') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('LOCATIONS_READ') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Historial de auditoría de la ubicación", description = "Devuelve el historial cronológico de cambios de una ubicación específica.")
     public ResponseEntity<ApiResponse<List<LocationAuditResponse>>> getLocationAuditLogs(@PathVariable UUID id) {
         List<LocationAuditResponse> response = locationUseCase.getLocationAuditLogs(id);

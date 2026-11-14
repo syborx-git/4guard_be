@@ -15,6 +15,7 @@ import java.util.UUID;
 /**
  * JPA Entity for wms.warehouse_transfers.
  * Internal transfer and relocation header.
+ * Homologado con ADR-011, ADR-017, ADR-020 y ADR-022.
  */
 @Entity
 @Table(
@@ -49,7 +50,11 @@ public class WarehouseTransferEntity extends BaseVersionedEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     @Builder.Default
-    private TransferStatus status = TransferStatus.COMPLETED;
+    private TransferStatus status = TransferStatus.ASSIGNED;
+
+    @Column(name = "priority", length = 20)
+    @Builder.Default
+    private String priority = "NORMAL";
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "origin_location_id", nullable = false)
@@ -84,6 +89,18 @@ public class WarehouseTransferEntity extends BaseVersionedEntity {
     @Column(name = "distinct_skus", nullable = false)
     @Builder.Default
     private Integer distinctSkus = 0;
+
+    @Column(name = "started_at")
+    private OffsetDateTime startedAt;
+
+    @Column(name = "completed_at")
+    private OffsetDateTime completedAt;
+
+    @Column(name = "paused_at")
+    private OffsetDateTime pausedAt;
+
+    @Column(name = "pause_reason", length = 100)
+    private String pauseReason;
 
     @Column(name = "cancelled_at")
     private OffsetDateTime cancelledAt;

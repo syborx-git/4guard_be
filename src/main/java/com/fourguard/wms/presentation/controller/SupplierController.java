@@ -37,7 +37,7 @@ public class SupplierController {
     // =========================================================================
 
     @PostMapping
-    @PreAuthorize("hasAuthority('SUPPLIERS_CREATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('SUPPLIERS_CREATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Crear proveedor",
                description = "Registra un nuevo proveedor con sus datos fiscales, contacto, dirección y condiciones comerciales. Genera código PRV-XXXX automáticamente.")
     @ApiResponses({
@@ -123,7 +123,7 @@ public class SupplierController {
     // =========================================================================
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('SUPPLIERS_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('SUPPLIERS_UPDATE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Actualizar proveedor",
                description = "Actualiza todos los datos de un proveedor. Las sub-entidades (contacto, dirección, términos) se actualizan en la misma transacción.")
     @ApiResponses({
@@ -145,7 +145,7 @@ public class SupplierController {
     // =========================================================================
 
     @PatchMapping("/{id}/status")
-    @PreAuthorize("hasAuthority('SUPPLIERS_STATUS_CHANGE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('SUPPLIERS_STATUS_CHANGE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Cambiar estado de proveedor",
                description = "Cambia el estado operativo del proveedor (ACTIVE, INACTIVE, BLOCKED). El motivo es obligatorio para INACTIVE y BLOCKED.")
     @ApiResponses({
@@ -167,7 +167,7 @@ public class SupplierController {
     // =========================================================================
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('SUPPLIERS_DELETE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('SUPPLIERS_DELETE') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Archivar proveedor",
                description = "Archivado lógico del proveedor (is_deleted=true). No se elimina físicamente. El historial y auditoría se preservan.")
     @ApiResponses({
@@ -186,7 +186,7 @@ public class SupplierController {
     // =========================================================================
 
     @GetMapping("/{id}/audit")
-    @PreAuthorize("hasAuthority('SUPPLIERS_READ') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR')")
+    @PreAuthorize("hasAuthority('SUPPLIERS_READ') or hasRole('OPERATIONS_MANAGER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN') or hasRole('OPERATIONS_SUPERVISOR') or hasRole('WAREHOUSE_SUPERVISOR') or hasRole('CONTROL_DESK') or hasRole('CEO')")
     @Operation(summary = "Historial de auditoría del proveedor",
                description = "Devuelve el historial cronológico de cambios del proveedor, incluyendo cambios de estado, datos y archivado.")
     @ApiResponses({

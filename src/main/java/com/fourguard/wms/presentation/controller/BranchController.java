@@ -62,7 +62,7 @@ public class BranchController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('BRANCHES_READ') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('BRANCHES_READ') or isAuthenticated()")
     @Operation(summary = "Obtener sucursal por ID", description = "Recupera los detalles de una sucursal específica por su UUID.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Sucursal encontrada con éxito"),
@@ -76,7 +76,7 @@ public class BranchController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAuthority('BRANCHES_READ') or hasRole('OPERATIONS_MANAGER')")
+    @PreAuthorize("hasAuthority('BRANCHES_READ') or isAuthenticated()")
     @Operation(summary = "Obtener sucursales", description = "Recupera la lista de sucursales, opcionalmente filtrada por organización.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Lista de sucursales recuperada con éxito"),

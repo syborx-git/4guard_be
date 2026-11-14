@@ -14,4 +14,9 @@ public class LogoutRequest {
 
     @NotBlank(message = "El Refresh Token es requerido para cerrar sesión")
     private String refreshToken;
+
+    /**
+     * Motivo de cierre de sesión: "MANUAL", "TIMEOUT", "REVOKED", etc.
+     */
+    private String reason;
 }

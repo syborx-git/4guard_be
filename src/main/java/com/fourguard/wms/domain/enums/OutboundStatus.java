@@ -9,6 +9,7 @@ public enum OutboundStatus {
     REGISTERED,
     ASSIGNED,
     IN_PROGRESS,
+    PAUSED,
     LOADED,
     COMPLETED,
     CANCELLED

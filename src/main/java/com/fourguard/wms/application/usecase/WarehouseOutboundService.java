@@ -238,6 +238,7 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
                 .preCheckin(preCheckin)
                 .folio(folio)
                 .status(targetStatus)
+                .priority(request.getPriority() != null && "URGENT".equalsIgnoreCase(request.getPriority().trim()) ? "URGENT" : "NORMAL")
                 .client(client)
                 .destination(destination)
                 .destinationName(destName)
@@ -278,7 +279,9 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
         outbound.setUpdatedBy(currentUsername);
 
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-        if (targetStatus == OutboundStatus.COMPLETED) {
+        if (targetStatus == OutboundStatus.IN_PROGRESS) {
+            outbound.setStartedAt(now);
+        } else if (targetStatus == OutboundStatus.COMPLETED) {
             outbound.setCompletedAt(now);
             outbound.setLeaderAuthorizedBy(currentUsername);
         }
@@ -424,7 +427,14 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
                     newValues.put("status", newStatus.name());
                     outbound.setStatus(newStatus);
 
-                    if (newStatus == OutboundStatus.COMPLETED) {
+                    if (newStatus == OutboundStatus.IN_PROGRESS && outbound.getStartedAt() == null) {
+                        outbound.setStartedAt(OffsetDateTime.now(ZoneOffset.UTC));
+                    } else if (newStatus == OutboundStatus.PAUSED) {
+                        outbound.setPausedAt(OffsetDateTime.now(ZoneOffset.UTC));
+                        if (request.getPauseReason() != null && !request.getPauseReason().isBlank()) {
+                            outbound.setPauseReason(request.getPauseReason().trim());
+                        }
+                    } else if (newStatus == OutboundStatus.COMPLETED) {
                         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
                         outbound.setCompletedAt(now);
                         String currentUsername = securityAuditHelper.getCurrentUsername();
@@ -471,6 +481,19 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
                     }
                 }
             } catch (IllegalArgumentException ignored) {}
+        }
+
+        // Priority update
+        if (request.getPriority() != null && !request.getPriority().isBlank()) {
+            String newPriority = request.getPriority().toUpperCase().trim();
+            if (!Objects.equals(outbound.getPriority(), newPriority)) {
+                oldValues.put("priority", outbound.getPriority() != null ? outbound.getPriority() : "NORMAL");
+                newValues.put("priority", newPriority);
+                outbound.setPriority(newPriority);
+            }
+        }
+        if (request.getPauseReason() != null && !request.getPauseReason().isBlank()) {
+            outbound.setPauseReason(request.getPauseReason().trim());
         }
 
         // 2. Ramp assignment
@@ -756,6 +779,8 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
                 ssePayload.put("folio", saved.getFolio());
                 ssePayload.put("type", "OUTBOUND_DISPATCH");
                 ssePayload.put("status", saved.getStatus().name());
+                ssePayload.put("priority", saved.getPriority());
+                ssePayload.put("shiftSessionId", saved.getShiftSessionId() != null ? saved.getShiftSessionId().toString() : null);
                 ssePayload.put("forkliftOperatorId", saved.getForkliftOperator().getId().toString());
                 ssePayload.put("forkliftOperatorCode", saved.getForkliftOperator().getCode());
                 ssePayload.put("forkliftOperatorName", saved.getForkliftOperator().getFullName());
@@ -1315,5 +1340,30 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
             }
         }
         return "CLI";
+    }
+
+    @Override
+    @Transactional
+    public OutboundResponse updatePriority(UUID id, String priority) {
+        UpdateOutboundRequest req = new UpdateOutboundRequest();
+        req.setPriority(priority);
+        return updateOutbound(id, req);
+    }
+
+    @Override
+    @Transactional
+    public OutboundResponse pauseOutbound(UUID id, String reason) {
+        UpdateOutboundRequest req = new UpdateOutboundRequest();
+        req.setStatus("PAUSED");
+        req.setPauseReason(reason);
+        return updateOutbound(id, req);
+    }
+
+    @Override
+    @Transactional
+    public OutboundResponse resumeOutbound(UUID id) {
+        UpdateOutboundRequest req = new UpdateOutboundRequest();
+        req.setStatus("IN_PROGRESS");
+        return updateOutbound(id, req);
     }
 }

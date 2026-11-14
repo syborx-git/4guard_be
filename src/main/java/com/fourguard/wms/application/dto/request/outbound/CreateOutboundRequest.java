@@ -63,6 +63,8 @@ public class CreateOutboundRequest {
 
     private String status;
 
+    private String priority; // NORMAL o URGENT
+
     private List<UUID> selectedItemIds;
 
     /** Optional: Linked security pre-checkin pass UUID */

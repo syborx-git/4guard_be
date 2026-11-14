@@ -2,6 +2,7 @@ package com.fourguard.wms.infrastructure.notification;
 
 import com.fourguard.wms.domain.model.quality.QualityAlertEvent;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -96,6 +97,32 @@ public class QualityAlertBroadcaster {
                         .name(eventType)
                         .data(payload));
             } catch (Exception e) {
+                deadEmitters.add(emitter);
+            }
+        }
+        activeEmitters.removeAll(deadEmitters);
+    }
+
+    
+    /**
+     * Heartbeat periódico cada 25 segundos para mantener vivas las conexiones SSE activas
+     * evitando desconexiones prematuras por inactividad de proxies o del contenedor web.
+     */
+    @Scheduled(fixedDelay = 25000)
+    public void sendHeartbeat() {
+        if (activeEmitters.isEmpty()) {
+            return;
+        }
+        List<SseEmitter> deadEmitters = new ArrayList<>();
+        for (SseEmitter emitter : activeEmitters) {
+            try {
+                emitter.send(SseEmitter.event()
+                        .name("PING")
+                        .comment("keep-alive"));
+            } catch (Exception e) {
+                try {
+                    emitter.complete();
+                } catch (Exception ignored) {}
                 deadEmitters.add(emitter);
             }
         }

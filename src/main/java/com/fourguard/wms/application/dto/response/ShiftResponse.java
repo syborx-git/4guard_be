@@ -21,6 +21,10 @@ public class ShiftResponse {
     private final LocalTime endTime;
     private final Integer restBreakMinutes;
     private final Integer toleranceMinutes;
+    private final LocalTime mealStartTime;
+    private final LocalTime mealEndTime;
+    private final Integer mealEarlyPauseMinutes;
+    private final Boolean hasMealBreak;
     private final Boolean isOvernight;
     private final Integer netDurationMinutes;
     private final ShiftStatus status;

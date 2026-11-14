@@ -24,6 +24,7 @@ public class OutboundResponse {
     private UUID branchId;
     private String folio;
     private String status;
+    private String priority; // NORMAL o URGENT
 
     private UUID clientId;
     private String clientName;
@@ -56,7 +57,10 @@ public class OutboundResponse {
 
     private List<OutboundItemResponse> items;
 
+    private OffsetDateTime startedAt;
     private OffsetDateTime completedAt;
+    private OffsetDateTime pausedAt;
+    private String pauseReason;
     private String leaderAuthorizedBy;
     private OffsetDateTime cancelledAt;
     private String cancellationReason;

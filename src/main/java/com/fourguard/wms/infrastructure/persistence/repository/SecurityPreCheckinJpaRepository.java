@@ -49,4 +49,32 @@ public interface SecurityPreCheckinJpaRepository extends JpaRepository<SecurityP
             @Param("orgId") UUID orgId,
             @Param("branchId") UUID branchId
     );
+
+    @Query("SELECT p FROM SecurityPreCheckinEntity p " +
+           "WHERE p.organization.id = :orgId " +
+           "AND (:branchId IS NULL OR p.branch.id = :branchId) " +
+           "AND p.status = 'COMPLETED_EXIT' " +
+           "AND ((:shiftSessionId IS NOT NULL AND p.shiftSessionId = :shiftSessionId) " +
+           "     OR (:shiftSessionId IS NULL AND (:since IS NULL OR p.exitedAt >= :since))) " +
+           "ORDER BY p.exitedAt DESC, p.createdAt DESC")
+    List<SecurityPreCheckinEntity> findCurrentShiftHistoryPasses(
+            @Param("orgId") UUID orgId,
+            @Param("branchId") UUID branchId,
+            @Param("shiftSessionId") UUID shiftSessionId,
+            @Param("since") OffsetDateTime since
+    );
+
+    @Query("SELECT p FROM SecurityPreCheckinEntity p " +
+           "WHERE p.organization.id = :orgId " +
+           "AND (:branchId IS NULL OR p.branch.id = :branchId) " +
+           "AND p.status = 'COMPLETED_EXIT' " +
+           "AND (:from IS NULL OR p.exitedAt >= :from) " +
+           "AND (:to IS NULL OR p.exitedAt <= :to) " +
+           "ORDER BY p.exitedAt DESC, p.createdAt DESC")
+    List<SecurityPreCheckinEntity> findGlobalHistoryPasses(
+            @Param("orgId") UUID orgId,
+            @Param("branchId") UUID branchId,
+            @Param("from") OffsetDateTime from,
+            @Param("to") OffsetDateTime to
+    );
 }

@@ -63,6 +63,9 @@ public class SecurityPreCheckinEntity extends BaseVersionedEntity {
     @Column(name = "source_outbound_folio", length = 50)
     private String sourceOutboundFolio;
 
+    @Column(name = "shift_session_id")
+    private UUID shiftSessionId;
+
     @Column(name = "reentry_reason", length = 100)
     private String reentryReason;
 

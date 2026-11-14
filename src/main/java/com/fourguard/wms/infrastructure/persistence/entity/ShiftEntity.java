@@ -49,6 +49,20 @@ public class ShiftEntity extends BaseVersionedEntity {
     @Builder.Default
     private Integer toleranceMinutes = 0;
 
+    @Column(name = "meal_start_time")
+    private LocalTime mealStartTime;
+
+    @Column(name = "meal_end_time")
+    private LocalTime mealEndTime;
+
+    @Column(name = "meal_early_pause_minutes")
+    @Builder.Default
+    private Integer mealEarlyPauseMinutes = 10;
+
+    @Column(name = "has_meal_break")
+    @Builder.Default
+    private Boolean hasMealBreak = true;
+
     @Column(name = "is_overnight")
     @Builder.Default
     private Boolean isOvernight = false;

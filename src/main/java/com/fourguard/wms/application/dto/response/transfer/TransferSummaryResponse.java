@@ -10,6 +10,7 @@ import java.util.UUID;
 
 /**
  * Summary DTO for transfer list views.
+ * ADR-011, ADR-017, ADR-020, ADR-022.
  */
 @Data
 @Builder
@@ -20,6 +21,7 @@ public class TransferSummaryResponse {
     private UUID id;
     private String folio;
     private String status;
+    private String priority;
     private UUID originLocationId;
     private String originLocationCode;
     private UUID destinationLocationId;
@@ -31,6 +33,10 @@ public class TransferSummaryResponse {
     private Integer totalPallets;
     private Double totalPieces;
     private Integer distinctSkus;
+    private OffsetDateTime startedAt;
+    private OffsetDateTime completedAt;
+    private OffsetDateTime pausedAt;
+    private String pauseReason;
     private OffsetDateTime createdAt;
     private String createdBy;
     private UUID shiftSessionId;

@@ -41,6 +41,7 @@ public class UpdateReceptionParametersRequest {
 
     /** Optional: Target lifecycle status (ASSIGNED, IN_PROGRESS, DISCHARGED, PARTIAL_DISCHARGED) */
     private String status;
+    private String priority;
 
     private String observations;
     private String handoverNotes;

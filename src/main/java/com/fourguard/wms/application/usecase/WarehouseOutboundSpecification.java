@@ -77,6 +77,7 @@ public class WarehouseOutboundSpecification {
                         OutboundStatus.REGISTERED,
                         OutboundStatus.ASSIGNED,
                         OutboundStatus.IN_PROGRESS,
+                        OutboundStatus.PAUSED,
                         OutboundStatus.LOADED)));
             } else if (scope == MovementScope.HISTORY) {
                 predicates.add(root.get("status").in(List.of(
