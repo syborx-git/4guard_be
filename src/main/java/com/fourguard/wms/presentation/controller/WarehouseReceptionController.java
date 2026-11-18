@@ -17,7 +17,7 @@ import java.util.Map;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/warehouse-receptions")
+@RequestMapping({"/warehouse-receptions", "/warehouse/receptions"})
 @RequiredArgsConstructor
 @Tag(name = "Recepciones de Almacén", description = "Endpoints para la gestión del flujo transaccional de Recepción de Mercancía F01 (Inbound)")
 public class WarehouseReceptionController {
