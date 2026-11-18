@@ -95,9 +95,9 @@ public class UserService implements CreateUserUseCase, GetUserUseCase, UpdateUse
 
         // Set defaults
         user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setStatus(request.getStatus() != null ? request.getStatus() : UserStatus.PENDING);
+        user.setStatus(request.getStatus() != null ? request.getStatus() : UserStatus.ACTIVE);
         user.setIsEnabled(request.getIsEnabled() != null ? request.getIsEnabled() : true);
-        user.setChangePasswordRequired(true);
+        user.setChangePasswordRequired(false);
         user.setFailedAttempts(0);
         user.setPermanentlyLocked(false);
         user.setCreatedAt(OffsetDateTime.now());
@@ -170,6 +170,10 @@ public class UserService implements CreateUserUseCase, GetUserUseCase, UpdateUse
         // Update password if provided
         if (request.getPassword() != null && !request.getPassword().isBlank()) {
             existingUser.setPassword(passwordEncoder.encode(request.getPassword()));
+            existingUser.setChangePasswordRequired(false);
+            existingUser.setFailedAttempts(0);
+            existingUser.setPermanentlyLocked(false);
+            existingUser.setLockedUntil(null);
         }
 
         // Resolve and update relationships if IDs are provided
