@@ -309,7 +309,9 @@ public class ShiftService implements ShiftUseCase {
                                 .map(u -> u.getUsername())
                                 .orElse("UNKNOWN");
                     }
-                    List<ShiftAuditResponse.AuditDetailResponse> details = logEntry.getDetails().stream()
+                    List<ShiftAuditResponse.AuditDetailResponse> details = java.util.Optional.ofNullable(logEntry.getDetails())
+                            .orElse(java.util.Collections.emptyList())
+                            .stream()
                             .map(d -> ShiftAuditResponse.AuditDetailResponse.builder()
                                     .fieldName(d.getFieldName())
                                     .oldValue(d.getOldValue())

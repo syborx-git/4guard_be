@@ -37,8 +37,10 @@ public interface ShiftJpaRepository extends JpaRepository<ShiftEntity, UUID> {
           AND (:excludeId IS NULL OR s.id <> :excludeId)
           AND d IN :days
           AND (
-              (s.isOvernight = false AND :isOvernightNew = false AND s.startTime < :endTime AND s.endTime > :startTime)
-              OR (s.isOvernight = true OR :isOvernightNew = true)
+              (:isOvernightNew = false AND s.isOvernight = false AND s.startTime < :endTime AND s.endTime > :startTime)
+              OR (:isOvernightNew = true AND s.isOvernight = false AND (s.endTime > :startTime OR s.startTime < :endTime))
+              OR (:isOvernightNew = false AND s.isOvernight = true AND (:endTime > s.startTime OR :startTime < s.endTime))
+              OR (:isOvernightNew = true AND s.isOvernight = true)
           )
     """)
     List<ShiftEntity> findOverlappingShifts(
