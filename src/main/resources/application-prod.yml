@@ -59,7 +59,7 @@ cache:
 security:
   jwt:
     secret: ${JWT_SECRET}
-    access-token-expiration: ${JWT_ACCESS_EXPIRATION:1800000}
+    access-token-expiration: ${JWT_ACCESS_EXPIRATION:28800000} # 8 horas (ms) para turnos operativos completos
     refresh-token-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
     password-reset-token-expiration: ${JWT_RESET_EXPIRATION:900000}
 
