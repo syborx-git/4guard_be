@@ -17,9 +17,9 @@ public interface UserJpaRepository extends JpaRepository<UserEntity, UUID> {
 
     Optional<UserEntity> findByEmail(String email);
 
-    /** Login lookup — supports username OR email. */
-    @Query("SELECT u FROM UserEntity u WHERE u.username = :identifier OR u.email = :identifier")
-    Optional<UserEntity> findByUsernameOrEmail(String identifier);
+    /** Login lookup — supports username OR email (case-insensitive). */
+    @Query("SELECT u FROM UserEntity u WHERE LOWER(u.username) = LOWER(:identifier) OR LOWER(u.email) = LOWER(:identifier)")
+    Optional<UserEntity> findByUsernameOrEmail(@Param("identifier") String identifier);
 
     boolean existsByUsername(String username);
 

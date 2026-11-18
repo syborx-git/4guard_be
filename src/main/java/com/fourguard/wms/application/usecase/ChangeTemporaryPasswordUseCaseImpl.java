@@ -27,7 +27,8 @@ public class ChangeTemporaryPasswordUseCaseImpl implements ChangeTemporaryPasswo
         log.info("[AUTH] User '{}' requested password update to permanent", username);
 
         UserEntity userEntity = userRepositoryPort.findByUsername(username)
-                .orElseThrow(() -> new EntityNotFoundException("User not found with username: " + username));
+                .or(() -> userRepositoryPort.findByUsernameOrEmail(username))
+                .orElseThrow(() -> new EntityNotFoundException("User not found with identifier: " + username));
 
         userEntity.setPassword(passwordEncoder.encode(newPassword));
         userEntity.setChangePasswordRequired(false);
