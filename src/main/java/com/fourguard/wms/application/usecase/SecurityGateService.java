@@ -362,35 +362,34 @@ public  class SecurityGateService implements SecurityGateUseCase {
             if (p.getGeneratedFolio() != null && !p.getGeneratedFolio().isBlank()) {
                 processedFolios.add(p.getGeneratedFolio().trim());
             }
-            result.add(mapToResponseWithWarehouseStatus(p));
+            PassResponse resp = mapToResponseWithWarehouseStatus(p);
+            if (!"CANCELLED".equalsIgnoreCase(resp.getWarehouseStatus())
+                    && !"CANCELLED".equalsIgnoreCase(resp.getStatus())) {
+                result.add(resp);
+            }
         }
 
         // 2. Unificar todas las recepciones activas en planta de
-        // wms.warehouse_receptions (incluye canceladas recientes que no han salido de caseta)
+        // wms.warehouse_receptions (excluyendo canceladas)
         List<WarehouseReceptionEntity> activeReceptions = warehouseReceptionRepositoryPort.findAll(
                 WarehouseReceptionSpecification.withFilters(organizationId, branchId, null, null, null, com.fourguard.wms.domain.enums.MovementScope.CURRENT));
 
-        OffsetDateTime recentThreshold = OffsetDateTime.now().minusDays(2);
         for (WarehouseReceptionEntity rec : activeReceptions) {
-            boolean isOldCancelled = rec.getStatus() == ReceptionStatus.CANCELLED &&
-                    ((rec.getCancelledAt() != null && rec.getCancelledAt().isBefore(recentThreshold)) ||
-                     (rec.getCreatedAt() != null && rec.getCreatedAt().isBefore(recentThreshold)));
-            if (!isOldCancelled && shouldIncludeInYardFolio(rec.getFolio(), processedFolios)) {
+            if (rec.getStatus() != ReceptionStatus.CANCELLED
+                    && shouldIncludeInYardFolio(rec.getFolio(), processedFolios)) {
                 processedFolios.add(rec.getFolio().trim());
                 result.add(mapReceptionToPassResponse(rec));
             }
         }
 
         // 3. Unificar todos los embarques (outbounds) activos en planta de
-        // wms.warehouse_outbounds (incluye cancelados recientes que no han salido de caseta)
+        // wms.warehouse_outbounds (excluyendo cancelados)
         List<WarehouseOutboundEntity> activeOutbounds = warehouseOutboundRepositoryPort.findAll(
                 WarehouseOutboundSpecification.withFilters(organizationId, branchId, null, null, null, com.fourguard.wms.domain.enums.MovementScope.CURRENT));
 
         for (WarehouseOutboundEntity out : activeOutbounds) {
-            boolean isOldCancelled = out.getStatus() == OutboundStatus.CANCELLED &&
-                    ((out.getCancelledAt() != null && out.getCancelledAt().isBefore(recentThreshold)) ||
-                     (out.getCreatedAt() != null && out.getCreatedAt().isBefore(recentThreshold)));
-            if (!isOldCancelled && shouldIncludeInYardFolio(out.getFolio(), processedFolios)) {
+            if (out.getStatus() != OutboundStatus.CANCELLED
+                    && shouldIncludeInYardFolio(out.getFolio(), processedFolios)) {
                 processedFolios.add(out.getFolio().trim());
                 result.add(mapOutboundToPassResponse(out));
             }
@@ -1104,7 +1103,7 @@ public  class SecurityGateService implements SecurityGateUseCase {
                 if (outbound.isPresent()) {
                     WarehouseOutboundEntity out = outbound.get();
                     whStatus = out.getStatus() != null ? out.getStatus().name() : "REGISTERED";
-                    readyForExit = (out.getStatus() == OutboundStatus.COMPLETED || out.getStatus() == OutboundStatus.CANCELLED);
+                    readyForExit = (out.getStatus() == OutboundStatus.COMPLETED);
                     if (out.getStatus() == OutboundStatus.CANCELLED) {
                         dynamicCancellationReason = out.getCancellationReason();
                         dynamicCancelledBy = out.getCancelledBy();
@@ -1121,7 +1120,7 @@ public  class SecurityGateService implements SecurityGateUseCase {
                 if (reception.isPresent()) {
                     WarehouseReceptionEntity rec = reception.get();
                     whStatus = rec.getStatus() != null ? rec.getStatus().name() : "REGISTERED";
-                    readyForExit = (rec.getStatus() == ReceptionStatus.COMPLETED || rec.getStatus() == ReceptionStatus.CANCELLED);
+                    readyForExit = (rec.getStatus() == ReceptionStatus.COMPLETED);
                     if (rec.getStatus() == ReceptionStatus.CANCELLED) {
                         dynamicCancellationReason = rec.getCancellationReason();
                         dynamicCancelledBy = rec.getCancelledBy();
