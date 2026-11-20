@@ -6,6 +6,10 @@ on:
       - main
   workflow_dispatch:
 
+concurrency:
+  group: deploy-backend-hetzner
+  cancel-in-progress: false
+
 jobs:
   deploy:
     name: Deploy 4Guard Backend to Hetzner
@@ -31,7 +35,7 @@ jobs:
             git reset --hard origin/main
             cd /opt/4guard
             docker compose build --no-cache 4guard-backend
-            docker compose up -d 4guard-backend
+            docker compose up -d 4guard-backend || (sleep 5 && docker compose up -d 4guard-backend)
             echo "=== Estado de los Contenedores ==="
             docker compose ps
             echo "=========================================================="
