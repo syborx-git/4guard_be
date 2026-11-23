@@ -1031,6 +1031,8 @@ public  class SecurityGateService implements SecurityGateUseCase {
                 .observations(rec.getObservations())
                 .warehouseStatus(rec.getStatus() != null ? rec.getStatus().name() : "REGISTERED")
                 .isReadyForExit(rec.getStatus() == ReceptionStatus.COMPLETED)
+                .forkliftOperatorId(rec.getForkliftOperator() != null ? rec.getForkliftOperator().getId() : null)
+                .forkliftOperatorName(rec.getForkliftOperator() != null ? rec.getForkliftOperator().getFullName() : null)
                 .cancellationReason(rec.getCancellationReason())
                 .cancelledBy(rec.getCancelledBy())
                 .cancelledAt(rec.getCancelledAt())
@@ -1075,6 +1077,8 @@ public  class SecurityGateService implements SecurityGateUseCase {
                 .observations(out.getObservations())
                 .warehouseStatus(out.getStatus() != null ? out.getStatus().name() : "REGISTERED")
                 .isReadyForExit(out.getStatus() == OutboundStatus.COMPLETED)
+                .forkliftOperatorId(out.getForkliftOperator() != null ? out.getForkliftOperator().getId() : null)
+                .forkliftOperatorName(out.getForkliftOperator() != null ? out.getForkliftOperator().getFullName() : null)
                 .cancellationReason(out.getCancellationReason())
                 .cancelledBy(out.getCancelledBy())
                 .cancelledAt(out.getCancelledAt())
@@ -1095,6 +1099,8 @@ public  class SecurityGateService implements SecurityGateUseCase {
         UUID dynamicRampId = entity.getRamp() != null ? entity.getRamp().getId() : null;
         Integer dynamicRampNumber = entity.getRampNumber();
         String dynamicRampCode = entity.getRampCode();
+        UUID dynamicForkliftOperatorId = null;
+        String dynamicForkliftOperatorName = null;
 
         if (entity.getGeneratedFolio() != null && !entity.getGeneratedFolio().isBlank()) {
             String folio = entity.getGeneratedFolio().trim();
@@ -1104,6 +1110,10 @@ public  class SecurityGateService implements SecurityGateUseCase {
                     WarehouseOutboundEntity out = outbound.get();
                     whStatus = out.getStatus() != null ? out.getStatus().name() : "REGISTERED";
                     readyForExit = (out.getStatus() == OutboundStatus.COMPLETED);
+                    if (out.getForkliftOperator() != null) {
+                        dynamicForkliftOperatorId = out.getForkliftOperator().getId();
+                        dynamicForkliftOperatorName = out.getForkliftOperator().getFullName();
+                    }
                     if (out.getStatus() == OutboundStatus.CANCELLED) {
                         dynamicCancellationReason = out.getCancellationReason();
                         dynamicCancelledBy = out.getCancelledBy();
@@ -1121,6 +1131,10 @@ public  class SecurityGateService implements SecurityGateUseCase {
                     WarehouseReceptionEntity rec = reception.get();
                     whStatus = rec.getStatus() != null ? rec.getStatus().name() : "REGISTERED";
                     readyForExit = (rec.getStatus() == ReceptionStatus.COMPLETED);
+                    if (rec.getForkliftOperator() != null) {
+                        dynamicForkliftOperatorId = rec.getForkliftOperator().getId();
+                        dynamicForkliftOperatorName = rec.getForkliftOperator().getFullName();
+                    }
                     if (rec.getStatus() == ReceptionStatus.CANCELLED) {
                         dynamicCancellationReason = rec.getCancellationReason();
                         dynamicCancelledBy = rec.getCancelledBy();
@@ -1200,6 +1214,8 @@ public  class SecurityGateService implements SecurityGateUseCase {
                 .exitedAt(entity.getExitedAt())
                 .warehouseStatus(whStatus)
                 .isReadyForExit(readyForExit)
+                .forkliftOperatorId(dynamicForkliftOperatorId)
+                .forkliftOperatorName(dynamicForkliftOperatorName)
                 .cancellationReason(dynamicCancellationReason)
                 .cancelledBy(dynamicCancelledBy)
                 .cancelledAt(dynamicCancelledAt)

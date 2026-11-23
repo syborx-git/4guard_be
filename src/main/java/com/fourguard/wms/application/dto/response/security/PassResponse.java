@@ -65,6 +65,8 @@ public class PassResponse {
     private OffsetDateTime exitedAt;
     private String warehouseStatus;
     private Boolean isReadyForExit;
+    private UUID forkliftOperatorId;
+    private String forkliftOperatorName;
 
     // Cancellation info
     private String cancellationReason;
