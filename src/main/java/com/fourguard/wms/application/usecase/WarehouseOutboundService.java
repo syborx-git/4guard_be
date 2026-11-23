@@ -536,9 +536,9 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
             operator = forkliftOperatorRepositoryPort.findById(request.getForkliftOperatorId()).orElse(null);
         }
         if (operator == null && request.getForkliftOperatorName() != null && !request.getForkliftOperatorName().isBlank()) {
-            String opSearch = request.getForkliftOperatorName().trim();
+            String opSearch = request.getForkliftOperatorName().trim().toLowerCase();
             operator = forkliftOperatorRepositoryPort.findAll().stream()
-                    .filter(o -> (o.getFullName() != null && o.getFullName().equalsIgnoreCase(opSearch)) ||
+                    .filter(o -> (o.getFullName() != null && o.getFullName().toLowerCase().contains(opSearch)) ||
                                  (o.getCode() != null && o.getCode().equalsIgnoreCase(opSearch)))
                     .findFirst()
                     .orElse(null);
@@ -613,6 +613,28 @@ public class WarehouseOutboundService implements WarehouseOutboundUseCase {
                 oldValues.put("noEcoCaja", !oldBoxEco.isEmpty() ? oldBoxEco : "Sin especificar");
                 newValues.put("noEcoCaja", incomingBoxEco);
                 outbound.setNoEcoCaja(incomingBoxEco);
+            }
+        }
+        if (outbound.getPreCheckin() != null) {
+            boolean preChanged = false;
+            if (outbound.getTractorPlates() != null && !outbound.getTractorPlates().isBlank()) {
+                outbound.getPreCheckin().setTractorPlates(outbound.getTractorPlates());
+                preChanged = true;
+            }
+            if (outbound.getBoxPlates() != null && !outbound.getBoxPlates().isBlank()) {
+                outbound.getPreCheckin().setBoxPlates(outbound.getBoxPlates());
+                preChanged = true;
+            }
+            if (outbound.getNoEcoTractor() != null && !outbound.getNoEcoTractor().isBlank()) {
+                outbound.getPreCheckin().setNoEcoTractor(outbound.getNoEcoTractor());
+                preChanged = true;
+            }
+            if (outbound.getNoEcoCaja() != null && !outbound.getNoEcoCaja().isBlank()) {
+                outbound.getPreCheckin().setNoEcoCaja(outbound.getNoEcoCaja());
+                preChanged = true;
+            }
+            if (preChanged) {
+                preCheckinJpaRepository.save(outbound.getPreCheckin());
             }
         }
 

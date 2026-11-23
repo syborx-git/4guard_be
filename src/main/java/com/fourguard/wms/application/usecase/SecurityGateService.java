@@ -1101,6 +1101,8 @@ public  class SecurityGateService implements SecurityGateUseCase {
         String dynamicRampCode = entity.getRampCode();
         UUID dynamicForkliftOperatorId = null;
         String dynamicForkliftOperatorName = null;
+        String dynamicNoEcoTractor = entity.getNoEcoTractor() != null ? entity.getNoEcoTractor().trim() : null;
+        String dynamicNoEcoCaja = entity.getNoEcoCaja() != null ? entity.getNoEcoCaja().trim() : null;
 
         if (entity.getGeneratedFolio() != null && !entity.getGeneratedFolio().isBlank()) {
             String folio = entity.getGeneratedFolio().trim();
@@ -1110,6 +1112,12 @@ public  class SecurityGateService implements SecurityGateUseCase {
                     WarehouseOutboundEntity out = outbound.get();
                     whStatus = out.getStatus() != null ? out.getStatus().name() : "REGISTERED";
                     readyForExit = (out.getStatus() == OutboundStatus.COMPLETED);
+                    if (out.getNoEcoTractor() != null && !out.getNoEcoTractor().isBlank()) {
+                        dynamicNoEcoTractor = out.getNoEcoTractor().trim();
+                    }
+                    if (out.getNoEcoCaja() != null && !out.getNoEcoCaja().isBlank()) {
+                        dynamicNoEcoCaja = out.getNoEcoCaja().trim();
+                    }
                     if (out.getForkliftOperator() != null) {
                         dynamicForkliftOperatorId = out.getForkliftOperator().getId();
                         dynamicForkliftOperatorName = out.getForkliftOperator().getFullName();
@@ -1188,8 +1196,8 @@ public  class SecurityGateService implements SecurityGateUseCase {
                 .driverLicense(entity.getDriverLicense())
                 .driverPhone(entity.getDriverPhone())
                 .transportType(entity.getTransportType())
-                .noEcoTractor(entity.getNoEcoTractor() != null ? entity.getNoEcoTractor().trim() : null)
-                .noEcoCaja(entity.getNoEcoCaja() != null ? entity.getNoEcoCaja().trim() : null)
+                .noEcoTractor(dynamicNoEcoTractor)
+                .noEcoCaja(dynamicNoEcoCaja)
                 .tractorPlates(entity.getTractorPlates())
                 .boxPlates(entity.getBoxPlates())
                 .boxDimensions(entity.getBoxDimensions())
