@@ -168,10 +168,12 @@ public class ChatService {
         requireParticipant(conversationId, me.getId());
 
         int safeLimit = Math.min(Math.max(limit, 1), 100);
-        List<ChatMessageEntity> entities = messageRepo.findRootMessagesByCursor(
-                conversationId,
-                before,
-                PageRequest.of(0, safeLimit)
+        List<ChatMessageEntity> entities = new ArrayList<>(
+                before == null
+                        ? messageRepo.findByConversationIdAndParentMessageIdIsNullOrderByCreatedAtDesc(
+                                conversationId, PageRequest.of(0, safeLimit))
+                        : messageRepo.findByConversationIdAndParentMessageIdIsNullAndCreatedAtBeforeOrderByCreatedAtDesc(
+                                conversationId, before, PageRequest.of(0, safeLimit))
         );
 
         Collections.reverse(entities);
