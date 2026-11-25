@@ -10,7 +10,7 @@ SET search_path TO wms, public;
 -- 1. INSERT SYSTEM ROLE: CHAT_ONLY
 INSERT INTO wms.roles (id, name, level, is_system)
 VALUES
-    ('88888888-8888-8888-8888-888888888888', 'CHAT_ONLY', 5, TRUE)
+    (uuid_generate_v4(), 'CHAT_ONLY', 5, TRUE)
 ON CONFLICT (name) DO NOTHING;
 
 -- 2. INSERT CHAT PERMISSION
