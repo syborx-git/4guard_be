@@ -3,6 +3,7 @@ package com.fourguard.wms.infrastructure.security.websocket;
 import com.fourguard.wms.domain.ports.out.TokenBlacklistPort;
 import com.fourguard.wms.domain.ports.out.UserRepositoryPort;
 import com.fourguard.wms.infrastructure.persistence.entity.UserEntity;
+import com.fourguard.wms.infrastructure.persistence.repository.chat.ChatParticipantRepository;
 import com.fourguard.wms.infrastructure.security.jwt.JwtService;
 import com.fourguard.wms.shared.constants.SecurityConstants;
 import io.jsonwebtoken.ExpiredJwtException;
@@ -48,14 +49,18 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
     private final UserDetailsService userDetailsService;
     private final TokenBlacklistPort tokenBlacklistPort;
     private final UserRepositoryPort userRepositoryPort;
+    private final ChatParticipantRepository chatParticipantRepository;
 
     // Patrón canónico para tópicos multi-tenant:
     // /topic/org/{orgId}/branch/{branchId}/{module}
     // /topic/org/{orgId}/{module}
+    // /topic/chat.{conversationId}
     private static final Pattern TOPIC_BRANCH_PATTERN =
             Pattern.compile("^/topic/org/([0-9a-fA-F\\-]+)/branch/([0-9a-fA-F\\-]+)/([a-zA-Z0-9_\\-]+)$");
     private static final Pattern TOPIC_ORG_PATTERN =
             Pattern.compile("^/topic/org/([0-9a-fA-F\\-]+)/([a-zA-Z0-9_\\-]+)$");
+    private static final Pattern TOPIC_CHAT_PATTERN =
+            Pattern.compile("^/topic/chat\\.([0-9a-fA-F\\-]+)$");
 
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
@@ -69,6 +74,11 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
             handleConnect(accessor);
         } else if (StompCommand.SUBSCRIBE.equals(command)) {
             handleSubscribe(accessor);
+        } else if (StompCommand.SEND.equals(command)) {
+            String dest = accessor.getDestination();
+            if (dest != null && (dest.startsWith("/topic/") || dest.startsWith("/queue/"))) {
+                throw new AccessDeniedException("Envío directo a tópicos o colas STOMP no permitido");
+            }
         }
 
         return message;
@@ -159,11 +169,6 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
             return;
         }
 
-        if (destination.startsWith("/user/")) {
-            // Spring MessageBroker enruta automáticamente colas privadas /user/{name}/...
-            return;
-        }
-
         var auth = accessor.getUser();
         if (auth == null || !(auth instanceof UsernamePasswordAuthenticationToken authToken)) {
             throw new AccessDeniedException("No autenticado para suscribirse a destinos STOMP");
@@ -172,6 +177,23 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
         Object principalObj = authToken.getPrincipal();
         if (!(principalObj instanceof WmsUserPrincipal principal)) {
             throw new AccessDeniedException("Principal inválido en sesión STOMP");
+        }
+
+        if (destination.startsWith("/user/")) {
+            // Spring MessageBroker enruta automáticamente colas privadas /user/{name}/...
+            return;
+        }
+
+        // Validación 0: Tópicos de Chat Empresarial /topic/chat.{conversationId}
+        Matcher chatMatcher = TOPIC_CHAT_PATTERN.matcher(destination);
+        if (chatMatcher.matches()) {
+            UUID conversationId = UUID.fromString(chatMatcher.group(1));
+            if (principal.userId() == null || !chatParticipantRepository.existsByConversationIdAndUserIdAndIsActiveTrue(conversationId, principal.userId())) {
+                log.warn("[STOMP-CHAT] VIOLACIÓN: Usuario '{}' intentó suscribirse a conversación {} sin ser participante activo",
+                        principal.username(), conversationId);
+                throw new AccessDeniedException("Acceso denegado: No eres participante activo de esta conversación");
+            }
+            return;
         }
 
         // Validación 1: Tópicos con jerarquía /topic/org/{orgId}/branch/{branchId}/...

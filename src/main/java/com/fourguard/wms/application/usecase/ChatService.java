@@ -194,7 +194,7 @@ public class ChatService {
 
         UUID orgId = me.getOrganization().getId();
         ChatConversationEntity space = conversationRepo.findById(conversationId)
-                .filter(c -> orgId.equals(c.getOrganizationId()) && !"DM".equals(c.getType()))
+                .filter(c -> orgId.equals(c.getOrganizationId()) && "SPACE".equals(c.getType()))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Espacio no encontrado"));
 
         Set<UUID> desiredIds = new LinkedHashSet<>(req.memberIds());
@@ -248,10 +248,7 @@ public class ChatService {
     @Transactional
     public MessageDto sendMessage(UUID conversationId, SendMessageRequest req) {
         UserEntity me = getCurrentUser();
-        requireParticipant(conversationId, me.getId());
-
-        ChatConversationEntity conv = conversationRepo.findById(conversationId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Conversación no encontrada"));
+        ChatConversationEntity conv = requireOrgConversationAndParticipant(conversationId, me);
 
         ChatMessageEntity saved = messageRepo.save(ChatMessageEntity.builder()
                 .conversationId(conversationId)
@@ -264,12 +261,13 @@ public class ChatService {
 
         if (req.attachments() != null && !req.attachments().isEmpty()) {
             for (AttachmentInput att : req.attachments()) {
+                validateAttachment(att);
                 attachmentRepo.save(ChatAttachmentEntity.builder()
                         .messageId(saved.getId())
-                        .fileName(att.fileName())
-                        .contentType(att.contentType())
+                        .fileName(att.fileName().trim())
+                        .contentType(att.contentType().trim().toLowerCase())
                         .fileSize(att.fileSize())
-                        .storageUrl(att.storageUrl())
+                        .storageUrl(att.storageUrl().trim())
                         .build());
             }
         }
@@ -294,6 +292,7 @@ public class ChatService {
         UserEntity me = getCurrentUser();
         ChatMessageEntity msg = messageRepo.findById(messageId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Mensaje no encontrado"));
+        requireOrgConversationAndParticipant(msg.getConversationId(), me);
 
         if (!msg.getSenderId().equals(me.getId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Solo puedes editar tus propios mensajes");
@@ -318,9 +317,16 @@ public class ChatService {
         ChatMessageEntity msg = messageRepo.findById(messageId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Mensaje no encontrado"));
 
+        ChatConversationEntity conv = conversationRepo.findById(msg.getConversationId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Conversación no encontrada"));
+        if (!me.getOrganization().getId().equals(conv.getOrganizationId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Acceso denegado a esta organización");
+        }
+
         String roleName = me.getRole() != null ? me.getRole().getName().toUpperCase() : "";
-        boolean isAdmin = roleName.contains("ADMIN") || roleName.contains("SUPERVISOR");
-        if (!msg.getSenderId().equals(me.getId()) && !isAdmin) {
+        boolean isOrgAdmin = roleName.contains("ADMIN") || roleName.contains("CEO") || roleName.contains("DIRECTOR");
+        boolean isActiveParticipant = participantRepo.existsByConversationIdAndUserIdAndIsActiveTrue(msg.getConversationId(), me.getId());
+        if (!(msg.getSenderId().equals(me.getId()) && isActiveParticipant) && !isOrgAdmin) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No tienes permiso para eliminar este mensaje");
         }
 
@@ -362,8 +368,10 @@ public class ChatService {
     @Transactional
     public void markAsRead(UUID conversationId) {
         UserEntity me = getCurrentUser();
+        requireOrgConversationAndParticipant(conversationId, me);
         ChatParticipantEntity part = participantRepo.findByConversationIdAndUserId(conversationId, me.getId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "No eres participante de esta conversación"));
+                .filter(p -> Boolean.TRUE.equals(p.getIsActive()))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "No eres participante activo de esta conversación"));
 
         part.setLastReadAt(Instant.now());
         messageRepo.findTopByConversationIdOrderByCreatedAtDesc(conversationId)
@@ -374,8 +382,10 @@ public class ChatService {
     @Transactional
     public void updateNotificationPref(UUID conversationId, UpdateNotificationPrefRequest req) {
         UserEntity me = getCurrentUser();
+        requireOrgConversationAndParticipant(conversationId, me);
         ChatParticipantEntity part = participantRepo.findByConversationIdAndUserId(conversationId, me.getId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "No eres participante de esta conversación"));
+                .filter(p -> Boolean.TRUE.equals(p.getIsActive()))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "No eres participante activo de esta conversación"));
 
         String pref = req.notificationPref().trim().toUpperCase();
         if (!Set.of("ALL", "MENTIONS", "MUTED").contains(pref)) {
@@ -394,6 +404,41 @@ public class ChatService {
     private void requireParticipant(UUID conversationId, UUID userId) {
         if (!participantRepo.existsByConversationIdAndUserIdAndIsActiveTrue(conversationId, userId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No tienes acceso a esta conversación");
+        }
+    }
+
+    private ChatConversationEntity requireOrgConversationAndParticipant(UUID conversationId, UserEntity me) {
+        ChatConversationEntity conv = conversationRepo.findById(conversationId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Conversación no encontrada"));
+        if (!me.getOrganization().getId().equals(conv.getOrganizationId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Acceso denegado a esta organización");
+        }
+        requireParticipant(conversationId, me.getId());
+        return conv;
+    }
+
+    private void validateAttachment(AttachmentInput att) {
+        if (att.fileSize() <= 0 || att.fileSize() > 2L * 1024 * 1024) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El tamaño del archivo debe ser mayor a 0 y máximo 2 MB");
+        }
+        String mime = att.contentType() != null ? att.contentType().trim().toLowerCase() : "";
+        Set<String> allowedMimes = Set.of("image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf");
+        if (!allowedMimes.contains(mime)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tipo de archivo no permitido: " + mime);
+        }
+        String url = att.storageUrl() != null ? att.storageUrl().trim() : "";
+        if (url.length() > 3_000_000) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El archivo excede el límite permitido");
+        }
+        boolean safePrefix = url.startsWith("data:image/jpeg;base64,")
+                || url.startsWith("data:image/png;base64,")
+                || url.startsWith("data:image/webp;base64,")
+                || url.startsWith("data:image/gif;base64,")
+                || url.startsWith("data:application/pdf;base64,")
+                || url.startsWith("https://")
+                || url.startsWith("/api/");
+        if (!safePrefix) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "URL o formato de adjunto no permitido");
         }
     }
 

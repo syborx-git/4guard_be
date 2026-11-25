@@ -6,6 +6,7 @@ import com.fourguard.wms.shared.response.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
@@ -14,6 +15,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/chat")
+@PreAuthorize("hasAuthority('CHAT_ACCESS') or hasAnyRole('CEO','DIRECTOR','GERENTE','OPERATIONS_MANAGER','OPERATIONS_SUPERVISOR','ADMIN','SUPER_ADMIN','FORKLIFT_OPERATOR','SECURITY_GUARD','VIGILANCIA','QUALITY_INSPECTOR','CHAT_ONLY')")
 @RequiredArgsConstructor
 public class ChatController {
 
