@@ -125,9 +125,13 @@ public class ChatService {
     public ConversationSummaryDto createSpace(CreateSpaceRequest req) {
         UserEntity me = getCurrentUser();
         String roleName = me.getRole() != null ? me.getRole().getName().toUpperCase() : "";
-        boolean isAdminOrSup = roleName.contains("ADMIN") || roleName.contains("SUPERVISOR") || roleName.contains("GERENTE") || roleName.contains("DIRECTOR");
-        if (!isAdminOrSup) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Solo Administradores o Supervisores pueden crear Espacios");
+        boolean isManagerOrDirector = roleName.contains("CEO")
+                || roleName.contains("DIRECTOR")
+                || roleName.contains("GERENTE")
+                || roleName.contains("OPERATIONS_MANAGER")
+                || roleName.contains("ADMIN");
+        if (!isManagerOrDirector) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Solo Gerentes o Directivos pueden crear Espacios");
         }
 
         UUID orgId = me.getOrganization().getId();
