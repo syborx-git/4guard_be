@@ -507,6 +507,7 @@ public class ChatService {
             if (loginEvents.isEmpty()) return Set.of();
 
             Map<UUID, AuditLogEntity> latestLogins = loginEvents.stream()
+                    .filter(e -> e.getUserId() != null && e.getCreatedAt() != null)
                     .collect(Collectors.toMap(
                             AuditLogEntity::getUserId,
                             e -> e,
@@ -520,6 +521,7 @@ public class ChatService {
                     .map(AuditLogEntity::getUserId)
                     .collect(Collectors.toSet());
         } catch (Exception ex) {
+            log.warn("[CHAT-PRESENCE] Error resolviendo usuarios en línea: {}", ex.getMessage());
             return Set.of();
         }
     }
