@@ -2,6 +2,8 @@ package com.fourguard.wms.application.usecase;
 
 import com.fourguard.wms.application.dto.chat.ChatDtos.*;
 import com.fourguard.wms.domain.enums.UserStatus;
+import com.fourguard.wms.domain.ports.out.AuditLogRepositoryPort;
+import com.fourguard.wms.infrastructure.persistence.entity.AuditLogEntity;
 import com.fourguard.wms.infrastructure.persistence.entity.UserEntity;
 import com.fourguard.wms.infrastructure.persistence.entity.chat.*;
 import com.fourguard.wms.infrastructure.persistence.repository.UserJpaRepository;
@@ -11,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.messaging.simp.user.SimpUserRegistry;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -18,6 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -32,7 +37,9 @@ public class ChatService {
     private final ChatMessageReactionRepository reactionRepo;
     private final ChatAttachmentRepository attachmentRepo;
     private final UserJpaRepository userRepo;
+    private final AuditLogRepositoryPort auditLogRepositoryPort;
     private final SimpMessagingTemplate messagingTemplate;
+    private final Optional<SimpUserRegistry> simpUserRegistry;
 
     public UserEntity getCurrentUser() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -47,20 +54,28 @@ public class ChatService {
     public List<ChatUserDto> listOrganizationUsers(UUID branchId) {
         UserEntity me = getCurrentUser();
         UUID orgId = me.getOrganization().getId();
+        Set<UUID> onlineIds = resolveOnlineUserIds();
+        Set<String> wsUsernames = resolveOnlineWsUsernames();
+
         return userRepo.findByOrganizationId(orgId).stream()
                 .filter(u -> u.getStatus() == UserStatus.ACTIVE)
                 .filter(u -> !u.getId().equals(me.getId()))
                 .filter(u -> branchId == null || (u.getBranch() != null && branchId.equals(u.getBranch().getId())))
-                .map(u -> new ChatUserDto(
-                        u.getId(),
-                        u.getUsername(),
-                        buildFullName(u),
-                        u.getEmail(),
-                        u.getRole() != null ? u.getRole().getName() : "USER",
-                        u.getBranch() != null ? u.getBranch().getId() : null,
-                        u.getStatus() == UserStatus.ACTIVE
-                ))
-                .sorted(Comparator.comparing(ChatUserDto::fullName, String.CASE_INSENSITIVE_ORDER))
+                .map(u -> {
+                    boolean isOnline = onlineIds.contains(u.getId()) || wsUsernames.contains(u.getUsername());
+                    return new ChatUserDto(
+                            u.getId(),
+                            u.getUsername(),
+                            buildFullName(u),
+                            u.getEmail(),
+                            u.getRole() != null ? u.getRole().getName() : "USER",
+                            u.getBranch() != null ? u.getBranch().getId() : null,
+                            u.getStatus() == UserStatus.ACTIVE,
+                            isOnline
+                    );
+                })
+                .sorted(Comparator.comparing(ChatUserDto::online).reversed()
+                        .thenComparing(ChatUserDto::fullName, String.CASE_INSENSITIVE_ORDER))
                 .toList();
     }
 
@@ -341,16 +356,21 @@ public class ChatService {
             UserEntity me,
             Map<UUID, UserEntity> userCache
     ) {
+        Set<UUID> onlineIds = resolveOnlineUserIds();
+        Set<String> wsUsernames = resolveOnlineWsUsernames();
+
         List<ChatParticipantEntity> parts = participantRepo.findByConversationIdAndIsActiveTrue(conv.getId());
         List<ParticipantDto> partDtos = parts.stream().map(p -> {
             UserEntity u = userCache.computeIfAbsent(p.getUserId(), id -> userRepo.findById(id).orElse(null));
+            boolean isOnline = onlineIds.contains(p.getUserId()) || (u != null && wsUsernames.contains(u.getUsername()));
             return new ParticipantDto(
                     p.getUserId(),
                     u != null ? u.getUsername() : "usuario",
                     u != null ? buildFullName(u) : "Usuario",
                     p.getRole(),
                     p.getNotificationPref(),
-                    p.getLastReadAt()
+                    p.getLastReadAt(),
+                    isOnline
             );
         }).toList();
 
@@ -478,6 +498,36 @@ public class ChatService {
         } catch (Exception ex) {
             log.warn("[CHAT-WS] Error difundiendo evento '{}' en conversación {}: {}", eventType, conversationId, ex.getMessage());
         }
+    }
+
+    private Set<UUID> resolveOnlineUserIds() {
+        try {
+            OffsetDateTime since = OffsetDateTime.now(ZoneOffset.UTC).minusHours(24);
+            List<AuditLogEntity> loginEvents = auditLogRepositoryPort.findByActionAndCreatedAtAfter("LOGIN", since);
+            if (loginEvents.isEmpty()) return Set.of();
+
+            Map<UUID, AuditLogEntity> latestLogins = loginEvents.stream()
+                    .collect(Collectors.toMap(
+                            AuditLogEntity::getUserId,
+                            e -> e,
+                            (a, b) -> a.getCreatedAt().isAfter(b.getCreatedAt()) ? a : b
+                    ));
+
+            return latestLogins.values().stream()
+                    .filter(login -> auditLogRepositoryPort
+                            .findLastLogoutForUserAfter(login.getUserId(), login.getCreatedAt())
+                            .isEmpty())
+                    .map(AuditLogEntity::getUserId)
+                    .collect(Collectors.toSet());
+        } catch (Exception ex) {
+            return Set.of();
+        }
+    }
+
+    private Set<String> resolveOnlineWsUsernames() {
+        return simpUserRegistry
+                .map(reg -> reg.getUsers().stream().map(u -> u.getName()).collect(Collectors.toSet()))
+                .orElse(Set.of());
     }
 
     private String buildFullName(UserEntity u) {

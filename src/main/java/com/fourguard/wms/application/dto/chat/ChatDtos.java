@@ -17,7 +17,8 @@ public final class ChatDtos {
             String email,
             String roleName,
             UUID branchId,
-            boolean active
+            boolean active,
+            boolean online
     ) {}
 
     public record ParticipantDto(
@@ -26,7 +27,8 @@ public final class ChatDtos {
             String fullName,
             String role,
             String notificationPref,
-            Instant lastReadAt
+            Instant lastReadAt,
+            boolean online
     ) {}
 
     public record ReactionSummaryDto(
