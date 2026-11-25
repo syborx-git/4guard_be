@@ -74,6 +74,7 @@ public final class ChatDtos {
                         String name,
                         String description,
                         String icon,
+                        String category,
                         String entityType,
                         String entityId,
                         Instant lastMessageAt,
@@ -91,8 +92,13 @@ public final class ChatDtos {
                         @NotBlank String name,
                         String description,
                         String icon,
+                        String category,
                         UUID branchId,
                         List<UUID> memberIds) {
+        }
+
+        public record UpdateSpaceMembersRequest(
+                        @NotNull List<UUID> memberIds) {
         }
 
         public record AttachmentInput(

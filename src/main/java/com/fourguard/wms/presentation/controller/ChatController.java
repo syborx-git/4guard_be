@@ -45,6 +45,14 @@ public class ChatController {
         return ResponseEntity.ok(ApiResponse.ok("Espacio creado", chatService.createSpace(request)));
     }
 
+    @PutMapping("/conversations/{conversationId}/members")
+    public ResponseEntity<ApiResponse<ConversationSummaryDto>> updateSpaceMembers(
+            @PathVariable UUID conversationId,
+            @Valid @RequestBody UpdateSpaceMembersRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok("Miembros actualizados", chatService.updateSpaceMembers(conversationId, request)));
+    }
+
     @GetMapping("/conversations/{conversationId}/messages")
     public ResponseEntity<ApiResponse<List<MessageDto>>> getMessages(
             @PathVariable UUID conversationId,

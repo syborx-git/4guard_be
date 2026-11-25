@@ -36,6 +36,9 @@ public class ChatConversationEntity {
     @Column(name = "icon", length = 60)
     private String icon;
 
+    @Column(name = "category", length = 80)
+    private String category;
+
     @Column(name = "entity_type", length = 50)
     private String entityType;
 

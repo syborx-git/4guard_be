@@ -136,9 +136,7 @@ public class ChatService {
         return buildConversationSummary(conv, me, new HashMap<>(cache));
     }
 
-    @Transactional
-    public ConversationSummaryDto createSpace(CreateSpaceRequest req) {
-        UserEntity me = getCurrentUser();
+    private void requireManagerOrDirector(UserEntity me, String errorMessage) {
         String roleName = me.getRole() != null ? me.getRole().getName().toUpperCase() : "";
         boolean isManagerOrDirector = roleName.contains("CEO")
                 || roleName.contains("DIRECTOR")
@@ -146,10 +144,17 @@ public class ChatService {
                 || roleName.contains("OPERATIONS_MANAGER")
                 || roleName.contains("ADMIN");
         if (!isManagerOrDirector) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Solo Gerentes o Directivos pueden crear Espacios");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, errorMessage);
         }
+    }
+
+    @Transactional
+    public ConversationSummaryDto createSpace(CreateSpaceRequest req) {
+        UserEntity me = getCurrentUser();
+        requireManagerOrDirector(me, "Solo Gerentes o Directivos pueden crear Espacios");
 
         UUID orgId = me.getOrganization().getId();
+        String category = req.category() != null && !req.category().isBlank() ? req.category().trim() : null;
         ChatConversationEntity space = conversationRepo.save(ChatConversationEntity.builder()
                 .organizationId(orgId)
                 .branchId(req.branchId())
@@ -157,6 +162,7 @@ public class ChatService {
                 .name(req.name().trim())
                 .description(req.description())
                 .icon(req.icon() != null && !req.icon().isBlank() ? req.icon() : "tag")
+                .category(category)
                 .createdBy(me.getId())
                 .build());
 
@@ -174,6 +180,46 @@ public class ChatService {
                             .userId(uid)
                             .role(uid.equals(me.getId()) ? "OWNER" : "MEMBER")
                             .build());
+                }
+            });
+        }
+
+        return buildConversationSummary(space, me, new HashMap<>(Map.of(me.getId(), me)));
+    }
+
+    @Transactional
+    public ConversationSummaryDto updateSpaceMembers(UUID conversationId, UpdateSpaceMembersRequest req) {
+        UserEntity me = getCurrentUser();
+        requireManagerOrDirector(me, "Solo Gerentes o Directivos pueden administrar miembros de Espacios");
+
+        UUID orgId = me.getOrganization().getId();
+        ChatConversationEntity space = conversationRepo.findById(conversationId)
+                .filter(c -> orgId.equals(c.getOrganizationId()) && !"DM".equals(c.getType()))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Espacio no encontrado"));
+
+        Set<UUID> desiredIds = new LinkedHashSet<>(req.memberIds());
+        desiredIds.add(space.getCreatedBy());
+        desiredIds.add(me.getId());
+
+        List<ChatParticipantEntity> existing = participantRepo.findByConversationIdAndIsActiveTrue(conversationId);
+        for (ChatParticipantEntity p : existing) {
+            if (!desiredIds.contains(p.getUserId()) && !"OWNER".equals(p.getRole())) {
+                p.setIsActive(false);
+                participantRepo.save(p);
+            }
+        }
+
+        for (UUID uid : desiredIds) {
+            userRepo.findById(uid).ifPresent(u -> {
+                if (u.getOrganization().getId().equals(orgId)) {
+                    ChatParticipantEntity part = participantRepo.findByConversationIdAndUserId(conversationId, uid)
+                            .orElseGet(() -> ChatParticipantEntity.builder()
+                                    .conversationId(conversationId)
+                                    .userId(uid)
+                                    .role(uid.equals(space.getCreatedBy()) ? "OWNER" : "MEMBER")
+                                    .build());
+                    part.setIsActive(true);
+                    participantRepo.save(part);
                 }
             });
         }
@@ -403,6 +449,7 @@ public class ChatService {
                 displayName,
                 conv.getDescription(),
                 conv.getIcon(),
+                conv.getCategory(),
                 conv.getEntityType(),
                 conv.getEntityId(),
                 conv.getLastMessageAt(),
