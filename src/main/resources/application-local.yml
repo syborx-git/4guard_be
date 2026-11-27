@@ -42,8 +42,8 @@ spring:
     default-schema: wms
     create-schemas: true
     baseline-on-migrate: true
-    out-of-order: false
-    validate-on-migrate: true
+    out-of-order: true
+    validate-on-migrate: false
 
   # ── Redis (opcional en local — activo si se levanta un contenedor local) ────
   data:
