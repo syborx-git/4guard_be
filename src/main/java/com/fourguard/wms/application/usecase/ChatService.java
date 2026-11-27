@@ -10,6 +10,7 @@ import com.fourguard.wms.infrastructure.persistence.repository.UserJpaRepository
 import com.fourguard.wms.infrastructure.persistence.repository.chat.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -24,6 +25,7 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 @Service
@@ -40,6 +42,7 @@ public class ChatService {
     private final AuditLogRepositoryPort auditLogRepositoryPort;
     private final SimpMessagingTemplate messagingTemplate;
     private final Optional<SimpUserRegistry> simpUserRegistry;
+    private final ConcurrentHashMap<String, Object> dmLocks = new ConcurrentHashMap<>();
 
     public UserEntity getCurrentUser() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -85,11 +88,14 @@ public class ChatService {
         UUID orgId = me.getOrganization().getId();
         List<ChatConversationEntity> conversations = conversationRepo.findActiveByOrganizationAndUser(orgId, me.getId());
 
+        Set<UUID> onlineIds = resolveOnlineUserIds();
+        Set<String> wsUsernames = resolveOnlineWsUsernames();
+
         Map<UUID, UserEntity> userCache = new HashMap<>();
         userCache.put(me.getId(), me);
 
         return conversations.stream()
-                .map(conv -> buildConversationSummary(conv, me, userCache))
+                .map(conv -> buildConversationSummary(conv, me, userCache, onlineIds, wsUsernames))
                 .toList();
     }
 
@@ -108,29 +114,38 @@ public class ChatService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No puedes iniciar un DM contigo mismo");
         }
 
-        ChatConversationEntity conv = conversationRepo.findDirectMessageBetween(orgId, me.getId(), target.getId())
-                .orElseGet(() -> {
-                    ChatConversationEntity created = conversationRepo.save(ChatConversationEntity.builder()
-                            .organizationId(orgId)
-                            .branchId(me.getBranch() != null ? me.getBranch().getId() : null)
-                            .type("DM")
-                            .createdBy(me.getId())
-                            .build());
+        String u1 = me.getId().toString();
+        String u2 = target.getId().toString();
+        String pairKey = u1.compareTo(u2) <= 0 ? u1 + ":" + u2 : u2 + ":" + u1;
+        String lockKey = orgId + ":" + pairKey;
+        Object lock = dmLocks.computeIfAbsent(lockKey, k -> new Object());
 
-                    participantRepo.save(ChatParticipantEntity.builder()
-                            .conversationId(created.getId())
-                            .userId(me.getId())
-                            .role("MEMBER")
-                            .build());
+        ChatConversationEntity conv;
+        synchronized (lock) {
+            conv = conversationRepo.findDirectMessageBetween(orgId, me.getId(), target.getId())
+                    .orElseGet(() -> {
+                        ChatConversationEntity created = conversationRepo.save(ChatConversationEntity.builder()
+                                .organizationId(orgId)
+                                .branchId(me.getBranch() != null ? me.getBranch().getId() : null)
+                                .type("DM")
+                                .createdBy(me.getId())
+                                .build());
 
-                    participantRepo.save(ChatParticipantEntity.builder()
-                            .conversationId(created.getId())
-                            .userId(target.getId())
-                            .role("MEMBER")
-                            .build());
+                        participantRepo.save(ChatParticipantEntity.builder()
+                                .conversationId(created.getId())
+                                .userId(me.getId())
+                                .role("MEMBER")
+                                .build());
 
-                    return created;
-                });
+                        participantRepo.save(ChatParticipantEntity.builder()
+                                .conversationId(created.getId())
+                                .userId(target.getId())
+                                .role("MEMBER")
+                                .build());
+
+                        return created;
+                    });
+        }
 
         Map<UUID, UserEntity> cache = Map.of(me.getId(), me, target.getId(), target);
         return buildConversationSummary(conv, me, new HashMap<>(cache));
@@ -182,19 +197,22 @@ public class ChatService {
             memberIds.addAll(req.memberIds());
         }
 
+        Map<UUID, UserEntity> fetchedUsers = userRepo.findAllById(memberIds).stream()
+                .collect(Collectors.toMap(UserEntity::getId, u -> u, (a, b) -> a));
         for (UUID uid : memberIds) {
-            userRepo.findById(uid).ifPresent(u -> {
-                if (u.getOrganization().getId().equals(orgId)) {
-                    participantRepo.save(ChatParticipantEntity.builder()
-                            .conversationId(space.getId())
-                            .userId(uid)
-                            .role(uid.equals(me.getId()) ? "OWNER" : "MEMBER")
-                            .build());
-                }
-            });
+            UserEntity u = fetchedUsers.get(uid);
+            if (u != null && u.getOrganization().getId().equals(orgId)) {
+                participantRepo.save(ChatParticipantEntity.builder()
+                        .conversationId(space.getId())
+                        .userId(uid)
+                        .role(uid.equals(me.getId()) ? "OWNER" : "MEMBER")
+                        .build());
+            }
         }
 
-        return buildConversationSummary(space, me, new HashMap<>(Map.of(me.getId(), me)));
+        Map<UUID, UserEntity> cache = new HashMap<>(fetchedUsers);
+        cache.put(me.getId(), me);
+        return buildConversationSummary(space, me, cache);
     }
 
     @Transactional
@@ -219,22 +237,25 @@ public class ChatService {
             }
         }
 
+        Map<UUID, UserEntity> fetchedUsers = userRepo.findAllById(desiredIds).stream()
+                .collect(Collectors.toMap(UserEntity::getId, u -> u, (a, b) -> a));
         for (UUID uid : desiredIds) {
-            userRepo.findById(uid).ifPresent(u -> {
-                if (u.getOrganization().getId().equals(orgId)) {
-                    ChatParticipantEntity part = participantRepo.findByConversationIdAndUserId(conversationId, uid)
-                            .orElseGet(() -> ChatParticipantEntity.builder()
-                                    .conversationId(conversationId)
-                                    .userId(uid)
-                                    .role(uid.equals(space.getCreatedBy()) ? "OWNER" : "MEMBER")
-                                    .build());
-                    part.setIsActive(true);
-                    participantRepo.save(part);
-                }
-            });
+            UserEntity u = fetchedUsers.get(uid);
+            if (u != null && u.getOrganization().getId().equals(orgId)) {
+                ChatParticipantEntity part = participantRepo.findByConversationIdAndUserId(conversationId, uid)
+                        .orElseGet(() -> ChatParticipantEntity.builder()
+                                .conversationId(conversationId)
+                                .userId(uid)
+                                .role(uid.equals(space.getCreatedBy()) ? "OWNER" : "MEMBER")
+                                .build());
+                part.setIsActive(true);
+                participantRepo.save(part);
+            }
         }
 
-        return buildConversationSummary(space, me, new HashMap<>(Map.of(me.getId(), me)));
+        Map<UUID, UserEntity> cache = new HashMap<>(fetchedUsers);
+        cache.put(me.getId(), me);
+        return buildConversationSummary(space, me, cache);
     }
 
     @Transactional(readOnly = true)
@@ -433,11 +454,15 @@ public class ChatService {
         if (existing.isPresent()) {
             reactionRepo.delete(existing.get());
         } else {
-            reactionRepo.save(ChatMessageReactionEntity.builder()
-                    .messageId(messageId)
-                    .userId(me.getId())
-                    .emoji(req.emoji().trim())
-                    .build());
+            try {
+                reactionRepo.save(ChatMessageReactionEntity.builder()
+                        .messageId(messageId)
+                        .userId(me.getId())
+                        .emoji(req.emoji().trim())
+                        .build());
+            } catch (DataIntegrityViolationException ignored) {
+                /* idempotent concurrent insert */
+            }
         }
 
         MessageDto dto = enrichMessages(List.of(msg), me.getId()).get(0);
@@ -453,7 +478,10 @@ public class ChatService {
                 .filter(p -> Boolean.TRUE.equals(p.getIsActive()))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "No eres participante activo de esta conversación"));
 
-        part.setLastReadAt(Instant.now());
+        Instant now = Instant.now();
+        if (part.getLastReadAt() == null || now.isAfter(part.getLastReadAt())) {
+            part.setLastReadAt(now);
+        }
         messageRepo.findTopByConversationIdOrderByCreatedAtDesc(conversationId)
                 .ifPresent(last -> part.setLastReadMessageId(last.getId()));
         participantRepo.save(part);
@@ -541,6 +569,56 @@ public class ChatService {
         if (!safePrefix) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "URL o formato de adjunto no permitido");
         }
+
+        if (url.startsWith("data:")) {
+            int commaIdx = url.indexOf(',');
+            String expectedPrefix = "data:" + mime + ";base64";
+            if (commaIdx <= 0 || !url.substring(0, commaIdx).equalsIgnoreCase(expectedPrefix)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El tipo MIME del encabezado data: no coincide con el tipo declarado");
+            }
+            String b64 = url.substring(commaIdx + 1);
+            byte[] decoded;
+            try {
+                decoded = Base64.getDecoder().decode(b64);
+            } catch (IllegalArgumentException ex) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Archivo corrupto o Base64 inválido");
+            }
+            if (decoded.length == 0 || decoded.length > 2 * 1024 * 1024) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El tamaño del archivo decodificado debe ser mayor a 0 y máximo 2 MB");
+            }
+            if (!matchesMagicBytes(mime, decoded)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Firma de archivo no coincide con el tipo declarado");
+            }
+        }
+    }
+
+    private boolean matchesMagicBytes(String mime, byte[] bytes) {
+        return switch (mime) {
+            case "image/jpeg" -> bytes.length >= 3
+                    && (bytes[0] & 0xFF) == 0xFF
+                    && (bytes[1] & 0xFF) == 0xD8
+                    && (bytes[2] & 0xFF) == 0xFF;
+            case "image/png" -> bytes.length >= 4
+                    && (bytes[0] & 0xFF) == 0x89
+                    && bytes[1] == 0x50
+                    && bytes[2] == 0x4E
+                    && bytes[3] == 0x47;
+            case "image/gif" -> bytes.length >= 4
+                    && bytes[0] == 0x47
+                    && bytes[1] == 0x49
+                    && bytes[2] == 0x46
+                    && bytes[3] == 0x38;
+            case "image/webp" -> bytes.length >= 12
+                    && bytes[0] == 'R' && bytes[1] == 'I' && bytes[2] == 'F' && bytes[3] == 'F'
+                    && bytes[8] == 'W' && bytes[9] == 'E' && bytes[10] == 'B' && bytes[11] == 'P';
+            case "application/pdf" -> bytes.length >= 5
+                    && bytes[0] == 0x25
+                    && bytes[1] == 0x50
+                    && bytes[2] == 0x44
+                    && bytes[3] == 0x46
+                    && bytes[4] == 0x2D;
+            default -> false;
+        };
     }
 
     private ConversationSummaryDto buildConversationSummary(
@@ -548,8 +626,16 @@ public class ChatService {
             UserEntity me,
             Map<UUID, UserEntity> userCache
     ) {
-        Set<UUID> onlineIds = resolveOnlineUserIds();
-        Set<String> wsUsernames = resolveOnlineWsUsernames();
+        return buildConversationSummary(conv, me, userCache, resolveOnlineUserIds(), resolveOnlineWsUsernames());
+    }
+
+    private ConversationSummaryDto buildConversationSummary(
+            ChatConversationEntity conv,
+            UserEntity me,
+            Map<UUID, UserEntity> userCache,
+            Set<UUID> onlineIds,
+            Set<String> wsUsernames
+    ) {
 
         List<ChatParticipantEntity> parts = participantRepo.findByConversationIdAndIsActiveTrue(conv.getId());
         List<ParticipantDto> partDtos = parts.stream().map(p -> {
@@ -702,28 +788,71 @@ public class ChatService {
 
     private void broadcastEvent(String eventType, UUID conversationId, UserEntity sender, Object payload) {
         try {
+            Object wsPayload = sanitizeWsPayload(payload);
             ChatWsEventDto event = new ChatWsEventDto(
                     eventType,
                     conversationId,
                     sender.getId(),
                     sender.getUsername(),
-                    payload,
+                    wsPayload,
                     Instant.now()
             );
             messagingTemplate.convertAndSend("/topic/chat." + conversationId, event);
 
             // Notificar también a la cola personal de cada participante para badges en vivo
             List<ChatParticipantEntity> parts = participantRepo.findByConversationIdAndIsActiveTrue(conversationId);
-            for (ChatParticipantEntity p : parts) {
-                if (!p.getUserId().equals(sender.getId())) {
-                    userRepo.findById(p.getUserId()).ifPresent(u ->
-                            messagingTemplate.convertAndSendToUser(u.getUsername(), "/queue/chat", event)
-                    );
+            List<UUID> recipientIds = parts.stream()
+                    .map(ChatParticipantEntity::getUserId)
+                    .filter(uid -> !uid.equals(sender.getId()))
+                    .distinct()
+                    .toList();
+            if (!recipientIds.isEmpty()) {
+                for (UserEntity u : userRepo.findAllById(recipientIds)) {
+                    messagingTemplate.convertAndSendToUser(u.getUsername(), "/queue/chat", event);
                 }
             }
         } catch (Exception ex) {
             log.warn("[CHAT-WS] Error difundiendo evento '{}' en conversación {}: {}", eventType, conversationId, ex.getMessage());
         }
+    }
+
+    private Object sanitizeWsPayload(Object payload) {
+        if (payload instanceof MessageDto msg && msg.attachments() != null && !msg.attachments().isEmpty()) {
+            List<AttachmentDto> lightAttachments = msg.attachments().stream()
+                    .map(att -> {
+                        String url = att.storageUrl();
+                        boolean strip = url != null && (url.startsWith("data:") || url.length() > 32_768);
+                        return strip
+                                ? new AttachmentDto(att.id(), att.fileName(), att.contentType(), att.fileSize(), "")
+                                : att;
+                    })
+                    .toList();
+            return new MessageDto(
+                    msg.id(),
+                    msg.conversationId(),
+                    msg.senderId(),
+                    msg.senderUsername(),
+                    msg.senderFullName(),
+                    msg.parentMessageId(),
+                    msg.content(),
+                    msg.messageType(),
+                    msg.metadataJson(),
+                    msg.isEdited(),
+                    msg.editedAt(),
+                    msg.isDeleted(),
+                    msg.createdAt(),
+                    msg.reactions(),
+                    lightAttachments,
+                    msg.replyCount(),
+                    msg.parentMessageContent(),
+                    msg.parentSenderName(),
+                    msg.isPinned(),
+                    msg.pinnedAt(),
+                    msg.pinnedBy(),
+                    msg.pinnedByName()
+            );
+        }
+        return payload;
     }
 
     private Set<UUID> resolveOnlineUserIds() {
