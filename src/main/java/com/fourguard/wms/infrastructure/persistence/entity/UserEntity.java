@@ -6,6 +6,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
@@ -81,6 +82,14 @@ public class UserEntity extends BaseVersionedEntity {
     @Column(name = "permanently_locked", nullable = false)
     @Builder.Default
     private Boolean permanentlyLocked = false;
+
+    // ── Chat governance freeze ────────────────────────────────────────────────
+
+    @Column(name = "chat_frozen_until")
+    private Instant chatFrozenUntil;
+
+    @Column(name = "chat_frozen_reason", length = 255)
+    private String chatFrozenReason;
 
     @PrePersist
     protected void applyInsertDefaults() {

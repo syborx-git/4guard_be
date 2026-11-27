@@ -4,9 +4,11 @@ import com.fourguard.wms.application.dto.request.auth.RefreshTokenRequest;
 import com.fourguard.wms.application.dto.response.auth.AuthResponse;
 import com.fourguard.wms.application.dto.response.auth.UserInfoResponse;
 import com.fourguard.wms.application.mapper.UserMapper;
+import com.fourguard.wms.domain.enums.UserStatus;
 import com.fourguard.wms.domain.exception.InvalidCredentialsException;
 import com.fourguard.wms.domain.ports.in.RefreshTokenUseCase;
 import com.fourguard.wms.domain.ports.out.ForkliftOperatorRepositoryPort;
+import com.fourguard.wms.domain.ports.out.TokenBlacklistPort;
 import com.fourguard.wms.domain.ports.out.UserRepositoryPort;
 import com.fourguard.wms.infrastructure.persistence.entity.ForkliftOperatorEntity;
 import com.fourguard.wms.infrastructure.persistence.entity.UserEntity;
@@ -18,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Date;
 import java.util.Optional;
 
 @Slf4j
@@ -27,6 +30,7 @@ public class RefreshTokenUseCaseImpl implements RefreshTokenUseCase {
 
     private final UserRepositoryPort userRepositoryPort;
     private final ForkliftOperatorRepositoryPort forkliftOperatorRepositoryPort;
+    private final TokenBlacklistPort tokenBlacklistPort;
     private final JwtService jwtService;
     private final JwtProperties jwtProperties;
     private final UserMapper userMapper;
@@ -41,6 +45,15 @@ public class RefreshTokenUseCaseImpl implements RefreshTokenUseCase {
             
             UserEntity user = userRepositoryPort.findByUsername(username)
                     .orElseThrow(() -> new InvalidCredentialsException("Token inválido"));
+
+            if (!Boolean.TRUE.equals(user.getIsEnabled()) || user.getStatus() != UserStatus.ACTIVE) {
+                throw new InvalidCredentialsException("La cuenta está desactivada o suspendida");
+            }
+
+            Date issuedAt = jwtService.extractIssuedAt(refreshToken);
+            if (tokenBlacklistPort.isUserRevoked(user.getId(), issuedAt)) {
+                throw new InvalidCredentialsException("La sesión ha sido revocada");
+            }
 
             if (!jwtService.isTokenValid(refreshToken, user.getUsername())) {
                 throw new InvalidCredentialsException("Token inválido o expirado");
@@ -76,6 +89,9 @@ public class RefreshTokenUseCaseImpl implements RefreshTokenUseCase {
                     .user(userInfo)
                     .build();
 
+        } catch (InvalidCredentialsException ex) {
+            log.warn("[AUTH] Refresh token rejected: {}", ex.getMessage());
+            throw ex;
         } catch (Exception ex) {
             log.warn("[AUTH] Refresh token validation failed: {}", ex.getMessage());
             throw new InvalidCredentialsException("Token de refresco inválido o expirado");

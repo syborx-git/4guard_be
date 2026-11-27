@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -210,6 +211,14 @@ public class GlobalExceptionHandler {
         }
         log.warn("[IO_ERROR] Error de entrada/salida en petición: {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ApiResponse<Void>> handleResponseStatus(ResponseStatusException ex) {
+        log.warn("[STATUS_{}] {}", ex.getStatusCode().value(), ex.getReason());
+        String msg = ex.getReason() != null ? ex.getReason() : "Error en la solicitud";
+        return ResponseEntity.status(ex.getStatusCode())
+                .body(ApiResponse.error(msg));
     }
 
     @ExceptionHandler(Exception.class)

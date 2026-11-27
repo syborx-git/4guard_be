@@ -3,7 +3,6 @@ package com.fourguard.wms.application.usecase;
 import com.fourguard.wms.application.dto.chat.ChatDtos.*;
 import com.fourguard.wms.domain.enums.UserStatus;
 import com.fourguard.wms.domain.ports.out.AuditLogRepositoryPort;
-import com.fourguard.wms.infrastructure.persistence.entity.AuditLogEntity;
 import com.fourguard.wms.infrastructure.persistence.entity.UserEntity;
 import com.fourguard.wms.infrastructure.persistence.entity.chat.*;
 import com.fourguard.wms.infrastructure.persistence.repository.UserJpaRepository;
@@ -22,8 +21,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -280,6 +277,8 @@ public class ChatService {
     public MessageDto sendMessage(UUID conversationId, SendMessageRequest req) {
         UserEntity me = getCurrentUser();
         ChatConversationEntity conv = requireOrgConversationAndParticipant(conversationId, me);
+        assertUserNotChatFrozen(me);
+        assertConversationActive(conv);
 
         if (req.parentMessageId() != null) {
             ChatMessageEntity parent = messageRepo.findById(req.parentMessageId())
@@ -331,7 +330,9 @@ public class ChatService {
         UserEntity me = getCurrentUser();
         ChatMessageEntity msg = messageRepo.findById(messageId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Mensaje no encontrado"));
-        requireOrgConversationAndParticipant(msg.getConversationId(), me);
+        ChatConversationEntity conv = requireOrgConversationAndParticipant(msg.getConversationId(), me);
+        assertUserNotChatFrozen(me);
+        assertConversationActive(conv);
 
         if (!msg.getSenderId().equals(me.getId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Solo puedes editar tus propios mensajes");
@@ -340,10 +341,28 @@ public class ChatService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No puedes editar un mensaje eliminado");
         }
 
-        msg.setContent(req.content().trim());
+        String previousContent = msg.getContent();
+        if (msg.getOriginalContent() == null) {
+            msg.setOriginalContent(previousContent);
+        }
+        String updatedContent = req.content().trim();
+        msg.setContent(updatedContent);
         msg.setIsEdited(true);
         msg.setEditedAt(Instant.now());
         ChatMessageEntity saved = messageRepo.save(msg);
+
+        ChatSupportHelper.recordAudit(
+                auditLogRepositoryPort,
+                me,
+                "CHAT_MESSAGE_EDITED",
+                "CHAT_MESSAGE",
+                saved.getId(),
+                List.of(
+                        new ChatSupportHelper.AuditFieldChange("content", previousContent, updatedContent),
+                        new ChatSupportHelper.AuditFieldChange("conversationId", null, saved.getConversationId().toString())
+                ),
+                null
+        );
 
         MessageDto dto = enrichMessages(List.of(saved), me.getId()).get(0);
         broadcastEvent("MESSAGE_UPDATED", msg.getConversationId(), me, dto);
@@ -361,6 +380,8 @@ public class ChatService {
         if (!me.getOrganization().getId().equals(conv.getOrganizationId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Acceso denegado a esta organización");
         }
+        assertUserNotChatFrozen(me);
+        assertConversationActive(conv);
 
         String roleName = me.getRole() != null ? me.getRole().getName().toUpperCase() : "";
         boolean isOrgAdmin = roleName.contains("ADMIN") || roleName.contains("CEO") || roleName.contains("DIRECTOR");
@@ -369,13 +390,32 @@ public class ChatService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No tienes permiso para eliminar este mensaje");
         }
 
+        String previousContent = msg.getContent();
+        if (msg.getOriginalContent() == null) {
+            msg.setOriginalContent(previousContent);
+        }
         msg.setIsDeleted(true);
         msg.setDeletedAt(Instant.now());
+        msg.setDeletedBy(me.getId());
         msg.setContent("Mensaje eliminado");
         msg.setIsPinned(false);
         msg.setPinnedAt(null);
         msg.setPinnedBy(null);
         ChatMessageEntity saved = messageRepo.save(msg);
+
+        ChatSupportHelper.recordAudit(
+                auditLogRepositoryPort,
+                me,
+                "CHAT_MESSAGE_DELETED",
+                "CHAT_MESSAGE",
+                saved.getId(),
+                List.of(
+                        new ChatSupportHelper.AuditFieldChange("content", previousContent, "Mensaje eliminado"),
+                        new ChatSupportHelper.AuditFieldChange("deletedBy", null, me.getId().toString()),
+                        new ChatSupportHelper.AuditFieldChange("conversationId", null, saved.getConversationId().toString())
+                ),
+                null
+        );
 
         MessageDto dto = enrichMessages(List.of(saved), me.getId()).get(0);
         broadcastEvent("MESSAGE_DELETED", msg.getConversationId(), me, dto);
@@ -528,6 +568,26 @@ public class ChatService {
         UserEntity me = getCurrentUser();
         requireParticipant(conversationId, me.getId());
         broadcastEvent("TYPING", conversationId, me, Map.of("userId", me.getId(), "username", me.getUsername(), "fullName", buildFullName(me)));
+    }
+
+    private void assertConversationActive(ChatConversationEntity conv) {
+        String status = conv.getStatus() != null ? conv.getStatus().trim().toUpperCase() : "ACTIVE";
+        if (!"ACTIVE".equals(status)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "FROZEN".equals(status)
+                            ? "La conversación está congelada y no permite modificaciones"
+                            : "La conversación está archivada y es de solo lectura");
+        }
+    }
+
+    private void assertUserNotChatFrozen(UserEntity me) {
+        if (ChatSupportHelper.isUserChatFrozen(me, Instant.now())) {
+            String reason = me.getChatFrozenReason();
+            String msg = (reason != null && !reason.isBlank())
+                    ? "Tu acceso al chat está congelado: " + reason
+                    : "Tu acceso al chat está congelado por administración";
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, msg);
+        }
     }
 
     private void requireParticipant(UUID conversationId, UUID userId) {
@@ -856,41 +916,14 @@ public class ChatService {
     }
 
     private Set<UUID> resolveOnlineUserIds() {
-        try {
-            OffsetDateTime since = OffsetDateTime.now(ZoneOffset.UTC).minusHours(24);
-            List<AuditLogEntity> loginEvents = auditLogRepositoryPort.findByActionAndCreatedAtAfter("LOGIN", since);
-            if (loginEvents.isEmpty()) return Set.of();
-
-            Map<UUID, AuditLogEntity> latestLogins = loginEvents.stream()
-                    .filter(e -> e.getUserId() != null && e.getCreatedAt() != null)
-                    .collect(Collectors.toMap(
-                            AuditLogEntity::getUserId,
-                            e -> e,
-                            (a, b) -> a.getCreatedAt().isAfter(b.getCreatedAt()) ? a : b
-                    ));
-
-            return latestLogins.values().stream()
-                    .filter(login -> auditLogRepositoryPort
-                            .findLastLogoutForUserAfter(login.getUserId(), login.getCreatedAt())
-                            .isEmpty())
-                    .map(AuditLogEntity::getUserId)
-                    .collect(Collectors.toSet());
-        } catch (Exception ex) {
-            log.warn("[CHAT-PRESENCE] Error resolviendo usuarios en línea: {}", ex.getMessage());
-            return Set.of();
-        }
+        return ChatSupportHelper.resolveOnlineUserIds(auditLogRepositoryPort);
     }
 
     private Set<String> resolveOnlineWsUsernames() {
-        return simpUserRegistry
-                .map(reg -> reg.getUsers().stream().map(u -> u.getName()).collect(Collectors.toSet()))
-                .orElse(Set.of());
+        return ChatSupportHelper.resolveOnlineWsUsernames(simpUserRegistry);
     }
 
     private String buildFullName(UserEntity u) {
-        String first = u.getFirstName() != null ? u.getFirstName().trim() : "";
-        String last = u.getLastName() != null ? u.getLastName().trim() : "";
-        String full = (first + " " + last).trim();
-        return full.isEmpty() ? u.getUsername() : full;
+        return ChatSupportHelper.buildFullName(u);
     }
 }

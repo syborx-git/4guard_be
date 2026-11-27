@@ -120,6 +120,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             response.setContentType("application/json");
             response.getWriter().write("{\"success\":false,\"message\":\"Token JWT inválido\",\"data\":null}");
             return;
+        } catch (org.springframework.security.core.AuthenticationException e) {
+            log.warn("[Security] User authentication rejected in JWT filter: {}", e.getMessage());
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json");
+            response.getWriter().write("{\"success\":false,\"message\":\"Cuenta desactivada o sesión inválida\",\"data\":null}");
+            return;
         }
 
         filterChain.doFilter(request, response);

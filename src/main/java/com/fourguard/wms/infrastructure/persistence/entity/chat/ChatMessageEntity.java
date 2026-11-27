@@ -30,6 +30,9 @@ public class ChatMessageEntity {
     @Column(name = "content", nullable = false, columnDefinition = "TEXT")
     private String content;
 
+    @Column(name = "original_content", columnDefinition = "TEXT")
+    private String originalContent;
+
     @Column(name = "message_type", nullable = false, length = 30)
     @Builder.Default
     private String messageType = "TEXT"; // TEXT, SYSTEM, ENTITY_REF
@@ -50,6 +53,9 @@ public class ChatMessageEntity {
 
     @Column(name = "deleted_at")
     private Instant deletedAt;
+
+    @Column(name = "deleted_by")
+    private UUID deletedBy;
 
     @Column(name = "is_pinned", nullable = false)
     @Builder.Default

@@ -82,6 +82,8 @@ public interface UserMapper {
     @Mapping(target = "organization", source = "organization", qualifiedByName = "mapOrganizationToOrganizationEntity")
     @Mapping(target = "branch", source = "branch", qualifiedByName = "mapBranchToBranchEntity")
     @Mapping(target = "role", source = "role", qualifiedByName = "mapRoleToRoleEntity")
+    @Mapping(target = "chatFrozenUntil", ignore = true)
+    @Mapping(target = "chatFrozenReason", ignore = true)
     UserEntity toUserEntity(User user);
 
     // ── Entity to Domain Model ────────────────────────────────────────────────

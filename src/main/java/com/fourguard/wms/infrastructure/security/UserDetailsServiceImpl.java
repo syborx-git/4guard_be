@@ -1,5 +1,6 @@
 package com.fourguard.wms.infrastructure.security;
 
+import com.fourguard.wms.domain.enums.UserStatus;
 import com.fourguard.wms.domain.ports.out.UserRepositoryPort;
 import com.fourguard.wms.infrastructure.persistence.entity.UserEntity;
 import lombok.RequiredArgsConstructor;
@@ -30,8 +31,8 @@ public class UserDetailsServiceImpl implements UserDetailsService {
                 .orElseThrow(() -> new UsernameNotFoundException(
                         "Usuario no encontrado con identificador: " + identifier));
 
-        if (!entity.getIsEnabled()) {
-            throw new UsernameNotFoundException("La cuenta está desactivada");
+        if (!Boolean.TRUE.equals(entity.getIsEnabled()) || entity.getStatus() != UserStatus.ACTIVE) {
+            throw new UsernameNotFoundException("La cuenta está desactivada o suspendida");
         }
 
         // Map role and permissions to authorities
@@ -45,7 +46,7 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         return new User(
                 entity.getUsername(),
                 entity.getPassword(),
-                entity.getIsEnabled(),
+                true,
                 true, // accountNonExpired
                 true, // credentialsNonExpired
                 true, // accountNonLocked

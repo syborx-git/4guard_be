@@ -1,6 +1,8 @@
 package com.fourguard.wms.infrastructure.persistence.repository.chat;
 
 import com.fourguard.wms.infrastructure.persistence.entity.chat.ChatConversationEntity;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -43,5 +45,27 @@ public interface ChatConversationRepository extends JpaRepository<ChatConversati
             UUID organizationId,
             String entityType,
             String entityId
+    );
+
+    long countByOrganizationIdAndTypeAndStatus(UUID organizationId, String type, String status);
+
+    long countByOrganizationIdAndType(UUID organizationId, String type);
+
+    @Query("""
+            SELECT c FROM ChatConversationEntity c
+            WHERE c.organizationId = :orgId
+              AND c.type = 'SPACE'
+              AND (:status = '' OR UPPER(c.status) = :status)
+              AND (:searchPattern = ''
+                   OR LOWER(COALESCE(c.name, '')) LIKE :searchPattern
+                   OR LOWER(COALESCE(c.description, '')) LIKE :searchPattern
+                   OR LOWER(COALESCE(c.category, '')) LIKE :searchPattern)
+            ORDER BY COALESCE(c.lastMessageAt, c.createdAt) DESC
+            """)
+    Page<ChatConversationEntity> findGovernanceSpaces(
+            @Param("orgId") UUID orgId,
+            @Param("status") String status,
+            @Param("searchPattern") String searchPattern,
+            Pageable pageable
     );
 }
