@@ -135,4 +135,30 @@ class LoginUseCaseImplTest {
         verify(userRepositoryPort, never()).save(any());
         verify(loginLockService, times(1)).checkLockStatus(activeUser); // Should be called
     }
+
+    @Test
+    void whenLoginWithNullIsEnabled_thenThrowsInvalidCredentialsExceptionWithoutNpe() {
+        // Arrange
+        activeUser.setIsEnabled(null);
+        when(userRepositoryPort.findByUsernameOrEmail("enrique")).thenReturn(Optional.of(activeUser));
+        doNothing().when(loginLockService).checkLockStatus(activeUser);
+
+        // Act & Assert
+        assertThrows(InvalidCredentialsException.class, () -> loginUseCase.login(loginRequest));
+        verify(userRepositoryPort, never()).save(any());
+        verify(loginLockService, times(1)).checkLockStatus(activeUser);
+    }
+
+    @Test
+    void whenLoginWithNullStatus_thenThrowsInvalidCredentialsExceptionWithoutNpe() {
+        // Arrange
+        activeUser.setStatus(null);
+        when(userRepositoryPort.findByUsernameOrEmail("enrique")).thenReturn(Optional.of(activeUser));
+        doNothing().when(loginLockService).checkLockStatus(activeUser);
+
+        // Act & Assert
+        assertThrows(InvalidCredentialsException.class, () -> loginUseCase.login(loginRequest));
+        verify(userRepositoryPort, never()).save(any());
+        verify(loginLockService, times(1)).checkLockStatus(activeUser);
+    }
 }

@@ -51,7 +51,7 @@ public class LoginUseCaseImpl implements LoginUseCase {
         loginLockService.checkLockStatus(user);
 
         // 3. Check if account is active/enabled
-        if (!user.getIsEnabled() || !"ACTIVE".equals(user.getStatus().name())) {
+        if (!Boolean.TRUE.equals(user.getIsEnabled()) || user.getStatus() == null || !"ACTIVE".equals(user.getStatus().name())) {
             log.warn("[AUTH] Account disabled or pending: {}", user.getUsername());
             throw new InvalidCredentialsException("La cuenta está desactivada o pendiente de activación");
         }

@@ -12,6 +12,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataAccessException;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -48,6 +49,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             SecurityConstants.SECURITY_GATE_PUBLIC_PATTERN, // /security-gate/public/**
             SecurityConstants.NOTIFICATIONS_RF_STREAM_PATTERN, // /notifications/rf-stream
             SecurityConstants.NOTIFICATIONS_RF_ALERTS_PATTERN, // /notifications/rf-alerts/**
+            SecurityConstants.WEBSOCKET_ENDPOINT_PATTERN,      // /ws-wms/**
             SecurityConstants.ACTUATOR_HEALTH,           // /actuator/health
             "/swagger-ui.html",
             "/swagger-ui/**",
@@ -110,24 +112,33 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             }
         } catch (ExpiredJwtException e) {
             log.warn("JWT token has expired: {}", e.getMessage());
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.setContentType("application/json");
-            response.getWriter().write("{\"success\":false,\"message\":\"No autenticado o token expirado\",\"data\":null}");
+            writeErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "No autenticado o token expirado");
             return;
         } catch (SignatureException | MalformedJwtException | UnsupportedJwtException | IllegalArgumentException e) {
             log.warn("Invalid JWT token: {}", e.getMessage());
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.setContentType("application/json");
-            response.getWriter().write("{\"success\":false,\"message\":\"Token JWT inválido\",\"data\":null}");
+            writeErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "Token JWT inválido");
             return;
         } catch (org.springframework.security.core.AuthenticationException e) {
             log.warn("[Security] User authentication rejected in JWT filter: {}", e.getMessage());
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.setContentType("application/json");
-            response.getWriter().write("{\"success\":false,\"message\":\"Cuenta desactivada o sesión inválida\",\"data\":null}");
+            writeErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "Cuenta desactivada o sesión inválida");
+            return;
+        } catch (DataAccessException ex) {
+            Throwable mostSpecificCause = ex.getMostSpecificCause();
+            String sqlDetail = mostSpecificCause != null ? mostSpecificCause.getMessage() : ex.getMessage();
+            log.error("[JWT-FILTER-DB-ERROR] Error SQL/DB validando sesión JWT para {}: {} | RootCause: {}",
+                    request.getRequestURI(), ex.getMessage(), sqlDetail, ex);
+            writeErrorResponse(response, HttpServletResponse.SC_SERVICE_UNAVAILABLE,
+                    "Servicio temporalmente no disponible por error de base de datos");
             return;
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private void writeErrorResponse(HttpServletResponse response, int status, String message) throws IOException {
+        response.setStatus(status);
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+        response.getWriter().write("{\"success\":false,\"message\":\"" + message + "\",\"data\":null}");
     }
 }

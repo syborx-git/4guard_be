@@ -2,6 +2,8 @@
 -- V65: Chat Governance, Freeze/Archive Controls, DLP & Security Audit Events
 -- ============================================================================
 
+SET search_path TO wms, public;
+
 ALTER TABLE wms.chat_conversations
     ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
     ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ,

@@ -22,6 +22,7 @@ spring:
 # ── Server ──────────────────────────────────────────────────────────────────
 server:
   port: ${PORT:8080}
+  forward-headers-strategy: framework
   servlet:
     context-path: /api/v1
   tomcat:
@@ -95,4 +96,4 @@ logging:
   level:
     root: INFO
     org.springframework.security: INFO
-
+
