@@ -46,9 +46,8 @@ public class RefreshTokenUseCaseImpl implements RefreshTokenUseCase {
                 throw new InvalidCredentialsException("Token inválido o expirado");
             }
 
-            // Generate new access and refresh tokens
+            // Generate new access token while preserving the original refresh token (fixed 7-day weekly ceiling)
             String newAccessToken = jwtService.generateAccessToken(user);
-            String newRefreshToken = jwtService.generateRefreshToken(user);
 
             LocalDateTime expiresAt = LocalDateTime.now().plusNanos(jwtProperties.getAccessTokenExpiration() * 1_000_000L);
             UserInfoResponse userInfo = userMapper.toUserInfoResponse(user);
@@ -68,7 +67,7 @@ public class RefreshTokenUseCaseImpl implements RefreshTokenUseCase {
 
             return AuthResponse.builder()
                     .accessToken(newAccessToken)
-                    .refreshToken(newRefreshToken)
+                    .refreshToken(refreshToken)
                     .expiresAt(expiresAt)
                     .user(userInfo)
                     .build();

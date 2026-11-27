@@ -148,10 +148,20 @@ public class ChatService {
         }
     }
 
+    private void requireDirector(UserEntity me, String errorMessage) {
+        String roleName = me.getRole() != null ? me.getRole().getName().toUpperCase() : "";
+        boolean isDirector = roleName.contains("CEO")
+                || roleName.contains("DIRECTOR")
+                || roleName.contains("ADMIN");
+        if (!isDirector) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, errorMessage);
+        }
+    }
+
     @Transactional
     public ConversationSummaryDto createSpace(CreateSpaceRequest req) {
         UserEntity me = getCurrentUser();
-        requireManagerOrDirector(me, "Solo Gerentes o Directivos pueden crear Espacios");
+        requireDirector(me, "Solo Directivos pueden crear Espacios");
 
         UUID orgId = me.getOrganization().getId();
         String category = req.category() != null && !req.category().isBlank() ? req.category().trim() : null;
@@ -190,7 +200,7 @@ public class ChatService {
     @Transactional
     public ConversationSummaryDto updateSpaceMembers(UUID conversationId, UpdateSpaceMembersRequest req) {
         UserEntity me = getCurrentUser();
-        requireManagerOrDirector(me, "Solo Gerentes o Directivos pueden administrar miembros de Espacios");
+        requireDirector(me, "Solo Directivos pueden administrar miembros de Espacios");
 
         UUID orgId = me.getOrganization().getId();
         ChatConversationEntity space = conversationRepo.findById(conversationId)
@@ -447,6 +457,27 @@ public class ChatService {
         messageRepo.findTopByConversationIdOrderByCreatedAtDesc(conversationId)
                 .ifPresent(last -> part.setLastReadMessageId(last.getId()));
         participantRepo.save(part);
+
+        try {
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("userId", me.getId());
+            payload.put("username", me.getUsername());
+            payload.put("fullName", buildFullName(me));
+            payload.put("lastReadAt", part.getLastReadAt());
+            payload.put("lastReadMessageId", part.getLastReadMessageId());
+
+            ChatWsEventDto event = new ChatWsEventDto(
+                    "CONVERSATION_READ",
+                    conversationId,
+                    me.getId(),
+                    me.getUsername(),
+                    payload,
+                    Instant.now()
+            );
+            messagingTemplate.convertAndSend("/topic/chat." + conversationId, event);
+        } catch (Exception ex) {
+            log.warn("[CHAT-WS] Error difundiendo evento 'CONVERSATION_READ' en conversación {}: {}", conversationId, ex.getMessage());
+        }
     }
 
     @Transactional
