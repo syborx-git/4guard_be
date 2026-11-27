@@ -119,4 +119,35 @@ public class ChatController {
         chatService.broadcastTyping(conversationId);
         return ResponseEntity.ok(ApiResponse.ok("Typing enviado"));
     }
+
+    @RequestMapping(value = "/messages/{messageId}/pin", method = {RequestMethod.PUT, RequestMethod.POST})
+    public ResponseEntity<ApiResponse<MessageDto>> togglePinMessage(
+            @PathVariable UUID messageId,
+            @RequestBody(required = false) PinMessageRequest request
+    ) {
+        Boolean pinned = request != null ? request.pinned() : null;
+        return ResponseEntity.ok(ApiResponse.ok("Estado de fijado actualizado", chatService.togglePinMessage(messageId, pinned)));
+    }
+
+    @GetMapping("/conversations/{conversationId}/pinned")
+    public ResponseEntity<ApiResponse<List<MessageDto>>> getPinnedMessages(
+            @PathVariable UUID conversationId
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok("Mensajes fijados obtenidos", chatService.getPinnedMessages(conversationId)));
+    }
+
+    @GetMapping("/conversations/{conversationId}/messages/search")
+    public ResponseEntity<ApiResponse<List<MessageDto>>> searchMessages(
+            @PathVariable UUID conversationId,
+            @RequestParam String q
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok("Búsqueda de mensajes completada", chatService.searchMessages(conversationId, q)));
+    }
+
+    @GetMapping("/conversations/{conversationId}/evidence")
+    public ResponseEntity<ApiResponse<List<MessageDto>>> getConversationEvidence(
+            @PathVariable UUID conversationId
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok("Evidencias obtenidas", chatService.getConversationEvidence(conversationId)));
+    }
 }

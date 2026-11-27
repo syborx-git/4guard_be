@@ -235,9 +235,9 @@ public class ChatService {
         int safeLimit = Math.min(Math.max(limit, 1), 100);
         List<ChatMessageEntity> entities = new ArrayList<>(
                 before == null
-                        ? messageRepo.findByConversationIdAndParentMessageIdIsNullOrderByCreatedAtDesc(
+                        ? messageRepo.findByConversationIdOrderByCreatedAtDesc(
                                 conversationId, PageRequest.of(0, safeLimit))
-                        : messageRepo.findByConversationIdAndParentMessageIdIsNullAndCreatedAtBeforeOrderByCreatedAtDesc(
+                        : messageRepo.findByConversationIdAndCreatedAtBeforeOrderByCreatedAtDesc(
                                 conversationId, before, PageRequest.of(0, safeLimit))
         );
 
@@ -249,6 +249,14 @@ public class ChatService {
     public MessageDto sendMessage(UUID conversationId, SendMessageRequest req) {
         UserEntity me = getCurrentUser();
         ChatConversationEntity conv = requireOrgConversationAndParticipant(conversationId, me);
+
+        if (req.parentMessageId() != null) {
+            ChatMessageEntity parent = messageRepo.findById(req.parentMessageId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Mensaje padre no encontrado"));
+            if (!conversationId.equals(parent.getConversationId())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El mensaje padre no pertenece a esta conversación");
+            }
+        }
 
         ChatMessageEntity saved = messageRepo.save(ChatMessageEntity.builder()
                 .conversationId(conversationId)
@@ -333,11 +341,73 @@ public class ChatService {
         msg.setIsDeleted(true);
         msg.setDeletedAt(Instant.now());
         msg.setContent("Mensaje eliminado");
+        msg.setIsPinned(false);
+        msg.setPinnedAt(null);
+        msg.setPinnedBy(null);
         ChatMessageEntity saved = messageRepo.save(msg);
 
         MessageDto dto = enrichMessages(List.of(saved), me.getId()).get(0);
         broadcastEvent("MESSAGE_DELETED", msg.getConversationId(), me, dto);
         return dto;
+    }
+
+    @Transactional
+    public MessageDto togglePinMessage(UUID messageId, Boolean pinned) {
+        UserEntity me = getCurrentUser();
+        requireManagerOrDirector(me, "Solo Gerentes o Directivos pueden fijar mensajes");
+
+        ChatMessageEntity msg = messageRepo.findById(messageId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Mensaje no encontrado"));
+        requireOrgConversationAndParticipant(msg.getConversationId(), me);
+
+        if (Boolean.TRUE.equals(msg.getIsDeleted())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No puedes fijar un mensaje eliminado");
+        }
+
+        boolean targetPinned = pinned != null ? pinned : !Boolean.TRUE.equals(msg.getIsPinned());
+        msg.setIsPinned(targetPinned);
+        if (targetPinned) {
+            msg.setPinnedAt(Instant.now());
+            msg.setPinnedBy(me.getId());
+        } else {
+            msg.setPinnedAt(null);
+            msg.setPinnedBy(null);
+        }
+
+        ChatMessageEntity saved = messageRepo.save(msg);
+        MessageDto dto = enrichMessages(List.of(saved), me.getId()).get(0);
+        broadcastEvent("MESSAGE_PINNED", msg.getConversationId(), me, dto);
+        return dto;
+    }
+
+    @Transactional(readOnly = true)
+    public List<MessageDto> getPinnedMessages(UUID conversationId) {
+        UserEntity me = getCurrentUser();
+        requireOrgConversationAndParticipant(conversationId, me);
+        List<ChatMessageEntity> pinned = messageRepo
+                .findByConversationIdAndIsPinnedTrueAndIsDeletedFalseOrderByPinnedAtDesc(conversationId);
+        return enrichMessages(pinned, me.getId());
+    }
+
+    @Transactional(readOnly = true)
+    public List<MessageDto> searchMessages(UUID conversationId, String query) {
+        UserEntity me = getCurrentUser();
+        requireOrgConversationAndParticipant(conversationId, me);
+        if (query == null || query.trim().isEmpty()) {
+            return List.of();
+        }
+        List<ChatMessageEntity> results = messageRepo
+                .findByConversationIdAndIsDeletedFalseAndContentContainingIgnoreCaseOrderByCreatedAtDesc(
+                        conversationId, query.trim(), PageRequest.of(0, 50));
+        return enrichMessages(results, me.getId());
+    }
+
+    @Transactional(readOnly = true)
+    public List<MessageDto> getConversationEvidence(UUID conversationId) {
+        UserEntity me = getCurrentUser();
+        requireOrgConversationAndParticipant(conversationId, me);
+        List<ChatMessageEntity> evidence = messageRepo.findEvidenceMessages(conversationId, PageRequest.of(0, 100));
+        return enrichMessages(evidence, me.getId());
     }
 
     @Transactional
@@ -512,8 +582,23 @@ public class ChatService {
         List<ChatMessageReactionEntity> allReactions = reactionRepo.findByMessageIdIn(msgIds);
         List<ChatAttachmentEntity> allAttachments = attachmentRepo.findByMessageIdIn(msgIds);
 
+        Set<UUID> parentIds = entities.stream()
+                .map(ChatMessageEntity::getParentMessageId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        Map<UUID, ChatMessageEntity> parentsMap = parentIds.isEmpty()
+                ? Map.of()
+                : messageRepo.findAllById(parentIds).stream()
+                        .collect(Collectors.toMap(ChatMessageEntity::getId, p -> p));
+
         Set<UUID> userIds = new HashSet<>();
-        entities.forEach(m -> userIds.add(m.getSenderId()));
+        entities.forEach(m -> {
+            userIds.add(m.getSenderId());
+            if (m.getPinnedBy() != null) {
+                userIds.add(m.getPinnedBy());
+            }
+        });
+        parentsMap.values().forEach(p -> userIds.add(p.getSenderId()));
         allReactions.forEach(r -> userIds.add(r.getUserId()));
 
         Map<UUID, UserEntity> usersMap = userRepo.findAllById(userIds).stream()
@@ -545,6 +630,18 @@ public class ChatService {
                     .map(a -> new AttachmentDto(a.getId(), a.getFileName(), a.getContentType(), a.getFileSize(), a.getStorageUrl()))
                     .toList();
 
+            ChatMessageEntity parent = m.getParentMessageId() != null ? parentsMap.get(m.getParentMessageId()) : null;
+            String parentMessageContent = parent == null
+                    ? null
+                    : (Boolean.TRUE.equals(parent.getIsDeleted()) ? "Mensaje eliminado" : parent.getContent());
+            UserEntity parentSender = parent != null ? usersMap.get(parent.getSenderId()) : null;
+            String parentSenderName = parent == null
+                    ? null
+                    : (parentSender != null ? buildFullName(parentSender) : "Usuario");
+
+            UserEntity pinnedByUser = m.getPinnedBy() != null ? usersMap.get(m.getPinnedBy()) : null;
+            String pinnedByName = pinnedByUser != null ? buildFullName(pinnedByUser) : null;
+
             return new MessageDto(
                     m.getId(),
                     m.getConversationId(),
@@ -561,7 +658,13 @@ public class ChatService {
                     m.getCreatedAt(),
                     reactionDtos,
                     attachmentDtos,
-                    0L
+                    0L,
+                    parentMessageContent,
+                    parentSenderName,
+                    Boolean.TRUE.equals(m.getIsPinned()),
+                    m.getPinnedAt(),
+                    m.getPinnedBy(),
+                    pinnedByName
             );
         }).toList();
     }

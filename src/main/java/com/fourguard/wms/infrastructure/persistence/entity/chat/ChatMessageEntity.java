@@ -51,6 +51,16 @@ public class ChatMessageEntity {
     @Column(name = "deleted_at")
     private Instant deletedAt;
 
+    @Column(name = "is_pinned", nullable = false)
+    @Builder.Default
+    private Boolean isPinned = false;
+
+    @Column(name = "pinned_at")
+    private Instant pinnedAt;
+
+    @Column(name = "pinned_by")
+    private UUID pinnedBy;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -59,5 +69,6 @@ public class ChatMessageEntity {
         if (this.createdAt == null) this.createdAt = Instant.now();
         if (this.isEdited == null) this.isEdited = false;
         if (this.isDeleted == null) this.isDeleted = false;
+        if (this.isPinned == null) this.isPinned = false;
     }
 }

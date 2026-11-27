@@ -63,7 +63,13 @@ public final class ChatDtos {
                         Instant createdAt,
                         List<ReactionSummaryDto> reactions,
                         List<AttachmentDto> attachments,
-                        long replyCount) {
+                        long replyCount,
+                        String parentMessageContent,
+                        String parentSenderName,
+                        boolean isPinned,
+                        Instant pinnedAt,
+                        UUID pinnedBy,
+                        String pinnedByName) {
         }
 
         public record ConversationSummaryDto(
@@ -128,8 +134,12 @@ public final class ChatDtos {
                         @NotBlank String notificationPref) {
         }
 
+        public record PinMessageRequest(
+                        Boolean pinned) {
+        }
+
         public record ChatWsEventDto(
-                        String eventType, // MESSAGE_CREATED, MESSAGE_UPDATED, MESSAGE_DELETED, REACTION_UPDATED, TYPING
+                        String eventType, // MESSAGE_CREATED, MESSAGE_UPDATED, MESSAGE_DELETED, MESSAGE_PINNED, REACTION_UPDATED, TYPING
                         UUID conversationId,
                         UUID senderId,
                         String senderUsername,
