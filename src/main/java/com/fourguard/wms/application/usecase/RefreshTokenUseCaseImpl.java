@@ -46,8 +46,12 @@ public class RefreshTokenUseCaseImpl implements RefreshTokenUseCase {
                 throw new InvalidCredentialsException("Token inválido o expirado");
             }
 
-            // Generate new access token while preserving the original refresh token (fixed 7-day weekly ceiling)
+            // Generate new access token; preserve incoming refresh token only for CHAT_ONLY (strict 7-day ceiling)
             String newAccessToken = jwtService.generateAccessToken(user);
+            String roleName = user.getRole() != null ? user.getRole().getName() : "";
+            String newRefreshToken = "CHAT_ONLY".equalsIgnoreCase(roleName)
+                    ? refreshToken
+                    : jwtService.generateRefreshToken(user);
 
             LocalDateTime expiresAt = LocalDateTime.now().plusNanos(jwtProperties.getAccessTokenExpiration() * 1_000_000L);
             UserInfoResponse userInfo = userMapper.toUserInfoResponse(user);
@@ -67,7 +71,7 @@ public class RefreshTokenUseCaseImpl implements RefreshTokenUseCase {
 
             return AuthResponse.builder()
                     .accessToken(newAccessToken)
-                    .refreshToken(refreshToken)
+                    .refreshToken(newRefreshToken)
                     .expiresAt(expiresAt)
                     .user(userInfo)
                     .build();
