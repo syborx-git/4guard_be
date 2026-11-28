@@ -8,6 +8,7 @@ import com.fourguard.wms.domain.ports.out.AuditLogRepositoryPort;
 import com.fourguard.wms.domain.ports.out.UserRepositoryPort;
 import com.fourguard.wms.infrastructure.persistence.entity.AuditLogEntity;
 import com.fourguard.wms.infrastructure.persistence.entity.UserEntity;
+import com.fourguard.wms.shared.audit.SecurityAuditHelper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.AccessDeniedException;
@@ -32,6 +33,7 @@ public class GetActiveSessionsUseCaseImpl implements GetActiveSessionsUseCase {
     private final AuditLogRepositoryPort auditLogRepositoryPort;
     private final UserRepositoryPort userRepositoryPort;
     private final ActiveSessionMapper activeSessionMapper;
+    private final SecurityAuditHelper securityAuditHelper;
 
     @Override
     @Transactional(readOnly = true)
@@ -46,15 +48,19 @@ public class GetActiveSessionsUseCaseImpl implements GetActiveSessionsUseCase {
         UserEntity requestingUser = userRepositoryPort.findByUsername(principal.getName())
                 .orElseThrow(() -> new EntityNotFoundException("Usuario solicitante no encontrado: " + principal.getName()));
 
-        boolean hasAuditRead = requestingUser.getRole().getPermissions().stream()
-                .anyMatch(p -> "AUDIT_READ".equals(p.getName()));
+        String requestingRoleName = requestingUser.getRole() != null ? requestingUser.getRole().getName() : null;
+        boolean hasAuditRead = requestingUser.getRole() != null
+                && requestingUser.getRole().getPermissions() != null
+                && requestingUser.getRole().getPermissions().stream()
+                        .anyMatch(p -> "AUDIT_READ".equals(p.getName()));
 
-        boolean isOperationsManager = "OPERATIONS_MANAGER".equals(requestingUser.getRole().getName());
+        boolean isDirectorGeneral = securityAuditHelper.isDirectorGeneralRole(requestingRoleName);
+        boolean isOperationsManager = !isDirectorGeneral && securityAuditHelper.isOperationsManagerRole(requestingRoleName);
 
         UUID targetOrganizationId = organizationId;
         UUID targetBranchId = branchId;
 
-        if (!hasAuditRead) {
+        if (!hasAuditRead && !isDirectorGeneral) {
             if (isOperationsManager) {
                 UUID userOrgId = requestingUser.getOrganization().getId();
                 if (organizationId != null && !organizationId.equals(userOrgId)) {
@@ -110,6 +116,13 @@ public class GetActiveSessionsUseCaseImpl implements GetActiveSessionsUseCase {
         for (AuditLogEntity loginEvent : activeLogins) {
             UserEntity user = userMap.get(loginEvent.getUserId());
             if (user == null) {
+                continue;
+            }
+
+            // Hide Director General sessions from Operations Manager
+            if (isOperationsManager
+                    && user.getRole() != null
+                    && securityAuditHelper.isDirectorGeneralRole(user.getRole().getName())) {
                 continue;
             }
 

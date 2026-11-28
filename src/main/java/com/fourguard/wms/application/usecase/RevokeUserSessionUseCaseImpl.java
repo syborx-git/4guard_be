@@ -6,6 +6,7 @@ import com.fourguard.wms.domain.ports.out.TokenBlacklistPort;
 import com.fourguard.wms.domain.ports.out.UserRepositoryPort;
 import com.fourguard.wms.infrastructure.persistence.entity.UserEntity;
 import com.fourguard.wms.shared.audit.AuditService;
+import com.fourguard.wms.shared.audit.SecurityAuditHelper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.AccessDeniedException;
@@ -28,6 +29,7 @@ public class RevokeUserSessionUseCaseImpl implements RevokeUserSessionUseCase {
     private final UserRepositoryPort userRepositoryPort;
     private final TokenBlacklistPort tokenBlacklistPort;
     private final AuditService auditService;
+    private final SecurityAuditHelper securityAuditHelper;
 
     @Override
     @Transactional
@@ -42,10 +44,13 @@ public class RevokeUserSessionUseCaseImpl implements RevokeUserSessionUseCase {
         UserEntity requestingUser = userRepositoryPort.findByUsername(principal.getName())
                 .orElseThrow(() -> new EntityNotFoundException("Usuario solicitante no encontrado: " + principal.getName()));
 
-        boolean hasAuditWrite = requestingUser.getRole().getPermissions().stream()
-                .anyMatch(p -> "AUDIT_WRITE".equals(p.getName()));
-        boolean isOperationsManager = "OPERATIONS_MANAGER".equals(requestingUser.getRole().getName());
-        boolean isAdmin = "ADMIN".equals(requestingUser.getRole().getName()) || "SUPER_ADMIN".equals(requestingUser.getRole().getName());
+        String requestingRoleName = requestingUser.getRole() != null ? requestingUser.getRole().getName() : null;
+        boolean hasAuditWrite = requestingUser.getRole() != null
+                && requestingUser.getRole().getPermissions() != null
+                && requestingUser.getRole().getPermissions().stream()
+                        .anyMatch(p -> "AUDIT_WRITE".equals(p.getName()));
+        boolean isAdmin = securityAuditHelper.isDirectorGeneralRole(requestingRoleName);
+        boolean isOperationsManager = !isAdmin && securityAuditHelper.isOperationsManagerRole(requestingRoleName);
 
         if (!hasAuditWrite && !isOperationsManager && !isAdmin) {
             throw new AccessDeniedException("No tiene permisos para revocar sesiones de usuario.");
@@ -55,9 +60,18 @@ public class RevokeUserSessionUseCaseImpl implements RevokeUserSessionUseCase {
         UserEntity targetUser = userRepositoryPort.findById(targetUserId)
                 .orElseThrow(() -> new EntityNotFoundException("Usuario objetivo no encontrado con ID: " + targetUserId));
 
+        // 2b. Operations Manager cannot revoke sessions of Director General users
+        if (isOperationsManager
+                && targetUser.getRole() != null
+                && securityAuditHelper.isDirectorGeneralRole(targetUser.getRole().getName())) {
+            throw new EntityNotFoundException("Usuario no encontrado.");
+        }
+
         // 3. Organization scope check for OPERATIONS_MANAGER
         if (!hasAuditWrite && isOperationsManager) {
-            if (!targetUser.getOrganization().getId().equals(requestingUser.getOrganization().getId())) {
+            if (targetUser.getOrganization() == null
+                    || requestingUser.getOrganization() == null
+                    || !targetUser.getOrganization().getId().equals(requestingUser.getOrganization().getId())) {
                 throw new AccessDeniedException("No tiene permisos para revocar sesiones de usuarios de otra organización.");
             }
         }

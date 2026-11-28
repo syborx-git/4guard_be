@@ -3,6 +3,7 @@ package com.fourguard.wms.application.usecase;
 import com.fourguard.wms.domain.exception.EntityNotFoundException;
 import com.fourguard.wms.domain.ports.out.UserRepositoryPort;
 import com.fourguard.wms.infrastructure.persistence.entity.UserEntity;
+import com.fourguard.wms.shared.audit.SecurityAuditHelper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -39,7 +40,8 @@ class ResetUserPasswordUseCaseImplTest {
 
     @BeforeEach
     void setUp() {
-        resetUserPasswordUseCase = new ResetUserPasswordUseCaseImpl(userRepositoryPort, passwordEncoder, auditService);
+        resetUserPasswordUseCase = new ResetUserPasswordUseCaseImpl(
+                userRepositoryPort, passwordEncoder, auditService, new SecurityAuditHelper());
 
         userId = UUID.randomUUID();
         userEntity = UserEntity.builder()

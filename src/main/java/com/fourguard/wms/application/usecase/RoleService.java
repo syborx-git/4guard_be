@@ -20,6 +20,7 @@ import com.fourguard.wms.shared.audit.AuditService;
 import com.fourguard.wms.shared.audit.SecurityAuditHelper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -54,6 +55,12 @@ public class RoleService implements RoleUseCase {
     public RoleResponse createRole(CreateRoleRequest request) {
         log.info("Creating role with name: {}", request.getName());
 
+        if (securityAuditHelper.isCurrentUserOperationsManager()
+                && (securityAuditHelper.isDirectorGeneralRole(request.getName())
+                    || (request.getLevel() != null && request.getLevel() >= 7))) {
+            throw new AccessDeniedException("No tiene permisos para crear un rol de Director General o con nivel restringido.");
+        }
+
         validateUniqueRoleName(request.getName(), null);
 
         RoleEntity entity = roleMapper.toEntity(request);
@@ -83,6 +90,15 @@ public class RoleService implements RoleUseCase {
         log.info("Updating role with ID: {}", request.getId());
 
         RoleEntity existing = findRoleOrThrow(request.getId());
+        if (securityAuditHelper.isCurrentUserOperationsManager()) {
+            if (securityAuditHelper.isDirectorGeneralRole(existing.getName())) {
+                throw new EntityNotFoundException("Rol no encontrado con ID: " + request.getId());
+            }
+            if (securityAuditHelper.isDirectorGeneralRole(request.getName())
+                    || (request.getLevel() != null && request.getLevel() >= 7)) {
+                throw new AccessDeniedException("No tiene permisos para asignar un rol de Director General o con nivel restringido.");
+            }
+        }
         validateUniqueRoleName(request.getName(), existing.getId());
 
         Map<String, Object> beforeState = buildAuditState(existing);
@@ -115,6 +131,10 @@ public class RoleService implements RoleUseCase {
         log.debug("Fetching role with ID: {}", id);
         RoleEntity entity = roleRepositoryPort.findByIdWithPermissions(id)
                 .orElseThrow(() -> new EntityNotFoundException("Rol no encontrado con ID: " + id));
+        if (securityAuditHelper.isCurrentUserOperationsManager()
+                && securityAuditHelper.isDirectorGeneralRole(entity.getName())) {
+            throw new EntityNotFoundException("Rol no encontrado con ID: " + id);
+        }
         return roleMapper.toResponse(entity);
     }
 
@@ -124,7 +144,13 @@ public class RoleService implements RoleUseCase {
     @Transactional(readOnly = true)
     public List<RoleResponse> getAllRoles() {
         log.debug("Fetching all roles");
-        return roleMapper.toResponseList(roleRepositoryPort.findAll());
+        List<RoleEntity> roles = roleRepositoryPort.findAll();
+        if (securityAuditHelper.isCurrentUserOperationsManager()) {
+            roles = roles.stream()
+                    .filter(role -> !securityAuditHelper.isDirectorGeneralRole(role.getName()))
+                    .collect(Collectors.toList());
+        }
+        return roleMapper.toResponseList(roles);
     }
 
     // ── AUDIT LOGS ────────────────────────────────────────────────────────────
@@ -133,7 +159,10 @@ public class RoleService implements RoleUseCase {
     @Transactional(readOnly = true)
     public List<RoleAuditResponse> getRoleAuditLogs(UUID id) {
         log.debug("Fetching audit logs for role: {}", id);
-        if (roleRepositoryPort.findById(id).isEmpty()) {
+        RoleEntity role = roleRepositoryPort.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Rol no encontrado con ID: " + id));
+        if (securityAuditHelper.isCurrentUserOperationsManager()
+                && securityAuditHelper.isDirectorGeneralRole(role.getName())) {
             throw new EntityNotFoundException("Rol no encontrado con ID: " + id);
         }
 
@@ -175,6 +204,11 @@ public class RoleService implements RoleUseCase {
 
         RoleEntity existing = findRoleOrThrow(id);
 
+        if (securityAuditHelper.isCurrentUserOperationsManager()
+                && securityAuditHelper.isDirectorGeneralRole(existing.getName())) {
+            throw new EntityNotFoundException("Rol no encontrado con ID: " + id);
+        }
+
         if (Boolean.TRUE.equals(existing.getIsSystem())) {
             throw new ValidationException("No se puede eliminar un rol de sistema: " + existing.getName());
         }
@@ -206,6 +240,11 @@ public class RoleService implements RoleUseCase {
 
         RoleEntity existing = roleRepositoryPort.findByIdWithPermissions(roleId)
                 .orElseThrow(() -> new EntityNotFoundException("Rol no encontrado con ID: " + roleId));
+
+        if (securityAuditHelper.isCurrentUserOperationsManager()
+                && securityAuditHelper.isDirectorGeneralRole(existing.getName())) {
+            throw new EntityNotFoundException("Rol no encontrado con ID: " + roleId);
+        }
 
         Map<String, Object> beforeState = buildAuditState(existing);
 

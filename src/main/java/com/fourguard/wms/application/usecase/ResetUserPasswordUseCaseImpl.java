@@ -4,6 +4,7 @@ import com.fourguard.wms.domain.exception.EntityNotFoundException;
 import com.fourguard.wms.domain.ports.in.ResetUserPasswordUseCase;
 import com.fourguard.wms.domain.ports.out.UserRepositoryPort;
 import com.fourguard.wms.infrastructure.persistence.entity.UserEntity;
+import com.fourguard.wms.shared.audit.SecurityAuditHelper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -21,6 +22,7 @@ public class ResetUserPasswordUseCaseImpl implements ResetUserPasswordUseCase {
     private final UserRepositoryPort userRepositoryPort;
     private final PasswordEncoder passwordEncoder;
     private final com.fourguard.wms.shared.audit.AuditService auditService;
+    private final SecurityAuditHelper securityAuditHelper;
 
     @Override
     @Transactional
@@ -47,6 +49,12 @@ public class ResetUserPasswordUseCaseImpl implements ResetUserPasswordUseCase {
     }
 
     private String executeReset(UserEntity userEntity, String adminUsername) {
+        if (securityAuditHelper.isCurrentUserOperationsManager()
+                && userEntity.getRole() != null
+                && securityAuditHelper.isDirectorGeneralRole(userEntity.getRole().getName())) {
+            throw new EntityNotFoundException("Usuario no encontrado.");
+        }
+
         UUID userId = userEntity.getId();
         UserEntity adminEntity = resolveAuditActor(adminUsername, userEntity);
 

@@ -27,6 +27,7 @@ import com.fourguard.wms.shared.audit.AuditService;
 import com.fourguard.wms.shared.audit.SecurityAuditHelper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -91,7 +92,12 @@ public class UserService implements CreateUserUseCase, GetUserUseCase, UpdateUse
         // Resolve relationships
         user.setOrganization(findOrganizationById(request.getOrganizationId()));
         user.setBranch(findBranchById(request.getBranchId()));
-        user.setRole(findRoleById(request.getRoleId()));
+        Role targetRole = findRoleById(request.getRoleId());
+        if (securityAuditHelper.isCurrentUserOperationsManager()
+                && securityAuditHelper.isDirectorGeneralRole(targetRole.getName())) {
+            throw new AccessDeniedException("No tiene permisos para crear usuarios con el rol de Director General.");
+        }
+        user.setRole(targetRole);
 
         // Set defaults
         user.setPassword(passwordEncoder.encode(request.getPassword()));
@@ -130,6 +136,12 @@ public class UserService implements CreateUserUseCase, GetUserUseCase, UpdateUse
         List<User> users = userMapper.toUserList(userEntities);
         // Manually resolve relationships for each user in the list
         users.forEach(this::resolveUserRelationships);
+        if (securityAuditHelper.isCurrentUserOperationsManager()) {
+            users = users.stream()
+                    .filter(user -> user.getRole() == null
+                            || !securityAuditHelper.isDirectorGeneralRole(user.getRole().getName()))
+                    .collect(Collectors.toList());
+        }
         return userMapper.toUserResponseList(users);
     }
 
@@ -140,6 +152,11 @@ public class UserService implements CreateUserUseCase, GetUserUseCase, UpdateUse
                 .orElseThrow(() -> new EntityNotFoundException("User not found with ID: " + id));
         User user = userMapper.toUser(userEntity);
         resolveUserRelationships(user); // Resolve relationships for the single user
+        if (securityAuditHelper.isCurrentUserOperationsManager()
+                && user.getRole() != null
+                && securityAuditHelper.isDirectorGeneralRole(user.getRole().getName())) {
+            throw new EntityNotFoundException("User not found with ID: " + id);
+        }
         return userMapper.toUserResponse(user);
     }
 
@@ -149,7 +166,11 @@ public class UserService implements CreateUserUseCase, GetUserUseCase, UpdateUse
 
         UserEntity existingUserEntity = userRepositoryPort.findById(request.getId())
                 .orElseThrow(() -> new EntityNotFoundException("User not found with ID: " + request.getId()));
-        
+
+        if (securityAuditHelper.isCurrentUserOperationsManager() && isDirectorGeneralUser(existingUserEntity)) {
+            throw new EntityNotFoundException("User not found with ID: " + request.getId());
+        }
+
         // Take snapshot for audit
         UserEntity originalSnapshot = cloneUserEntity(existingUserEntity);
 
@@ -184,7 +205,12 @@ public class UserService implements CreateUserUseCase, GetUserUseCase, UpdateUse
             existingUser.setBranch(findBranchById(request.getBranchId()));
         }
         if (request.getRoleId() != null) {
-            existingUser.setRole(findRoleById(request.getRoleId()));
+            Role newRole = findRoleById(request.getRoleId());
+            if (securityAuditHelper.isCurrentUserOperationsManager()
+                    && securityAuditHelper.isDirectorGeneralRole(newRole.getName())) {
+                throw new AccessDeniedException("No tiene permisos para asignar el rol de Director General.");
+            }
+            existingUser.setRole(newRole);
         }
 
         String currentUser = securityAuditHelper.getCurrentUsername();
@@ -215,6 +241,10 @@ public class UserService implements CreateUserUseCase, GetUserUseCase, UpdateUse
         UserEntity existingUserEntity = userRepositoryPort.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("User not found with ID: " + id));
 
+        if (securityAuditHelper.isCurrentUserOperationsManager() && isDirectorGeneralUser(existingUserEntity)) {
+            throw new EntityNotFoundException("User not found with ID: " + id);
+        }
+
         UserEntity originalSnapshot = cloneUserEntity(existingUserEntity);
         String currentUser = securityAuditHelper.getCurrentUsername();
 
@@ -228,7 +258,10 @@ public class UserService implements CreateUserUseCase, GetUserUseCase, UpdateUse
     @Transactional(readOnly = true)
     public List<UserAuditResponse> getUserAuditLogs(UUID id) {
         log.debug("Fetching audit logs for user: {}", id);
-        if (userRepositoryPort.findById(id).isEmpty()) {
+        UserEntity target = userRepositoryPort.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("User not found with ID: " + id));
+
+        if (securityAuditHelper.isCurrentUserOperationsManager() && isDirectorGeneralUser(target)) {
             throw new EntityNotFoundException("User not found with ID: " + id);
         }
 
@@ -344,5 +377,18 @@ public class UserService implements CreateUserUseCase, GetUserUseCase, UpdateUse
         if (user.getRole() != null && user.getRole().getId() != null) {
             user.setRole(findRoleById(user.getRole().getId()));
         }
+    }
+
+    private boolean isDirectorGeneralUser(UserEntity userEntity) {
+        if (userEntity == null || userEntity.getRole() == null) {
+            return false;
+        }
+        String roleName = userEntity.getRole().getName();
+        if (roleName == null && userEntity.getRole().getId() != null) {
+            roleName = roleRepositoryPort.findById(userEntity.getRole().getId())
+                    .map(r -> r.getName())
+                    .orElse(null);
+        }
+        return securityAuditHelper.isDirectorGeneralRole(roleName);
     }
 }

@@ -7,6 +7,7 @@ import com.fourguard.wms.domain.ports.out.AuditLogRepositoryPort;
 import com.fourguard.wms.domain.ports.out.UserRepositoryPort;
 import com.fourguard.wms.infrastructure.persistence.entity.AuditLogEntity;
 import com.fourguard.wms.infrastructure.persistence.entity.UserEntity;
+import com.fourguard.wms.shared.audit.SecurityAuditHelper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.AccessDeniedException;
@@ -29,6 +30,7 @@ public class GetUserActivityUseCaseImpl implements GetUserActivityUseCase {
 
     private final AuditLogRepositoryPort auditLogRepositoryPort;
     private final UserRepositoryPort userRepositoryPort;
+    private final SecurityAuditHelper securityAuditHelper;
 
     @Override
     @Transactional(readOnly = true)
@@ -49,13 +51,27 @@ public class GetUserActivityUseCaseImpl implements GetUserActivityUseCase {
         UserEntity requestingUser = userRepositoryPort.findByUsername(principal.getName())
                 .orElseThrow(() -> new EntityNotFoundException("Usuario solicitante no encontrado: " + principal.getName()));
 
-        boolean hasAuditRead = requestingUser.getRole().getPermissions().stream()
-                .anyMatch(p -> "AUDIT_READ".equals(p.getName()));
+        String requestingRoleName = requestingUser.getRole() != null ? requestingUser.getRole().getName() : null;
+        boolean hasAuditRead = requestingUser.getRole() != null
+                && requestingUser.getRole().getPermissions() != null
+                && requestingUser.getRole().getPermissions().stream()
+                        .anyMatch(p -> "AUDIT_READ".equals(p.getName()));
 
-        boolean isOperationsManager = "OPERATIONS_MANAGER".equals(requestingUser.getRole().getName());
+        boolean isDirectorGeneral = securityAuditHelper.isDirectorGeneralRole(requestingRoleName);
+        boolean isOperationsManager = !isDirectorGeneral && securityAuditHelper.isOperationsManagerRole(requestingRoleName);
 
-        if (!hasAuditRead && !isOperationsManager) {
+        if (!hasAuditRead && !isOperationsManager && !isDirectorGeneral) {
             throw new AccessDeniedException("No tiene permisos para consultar el historial de auditoría de actividad.");
+        }
+
+        // 1b. If Operations Manager filters by a Director General userId, return empty list
+        if (isOperationsManager && userId != null) {
+            boolean targetIsDirectorGeneral = userRepositoryPort.findById(userId)
+                    .map(u -> u.getRole() != null && securityAuditHelper.isDirectorGeneralRole(u.getRole().getName()))
+                    .orElse(false);
+            if (targetIsDirectorGeneral) {
+                return Collections.emptyList();
+            }
         }
 
         // 2. Fetch logs from repository
@@ -73,15 +89,26 @@ public class GetUserActivityUseCaseImpl implements GetUserActivityUseCase {
                 .distinct()
                 .collect(Collectors.toList());
 
-        Map<UUID, String> usernameMap = userRepositoryPort.findAllById(userIds).stream()
-                .collect(Collectors.toMap(user -> user.getId(), user -> user.getUsername()));
+        Map<UUID, UserEntity> userMap = userRepositoryPort.findAllById(userIds).stream()
+                .collect(Collectors.toMap(UserEntity::getId, user -> user));
 
-        // 4. Map to response DTOs
+        // 4. Map to response DTOs (hiding Director General activity from Operations Manager)
         return logs.stream()
+                .filter(logEntry -> {
+                    if (!isOperationsManager || logEntry.getUserId() == null) {
+                        return true;
+                    }
+                    UserEntity logUser = userMap.get(logEntry.getUserId());
+                    return logUser == null
+                            || logUser.getRole() == null
+                            || !securityAuditHelper.isDirectorGeneralRole(logUser.getRole().getName());
+                })
                 .map(logEntry -> {
-                    String username = logEntry.getUserId() != null
-                            ? usernameMap.getOrDefault(logEntry.getUserId(), "UNKNOWN")
-                            : "SYSTEM";
+                    String username = "SYSTEM";
+                    if (logEntry.getUserId() != null) {
+                        UserEntity logUser = userMap.get(logEntry.getUserId());
+                        username = logUser != null ? logUser.getUsername() : "UNKNOWN";
+                    }
 
                     List<UserActivityAuditResponse.AuditDetailResponse> detailResponses = logEntry.getDetails() != null
                             ? logEntry.getDetails().stream()
